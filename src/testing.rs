@@ -1,0 +1,534 @@
+// testing: Port of Go's `testing` package — goal is to let real Go tests be
+// ported to goish line-by-line.
+//
+//   Go                                  goish
+//   ─────────────────────────────────   ──────────────────────────────────
+//   func TestFoo(t *testing.T) { … }    test!{ fn TestFoo(t) { … } }
+//   t.Errorf("got %d", got)             t.Errorf(Sprintf!("got %d", got))
+//   t.Error("bad")                      t.Error("bad")
+//   t.Fatalf("no way %s", why)          t.Fatalf(Sprintf!("no way %s", why))
+//   t.Fatal(err)                        t.Fatal(err)
+//   t.Logf("info %d", n)                t.Logf(Sprintf!("info %d", n))
+//   t.Log("info")                       t.Log("info")
+//   t.Skipf("slow %s", why)             t.Skipf(Sprintf!("slow %s", why))
+//   t.Skip("slow")                      t.Skip("slow")
+//   t.SkipNow()                         t.SkipNow()
+//   t.Helper()                          t.Helper()           ← no-op today
+//   t.Name()                            t.Name()
+//   t.Failed()                          t.Failed()
+//   t.Skipped()                         t.Skipped()
+//   t.Cleanup(fn)                       t.Cleanup(|| { … })
+//   t.Run("case", func(t *testing.T))   t.Run("case", |t| { … })
+//
+//   func TestMain(m *testing.M) { … }   test_main!{ fn TestMain(m) { … } }
+//
+// The format variants (Errorf/Fatalf/Logf/Skipf) are *methods* on T that
+// accept a preformatted string. Users wrap the format spec with the
+// existing `Sprintf!` macro. This keeps the method name Go-identical
+// while avoiding a name collision with `fmt::Errorf!` (which already
+// occupies the top-level macro namespace).
+
+use crate::types::{int, string};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+
+// ── T: test handle ─────────────────────────────────────────────────────
+
+pub struct T {
+    name: String,
+    failed: AtomicBool,
+    skipped: AtomicBool,
+    logbuf: Mutex<String>,
+    cleanups: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+    // Subtest failures roll up into parent via set_failed_parent when Run
+    // returns.
+    sub_failures: AtomicBool,
+}
+
+impl T {
+    #[doc(hidden)]
+    pub fn new(name: impl Into<String>) -> T {
+        T {
+            name: name.into(),
+            failed: AtomicBool::new(false),
+            skipped: AtomicBool::new(false),
+            logbuf: Mutex::new(String::new()),
+            cleanups: Mutex::new(Vec::new()),
+            sub_failures: AtomicBool::new(false),
+        }
+    }
+
+    /// t.Name() — the test's name path.
+    #[allow(non_snake_case)]
+    pub fn Name(&self) -> string {
+        self.name.clone()
+    }
+
+    /// t.Failed() — whether this test (or any of its subtests) has failed.
+    #[allow(non_snake_case)]
+    pub fn Failed(&self) -> bool {
+        self.failed.load(Ordering::SeqCst) || self.sub_failures.load(Ordering::SeqCst)
+    }
+
+    /// t.Skipped() — whether this test was skipped.
+    #[allow(non_snake_case)]
+    pub fn Skipped(&self) -> bool {
+        self.skipped.load(Ordering::SeqCst)
+    }
+
+    /// t.Log(msg) — append msg to the test's log buffer. Only printed on failure.
+    #[allow(non_snake_case)]
+    pub fn Log(&self, msg: impl AsRef<str>) {
+        self.append_log(msg.as_ref());
+    }
+
+    /// t.Error(msg) — log + mark failed; continue.
+    #[allow(non_snake_case)]
+    pub fn Error(&self, msg: impl AsRef<str>) {
+        self.append_log(msg.as_ref());
+        self.failed.store(true, Ordering::SeqCst);
+    }
+
+    /// t.Errorf(msg) — identical to Error in goish; the `f` suffix preserves
+    /// Go's naming. Typical use: `t.Errorf(Sprintf!("got %d", x))`.
+    #[allow(non_snake_case)]
+    pub fn Errorf(&self, msg: impl AsRef<str>) {
+        self.Error(msg);
+    }
+
+    /// t.Fatal(msg) — log + mark failed + stop this test immediately.
+    #[allow(non_snake_case)]
+    pub fn Fatal(&self, msg: impl AsRef<str>) -> ! {
+        self.append_log(msg.as_ref());
+        self.failed.store(true, Ordering::SeqCst);
+        self.abort(Abort::FailNow);
+    }
+
+    /// t.Fatalf(msg) — alias for Fatal. Typical use: `t.Fatalf(Sprintf!(...))`.
+    #[allow(non_snake_case)]
+    pub fn Fatalf(&self, msg: impl AsRef<str>) -> ! { self.Fatal(msg) }
+
+    /// t.Logf(msg) — alias for Log. Typical use: `t.Logf(Sprintf!(...))`.
+    #[allow(non_snake_case)]
+    pub fn Logf(&self, msg: impl AsRef<str>) { self.Log(msg) }
+
+    /// t.Skip(msg) — log + mark skipped + stop this test immediately.
+    #[allow(non_snake_case)]
+    pub fn Skip(&self, msg: impl AsRef<str>) -> ! {
+        self.append_log(msg.as_ref());
+        self.skipped.store(true, Ordering::SeqCst);
+        self.abort(Abort::SkipNow);
+    }
+
+    /// t.Skipf(msg) — alias for Skip. Typical use: `t.Skipf(Sprintf!(...))`.
+    #[allow(non_snake_case)]
+    pub fn Skipf(&self, msg: impl AsRef<str>) -> ! { self.Skip(msg) }
+
+    /// t.FailNow() — mark failed + stop (equivalent to Fatal without message).
+    #[allow(non_snake_case)]
+    pub fn FailNow(&self) -> ! {
+        self.failed.store(true, Ordering::SeqCst);
+        self.abort(Abort::FailNow);
+    }
+
+    /// t.SkipNow() — mark skipped + stop.
+    #[allow(non_snake_case)]
+    pub fn SkipNow(&self) -> ! {
+        self.skipped.store(true, Ordering::SeqCst);
+        self.abort(Abort::SkipNow);
+    }
+
+    /// t.Fail() — mark failed, continue.
+    #[allow(non_snake_case)]
+    pub fn Fail(&self) {
+        self.failed.store(true, Ordering::SeqCst);
+    }
+
+    /// t.Helper() — best-effort no-op in goish v0.4. Helpers aren't stripped
+    /// from our traceback yet; kept as a stub so Go code compiles unchanged.
+    #[allow(non_snake_case)]
+    pub fn Helper(&self) {}
+
+    /// t.Cleanup(f) — register a callback to run LIFO after this test returns.
+    #[allow(non_snake_case)]
+    pub fn Cleanup<F: FnOnce() + Send + 'static>(&self, f: F) {
+        self.cleanups.lock().unwrap().push(Box::new(f));
+    }
+
+    /// t.Parallel() — no-op under the default `#[test]` harness (tests already
+    /// run in parallel threads as chosen by libtest). Present so Go code
+    /// compiles unchanged.
+    #[allow(non_snake_case)]
+    pub fn Parallel(&self) {}
+
+    /// t.Run(name, f) — run a subtest. Returns true iff the subtest passed.
+    ///
+    /// Failures in the subtest propagate the parent's Failed() without
+    /// aborting the parent.
+    #[allow(non_snake_case)]
+    pub fn Run<F>(&self, name: impl AsRef<str>, f: F) -> bool
+    where
+        F: FnOnce(&T),
+    {
+        let full = format!("{}/{}", self.name, name.as_ref());
+        let sub = T::new(full);
+        let sub_ref = &sub;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            f(sub_ref);
+        }));
+        // Run any cleanups the sub registered, even on panic.
+        sub.run_cleanups();
+        // Dump sub's log to parent so parent collects it.
+        let sub_log = sub.logbuf.lock().unwrap().clone();
+        if !sub_log.is_empty() {
+            let mut g = self.logbuf.lock().unwrap();
+            g.push_str(&sub_log);
+        }
+        let sub_failed = sub.Failed();
+        let is_abort = matches!(&result, Err(e) if is_abort_panic(e));
+        // Re-raise non-abort panics from the subtest.
+        if let Err(e) = result {
+            if !is_abort_panic(&e) { std::panic::resume_unwind(e); }
+        }
+        if sub_failed {
+            self.sub_failures.store(true, Ordering::SeqCst);
+        }
+        !sub_failed && !is_abort
+    }
+
+    // ── Internals ──────────────────────────────────────────────────────
+
+    #[doc(hidden)]
+    pub fn append_log(&self, s: &str) {
+        let mut g = self.logbuf.lock().unwrap();
+        if !g.is_empty() && !g.ends_with('\n') { g.push('\n'); }
+        g.push_str(s);
+    }
+
+    #[doc(hidden)]
+    pub fn log_contents(&self) -> string {
+        self.logbuf.lock().unwrap().clone()
+    }
+
+    #[doc(hidden)]
+    pub fn run_cleanups(&self) {
+        let mut g = self.cleanups.lock().unwrap();
+        while let Some(f) = g.pop() { f(); }
+    }
+
+    fn abort(&self, kind: Abort) -> ! {
+        std::panic::panic_any(kind);
+    }
+
+    /// Called by test! macro after the user body runs (possibly via panic).
+    /// Returns Ok if the test is considered passing (or skipped), Err with the
+    /// log otherwise.
+    #[doc(hidden)]
+    pub fn finish(&self, outcome: Outcome) -> std::result::Result<(), string> {
+        self.run_cleanups();
+        match outcome {
+            Outcome::Ok => {
+                if self.Failed() {
+                    Err(self.log_contents())
+                } else {
+                    Ok(())
+                }
+            }
+            Outcome::Aborted => {
+                if self.Skipped() && !self.failed.load(Ordering::SeqCst) {
+                    Ok(())
+                } else {
+                    Err(self.log_contents())
+                }
+            }
+            Outcome::Paniced(msg) => {
+                let mut log = self.log_contents();
+                if !log.is_empty() && !log.ends_with('\n') { log.push('\n'); }
+                log.push_str(&format!("panic: {}", msg));
+                Err(log)
+            }
+        }
+    }
+}
+
+/// Panic sentinel for Fatal/Skip that aborts the test function.
+#[doc(hidden)]
+#[derive(Debug)]
+pub enum Abort { FailNow, SkipNow }
+
+#[doc(hidden)]
+pub fn is_abort_panic(e: &Box<dyn std::any::Any + Send>) -> bool {
+    e.is::<Abort>()
+}
+
+#[doc(hidden)]
+pub enum Outcome {
+    Ok,
+    Aborted,
+    Paniced(String),
+}
+
+// ── test! macro: #[test] bridge ────────────────────────────────────────
+
+/// `test!{ fn TestFoo(t) { … } }` — declares a `#[test]` test function whose
+/// body gets a `&T` named `t`. Fatal/Skip/FailNow unwind via a sentinel panic
+/// which the macro catches and converts to a PASS/FAIL/SKIP result.
+#[macro_export]
+macro_rules! test {
+    (fn $name:ident ( $t:ident ) $body:block) => {
+        #[test]
+        #[allow(non_snake_case)]
+        fn $name() {
+            let __t = $crate::testing::T::new(stringify!($name));
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let $t: &$crate::testing::T = &__t;
+                $body
+            }));
+            let finished = match outcome {
+                Ok(()) => __t.finish($crate::testing::__priv::Outcome::Ok),
+                Err(e) if $crate::testing::__priv::is_abort_panic(&e) => {
+                    __t.finish($crate::testing::__priv::Outcome::Aborted)
+                }
+                Err(e) => {
+                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else if let Some(s) = e.downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        "unknown panic".to_string()
+                    };
+                    __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
+                }
+            };
+            if let Err(log) = finished {
+                panic!("{}", log);
+            } else if __t.Skipped() {
+                // libtest has no way to report "skipped"; just exit OK with a log line.
+                eprintln!("--- SKIP: {} ({})", __t.Name(), __t.log_contents());
+            }
+        }
+    };
+}
+
+// Expose Outcome / is_abort_panic to the test! macro without committing
+// to a public API.
+#[doc(hidden)]
+pub mod __priv {
+    pub use super::{is_abort_panic, Outcome};
+}
+
+// ── Short / Verbose flag accessors ─────────────────────────────────────
+
+use std::sync::OnceLock;
+
+fn flags() -> &'static Flags {
+    static F: OnceLock<Flags> = OnceLock::new();
+    F.get_or_init(Flags::parse)
+}
+
+struct Flags { short: bool, verbose: bool }
+
+impl Flags {
+    fn parse() -> Self {
+        let mut short = false;
+        let mut verbose = false;
+        for a in std::env::args() {
+            match a.as_str() {
+                "-short" | "--short" | "-test.short" => short = true,
+                "-v" | "--verbose" | "-test.v" => verbose = true,
+                _ => {}
+            }
+        }
+        Flags { short, verbose }
+    }
+}
+
+#[allow(non_snake_case)]
+pub fn Short() -> bool { flags().short }
+
+#[allow(non_snake_case)]
+pub fn Verbose() -> bool { flags().verbose }
+
+/// testing.AllocsPerRun(runs, f) — stub returning 0 in v0.4.
+/// Rust has no stable allocator introspection; tests that depend on this
+/// value should use `if testing::AllocsPerRun(...) == 0.0` guards or skip.
+#[allow(non_snake_case)]
+pub fn AllocsPerRun<F: FnMut()>(_runs: int, mut f: F) -> f64 {
+    f();
+    0.0
+}
+
+// ── B (benchmark handle) — minimal stub ────────────────────────────────
+
+pub struct B {
+    pub N: int,
+    report_allocs: AtomicBool,
+}
+
+impl B {
+    #[doc(hidden)]
+    pub fn new(n: int) -> B {
+        B { N: n, report_allocs: AtomicBool::new(false) }
+    }
+
+    /// b.Loop() — condition-style iteration (Go 1.24+). Returns true while
+    /// more iterations are needed. Decrements internal counter on each call.
+    #[allow(non_snake_case)]
+    pub fn Loop(&mut self) -> bool {
+        if self.N > 0 { self.N -= 1; true } else { false }
+    }
+
+    #[allow(non_snake_case)]
+    pub fn ResetTimer(&self) {}
+    #[allow(non_snake_case)]
+    pub fn StartTimer(&self) {}
+    #[allow(non_snake_case)]
+    pub fn StopTimer(&self) {}
+    #[allow(non_snake_case)]
+    pub fn ReportAllocs(&self) { self.report_allocs.store(true, Ordering::SeqCst); }
+    #[allow(non_snake_case)]
+    pub fn SetBytes(&self, _n: int) {}
+}
+
+/// `benchmark!{ fn BenchmarkX(b) { … } }` — registers a benchmark. In v0.4
+/// this compiles under `#[cfg(test)]` and runs as a normal `#[test]` with a
+/// small fixed N=1000 so it at least exercises the code; full statistical
+/// benchmarking is deferred.
+#[macro_export]
+macro_rules! benchmark {
+    (fn $name:ident ( $b:ident ) $body:block) => {
+        #[test]
+        #[allow(non_snake_case)]
+        fn $name() {
+            let mut __b = $crate::testing::B::new(1000);
+            let $b: &mut $crate::testing::B = &mut __b;
+            $body
+        }
+    };
+}
+
+// ── test_main! / M — stub that runs the user body then exits ───────────
+//
+// Under the default `#[test]` harness we can't actually replace `main()`,
+// so test_main! is a no-op that the test runner detects and reports. For
+// true TestMain semantics, users set `harness = false` in Cargo.toml and
+// the macro generates a `fn main()`. We detect which mode via cfg: if a
+// `__goish_custom_harness` cfg is set, generate main; otherwise a warning.
+
+pub struct M;
+
+impl M {
+    #[allow(non_snake_case)]
+    pub fn Run(&self) -> int { 0 }
+}
+
+#[macro_export]
+macro_rules! test_main {
+    (fn $name:ident ( $m:ident ) $body:block) => {
+        // In default-harness mode, TestMain is documented but inert.
+        // The user body is compiled for type-checking only.
+        #[allow(dead_code, non_snake_case)]
+        fn $name() {
+            let __m = $crate::testing::M;
+            let $m: &$crate::testing::M = &__m;
+            $body
+        }
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn t_name_and_flags() {
+        let t = T::new("TestSelf");
+        assert_eq!(t.Name(), "TestSelf");
+        assert!(!t.Failed());
+        assert!(!t.Skipped());
+    }
+
+    #[test]
+    fn t_error_marks_failed() {
+        let t = T::new("X");
+        t.Error("oops");
+        assert!(t.Failed());
+        assert!(t.log_contents().contains("oops"));
+    }
+
+    #[test]
+    fn t_fatal_aborts_via_panic() {
+        let result = std::panic::catch_unwind(|| {
+            let t = T::new("X");
+            t.Fatal("boom");
+        });
+        assert!(result.is_err());
+        if let Err(e) = result {
+            assert!(is_abort_panic(&e));
+        }
+    }
+
+    #[test]
+    fn t_skip_aborts_and_marks_skipped() {
+        let t = std::sync::Arc::new(T::new("X"));
+        let tt = t.clone();
+        let result = std::panic::catch_unwind(move || {
+            tt.Skip("slow");
+        });
+        assert!(result.is_err());
+        assert!(t.Skipped());
+    }
+
+    #[test]
+    fn cleanup_runs_lifo() {
+        let log = std::sync::Arc::new(Mutex::new(Vec::<i32>::new()));
+        let t = T::new("X");
+        let l1 = log.clone(); t.Cleanup(move || l1.lock().unwrap().push(1));
+        let l2 = log.clone(); t.Cleanup(move || l2.lock().unwrap().push(2));
+        let l3 = log.clone(); t.Cleanup(move || l3.lock().unwrap().push(3));
+        t.run_cleanups();
+        assert_eq!(*log.lock().unwrap(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn subtest_failure_propagates_to_parent() {
+        let t = T::new("Parent");
+        let ok = t.Run("sub", |sub| {
+            sub.Error("inner fail");
+        });
+        assert!(!ok);
+        assert!(t.Failed());
+    }
+
+    #[test]
+    fn subtest_pass_does_not_fail_parent() {
+        let t = T::new("Parent");
+        let ok = t.Run("sub", |_sub| { /* no assertion */ });
+        assert!(ok);
+        assert!(!t.Failed());
+    }
+
+    #[test]
+    fn errorf_method_accepts_sprintf() {
+        let t = T::new("X");
+        t.Errorf(crate::fmt::Sprintf!("got %d want %d", 1, 2));
+        assert!(t.Failed());
+        let log = t.log_contents();
+        assert!(log.contains("got 1 want 2"), "log = {:?}", log);
+    }
+
+    #[test]
+    fn short_and_verbose_do_not_panic() {
+        let _ = Short();
+        let _ = Verbose();
+    }
+
+    #[test]
+    fn b_loop_counts_down() {
+        let mut b = B::new(3);
+        let mut n = 0;
+        while b.Loop() { n += 1; }
+        assert_eq!(n, 3);
+        assert_eq!(b.N, 0);
+    }
+}

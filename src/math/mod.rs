@@ -14,6 +14,9 @@
 
 use crate::types::{float64, int64};
 
+// Sub-packages.
+pub mod rand;
+
 // ── constants ──────────────────────────────────────────────────────────
 
 #[allow(non_upper_case_globals)] pub const Pi: float64 = std::f64::consts::PI;

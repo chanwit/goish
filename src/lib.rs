@@ -31,12 +31,7 @@
 //   fmt.Println(a, b)                 fmt::Println!(a, b)
 //   fmt.Printf("%d", n)               fmt::Printf!("%d", n)
 //   fmt.Sprintf("%s", s)              fmt::Sprintf!("%s", s)
-//   fmt.Fprintf(w, "%d", n)           fmt::Fprintf!(w, "%d", n)
-//   fmt.Errorf("bad: %s", e)          fmt::Errorf!("bad: %s", e)
 //   errors.New("msg")                 errors::New("msg")
-//   errors.Wrap(err, "msg")           errors::Wrap(err, "msg")
-//   errors.Is(err, ErrX)              errors::Is(&err, &ErrX)
-//   errors.Unwrap(err)                errors::Unwrap(err)
 
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
@@ -46,89 +41,110 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(rustdoc::invalid_html_tags)]
 
-pub mod base64;
-pub mod binary;
+// ── Top-level Go packages ──────────────────────────────────────────────
+
 pub mod bufio;
 pub mod bytes;
-pub mod chan;
-pub mod consts;
-pub mod container;
+pub mod container;        // container/{list,heap}
 pub mod context;
-pub mod crypto;
-pub mod csv;
-pub mod defer;
+pub mod crypto;           // crypto/{md5,sha1,sha256}
+pub mod encoding;         // encoding/{base64,binary,csv,hex,json}
 pub mod errors;
-pub mod exec;
-pub mod filepath;
 pub mod flag;
 pub mod fmt;
-pub mod goroutine;
-pub mod hash;
-pub mod hex;
+pub mod hash;             // hash/{crc32,fnv}
 pub mod io;
-pub mod json;
 pub mod log;
-pub mod math;
+pub mod math;             // math + math/rand
 pub mod mime;
-pub mod os;
-pub mod path;
-pub mod rand;
-pub mod range;
+pub mod net;              // net/url (net/http in v0.5)
+pub mod os;               // os + os/exec
+pub mod path;             // path + path/filepath
 pub mod regexp;
 pub mod runtime;
 pub mod sort;
 pub mod strconv;
 pub mod strings;
-pub mod sync;
+pub mod sync;             // sync + sync/atomic
+pub mod testing;
 pub mod time;
+pub mod unicode;          // unicode + unicode/utf8
+
+// ── Built-ins (Go keyword / language-level things) ─────────────────────
+
+pub mod chan;
+pub mod consts;
+pub mod defer;
+pub mod goroutine;
+pub mod range;
 pub mod types;
-pub mod unicode;
-pub mod url;
-pub mod utf8;
+#[doc(hidden)]
+pub mod struct_macro;
+pub use struct_macro::__goish_into_string;
+
+// Backward-compat flat re-exports — keeps v0.3 import paths working. New
+// code should prefer the Go-import-path form (`encoding::base64`, `math::rand`).
+pub use encoding::base64;
+pub use encoding::binary;
+pub use encoding::csv;
+pub use encoding::hex;
+pub use encoding::json;
+pub use math::rand;
+pub use net::url;
+pub use os::exec;
+pub use path::filepath;
+pub use unicode::utf8;
 
 // Make Go primitive type names visible at the crate root so macros that
 // say `$crate::int` resolve correctly.
 pub use crate::types::*;
 
 pub mod prelude {
-    pub use crate::base64;
-    pub use crate::binary;
     pub use crate::bufio;
     pub use crate::bytes;
     pub use crate::chan::Chan;
     pub use crate::container;
     pub use crate::context;
     pub use crate::crypto;
-    pub use crate::csv;
+    pub use crate::encoding;
     pub use crate::errors::{self, error, nil};
-    pub use crate::exec;
-    pub use crate::filepath;
     pub use crate::flag;
     pub use crate::fmt;
     pub use crate::hash;
-    pub use crate::hex;
     pub use crate::io;
-    pub use crate::json;
     pub use crate::log;
     pub use crate::math;
     pub use crate::mime;
+    pub use crate::net;
     pub use crate::os;
     pub use crate::path;
-    pub use crate::rand;
     pub use crate::regexp;
     pub use crate::runtime;
     pub use crate::sort;
     pub use crate::strconv;
     pub use crate::strings;
     pub use crate::sync;
+    pub use crate::testing;
     pub use crate::time;
     pub use crate::unicode;
+
+    // v0.3-compat flat names — call site keeps the short form users expect.
+    pub use crate::base64;
+    pub use crate::binary;
+    pub use crate::csv;
+    pub use crate::exec;
+    pub use crate::filepath;
+    pub use crate::hex;
+    pub use crate::json;
+    pub use crate::rand;
     pub use crate::url;
     pub use crate::utf8;
+
     pub use crate::types::*;
     pub use crate::goroutine::Goroutine;
     pub use crate::{
         Errorf, Fprintf, Printf, Println, Sprintf,
-        append, chan, const_block, defer, delete, go, len, make, map, range, slice, stringer,
+        append, benchmark, chan, const_block, defer, delete, go, len, make, map,
+        range, slice, stringer, Struct, test, test_main,
     };
 }

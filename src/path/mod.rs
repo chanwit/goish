@@ -16,6 +16,9 @@
 
 use crate::types::string;
 
+// Sub-packages.
+pub mod filepath;
+
 const SEP: char = '/';
 
 #[allow(non_snake_case)]
@@ -45,28 +48,24 @@ pub fn Base(p: impl AsRef<str>) -> string {
 
 #[allow(non_snake_case)]
 pub fn Dir(p: impl AsRef<str>) -> string {
-    let s = p.as_ref();
-    let trimmed = s.trim_end_matches(SEP);
-    match trimmed.rsplit_once(SEP) {
-        Some((head, _)) => {
-            if head.is_empty() {
-                SEP.to_string()
-            } else {
-                Clean(head.to_string())
-            }
-        }
-        None => ".".to_string(),
-    }
+    // Mirror Go's path.Dir: dir, _ := Split(p); return Clean(dir)
+    let (dir, _) = Split(p);
+    Clean(dir)
 }
 
 #[allow(non_snake_case)]
 pub fn Ext(p: impl AsRef<str>) -> string {
+    // Go: scan from end; stop at first '/'; return substring from the last '.'.
     let s = p.as_ref();
-    let base = Base(s);
-    match base.rfind('.') {
-        Some(i) if i > 0 => base[i..].to_string(),
-        _ => String::new(),
+    let bytes = s.as_bytes();
+    let mut i = bytes.len();
+    while i > 0 {
+        i -= 1;
+        let c = bytes[i];
+        if c == b'/' { return String::new(); }
+        if c == b'.' { return s[i..].to_string(); }
     }
+    String::new()
 }
 
 #[allow(non_snake_case)]

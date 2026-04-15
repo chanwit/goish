@@ -13,6 +13,9 @@
 use crate::errors::{error, nil, New};
 use crate::types::{int, slice, string};
 
+// Sub-packages.
+pub mod exec;
+
 /// os.Args — the command line, argv[0] is the program name (like Go).
 #[allow(non_snake_case)]
 pub fn Args() -> slice<string> {

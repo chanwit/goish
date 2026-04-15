@@ -12,6 +12,9 @@
 // The Go-style `rune` alias in `types` gives `i32`; use `char::from_u32` to
 // convert when needed.
 
+// Sub-packages.
+pub mod utf8;
+
 use crate::types::rune;
 
 fn rune_to_char(r: rune) -> Option<char> {
