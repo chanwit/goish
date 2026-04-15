@@ -205,5 +205,60 @@ impl Request {
     pub fn FormValue(&self, key: &str) -> string {
         self.URL.Query().Get(key)
     }
+
+    /// `r.SetBasicAuth(user, pass)` — sets the Authorization header.
+    #[allow(non_snake_case)]
+    pub fn SetBasicAuth(&mut self, username: &str, password: &str) {
+        use crate::base64;
+        let token = format!("{}:{}", username, password);
+        let enc = base64::StdEncoding.EncodeToString(token.as_bytes());
+        self.Header.Set("Authorization", &format!("Basic {}", enc));
+    }
+
+    /// `r.BasicAuth()` — returns (username, password, ok) from the Authorization header.
+    #[allow(non_snake_case)]
+    pub fn BasicAuth(&self) -> (string, string, bool) {
+        let auth = self.Header.Get("Authorization");
+        if !auth.starts_with("Basic ") {
+            return (String::new(), String::new(), false);
+        }
+        let (user, pass, ok) = parse_basic_auth(&auth);
+        (user, pass, ok)
+    }
+}
+
+/// Shared parser for `Basic dXNlcjpwYXNz` header values.
+pub(crate) fn parse_basic_auth(auth: &str) -> (string, string, bool) {
+    if !auth.starts_with("Basic ") { return (String::new(), String::new(), false); }
+    let token = &auth[6..];
+    let (decoded, err) = crate::base64::StdEncoding.DecodeString(token);
+    if err != crate::errors::nil { return (String::new(), String::new(), false); }
+    let s = match std::str::from_utf8(&decoded) {
+        Ok(s) => s,
+        Err(_) => return (String::new(), String::new(), false),
+    };
+    match s.find(':') {
+        Some(i) => (s[..i].to_string(), s[i+1..].to_string(), true),
+        None => (String::new(), String::new(), false),
+    }
+}
+
+/// ParseHTTPVersion parses an HTTP version string according to RFC 7230, section 2.6.
+/// Examples: "HTTP/1.0" → (1, 0, true), "HTTP/1.1" → (1, 1, true).
+#[allow(non_snake_case)]
+pub fn ParseHTTPVersion(vers: &str) -> (crate::types::int, crate::types::int, bool) {
+    const BIG: u32 = 1_000_000;
+    if !vers.starts_with("HTTP/") { return (0, 0, false); }
+    let rest = &vers[5..];
+    let dot = match rest.find('.') { Some(i) => i, None => return (0, 0, false) };
+    let (major_s, rest2) = rest.split_at(dot);
+    let minor_s = &rest2[1..];
+    // Disallow leading zeros except "0".
+    if major_s.is_empty() || minor_s.is_empty() { return (0, 0, false); }
+    if major_s.len() > 1 && major_s.starts_with('0') { return (0, 0, false); }
+    if minor_s.len() > 1 && minor_s.starts_with('0') { return (0, 0, false); }
+    let major: u32 = match major_s.parse() { Ok(n) if n < BIG => n, _ => return (0, 0, false) };
+    let minor: u32 = match minor_s.parse() { Ok(n) if n < BIG => n, _ => return (0, 0, false) };
+    (major as crate::types::int, minor as crate::types::int, true)
 }
 

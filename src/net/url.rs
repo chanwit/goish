@@ -62,15 +62,22 @@ impl URL {
             out.push_str(&self.Scheme);
             out.push(':');
         }
-        if !self.Host.is_empty() || self.Scheme == "http" || self.Scheme == "https" || self.Scheme == "ws" || self.Scheme == "wss" || self.Scheme == "ftp" {
-            out.push_str("//");
-            if let Some(u) = &self.User {
-                out.push_str(&u.String());
-                out.push('@');
+        if !self.Opaque.is_empty() {
+            out.push_str(&self.Opaque);
+        } else {
+            if !self.Host.is_empty() || self.User.is_some()
+                || self.Scheme == "http" || self.Scheme == "https"
+                || self.Scheme == "ws" || self.Scheme == "wss" || self.Scheme == "ftp"
+            {
+                out.push_str("//");
+                if let Some(u) = &self.User {
+                    out.push_str(&u.String());
+                    out.push('@');
+                }
+                out.push_str(&self.Host);
             }
-            out.push_str(&self.Host);
+            out.push_str(&self.Path);
         }
-        out.push_str(&self.Path);
         if !self.RawQuery.is_empty() {
             out.push('?');
             out.push_str(&self.RawQuery);
@@ -97,6 +104,42 @@ impl URL {
             Some((host, _)) => host.to_string(),
             None => h.to_string(),
         }
+    }
+
+    /// URL.RequestURI — the path?query portion, suitable for an HTTP request.
+    pub fn RequestURI(&self) -> string {
+        let mut out = String::new();
+        if !self.Opaque.is_empty() {
+            out.push_str(&self.Opaque);
+        } else {
+            if self.Path.is_empty() {
+                out.push('/');
+            } else {
+                out.push_str(&self.Path);
+            }
+        }
+        if !self.RawQuery.is_empty() {
+            out.push('?');
+            out.push_str(&self.RawQuery);
+        }
+        out
+    }
+
+    /// URL.JoinPath — returns a new URL with the given path components appended.
+    pub fn JoinPath(&self, elem: &[impl AsRef<str>]) -> URL {
+        let mut joined = self.Path.clone();
+        for e in elem {
+            let s = e.as_ref();
+            if s.is_empty() { continue; }
+            if !joined.ends_with('/') && !s.starts_with('/') { joined.push('/'); }
+            joined.push_str(s);
+        }
+        // Normalise ./ and ../ like path.Clean would do for a pure path.
+        let cleaned = path_clean(&joined);
+        let mut u = self.clone();
+        u.Path = cleaned;
+        u.RawPath = String::new();
+        u
     }
 
     pub fn Port(&self) -> string {
@@ -281,12 +324,10 @@ pub fn PathEscape(s: impl AsRef<str>) -> string {
 fn escape(s: &str, is_query: bool) -> string {
     let mut out = String::with_capacity(s.len());
     for &b in s.as_bytes() {
-        if is_unreserved(b) {
+        if should_not_escape(b, is_query) {
             out.push(b as char);
         } else if b == b' ' && is_query {
             out.push('+');
-        } else if !is_query && b == b'/' {
-            out.push('/');
         } else {
             out.push('%');
             out.push(hex_digit(b >> 4));
@@ -296,8 +337,13 @@ fn escape(s: &str, is_query: bool) -> string {
     out
 }
 
-fn is_unreserved(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'-' || b == b'.' || b == b'_' || b == b'~'
+fn should_not_escape(b: u8, is_query: bool) -> bool {
+    if b.is_ascii_alphanumeric() { return true; }
+    match b {
+        b'-' | b'.' | b'_' | b'~' => true,
+        b'$' | b'&' | b'+' | b',' | b'/' | b':' | b';' | b'=' | b'?' | b'@' => !is_query && b != b'?',
+        _ => false,
+    }
 }
 
 fn hex_digit(n: u8) -> char {
@@ -344,6 +390,44 @@ fn unescape(s: &str, is_query: bool) -> (string, error) {
         }
     }
     (String::from_utf8_lossy(&out).into_owned(), nil)
+}
+
+fn path_clean(p: &str) -> String {
+    if p.is_empty() { return ".".to_string(); }
+    let absolute = p.starts_with('/');
+    let mut stack: Vec<&str> = Vec::new();
+    for part in p.split('/') {
+        match part {
+            "" | "." => continue,
+            ".." => {
+                if stack.last().map_or(false, |t| *t != "..") && !stack.is_empty() {
+                    stack.pop();
+                } else if !absolute {
+                    stack.push("..");
+                }
+            }
+            other => stack.push(other),
+        }
+    }
+    let joined = stack.join("/");
+    if absolute { format!("/{}", joined) }
+    else if joined.is_empty() { ".".to_string() }
+    else { joined }
+}
+
+/// url.JoinPath(base, elem...) — returns base with elem joined to its path.
+#[allow(non_snake_case)]
+pub fn JoinPath(base: impl AsRef<str>, elem: &[impl AsRef<str>]) -> (string, error) {
+    let (u, err) = Parse(base);
+    if err != nil { return (String::new(), err); }
+    let out = u.JoinPath(elem);
+    (out.String(), nil)
+}
+
+/// url.ParseRequestURI parses rawurl as absolute (either URL or path-only) for server Request.URI.
+#[allow(non_snake_case)]
+pub fn ParseRequestURI(raw: impl AsRef<str>) -> (URL, error) {
+    Parse(raw)
 }
 
 fn hex_val(b: u8) -> i32 {
