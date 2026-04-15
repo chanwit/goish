@@ -144,7 +144,7 @@ pub mod prelude {
     pub use crate::goroutine::Goroutine;
     pub use crate::{
         Errorf, Fprintf, Printf, Println, Sprintf,
-        append, benchmark, chan, const_block, defer, delete, go, len, make, map,
-        range, recover, slice, stringer, Struct, test, test_main,
+        append, benchmark, chan, close, const_block, defer, delete, go, len, make, map,
+        range, recover, select, slice, stringer, Struct, test, test_main,
     };
 }

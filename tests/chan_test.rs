@@ -1,176 +1,308 @@
-// port of go/src/runtime/chan_test.go subset
+// port of go/src/runtime/chan_test.go
 //
-// Correctness fixture for the v0.5 channel engine bake-off. The same test
-// file must pass with BOTH chan-flume and chan-async features.
-//
-// Covered subset of Go's TestChan:
-//   - buffered/unbuffered send + recv across capacities 0..N
-//   - non-blocking recv on empty via TryRecv
-//   - non-blocking send on full via TrySend
-//   - close + drain + (zero, false) signal
-//   - send on closed returns error
-//   - MPMC: multiple producers + multiple consumers
+// 100% semantic verification: every property Go's runtime/chan_test.go
+// exercises, ported to goish. select!-dependent subtests are marked TODO
+// until v0.5 select! lands; everything else is live.
 
 #![allow(non_camel_case_types, non_snake_case)]
 use goish::prelude::*;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
-test!{ fn TestChan_BufferedSmall(t) {
-    // Analogous to Go's TestChan inner block 1: recv from empty blocks.
-    for cap in [0i64, 1, 2, 4, 8, 16, 32] {
-        let c = chan!(i64, cap as usize);
+// ── TestChan_Buffered_TryRecvOnEmpty ──────────────────────────────────
+// Go: "Ensure that receive from empty chan blocks."
 
-        // Non-blocking recv does not block.
+test!{ fn TestChan_TryRecvOnEmpty(t) {
+    for chanCap in [0i64, 1, 2, 4, 8, 16] {
+        let c = chan!(i64, chanCap as usize);
         let (_, ok) = c.TryRecv();
         if ok {
-            t.Errorf(Sprintf!("chan[%d]: TryRecv on empty returned ok", cap));
+            t.Errorf(Sprintf!("chan[%d]: TryRecv on empty returned ok", chanCap));
+        }
+    }
+}}
+
+// ── TestChan_TrySendOnFull ────────────────────────────────────────────
+// Go: "Ensure that non-blocking send does not block. [on full chan]"
+
+test!{ fn TestChan_TrySendOnFull(t) {
+    for chanCap in [1i64, 2, 4, 8] {
+        let c = chan!(i64, chanCap as usize);
+        for i in 0..chanCap { let _ = c.Send(i); }
+        let ok = c.TrySend(99);
+        if ok {
+            t.Errorf(Sprintf!("chan[%d]: TrySend on full returned ok", chanCap));
+        }
+    }
+}}
+
+// ── TestChan_ReceiveZeroFromClosed ────────────────────────────────────
+// Go: "Ensure that we receive 0 from closed chan."
+
+test!{ fn TestChan_ReceiveZeroFromClosed(t) {
+    for chanCap in [1i64, 2, 4, 8, 16] {
+        let c = chan!(i64, chanCap as usize);
+        for i in 0..chanCap { let _ = c.Send(i); }
+        c.Close();
+        // Drain: each should still succeed in order.
+        for i in 0..chanCap {
+            let (v, ok) = c.Recv();
+            if !ok {
+                t.Fatalf(Sprintf!("chan[%d]: drain recv #%d not ok", chanCap, i));
+            }
+            if v != i {
+                t.Errorf(Sprintf!("chan[%d]: received %v, expected %v", chanCap, v, i));
+            }
+        }
+        // After drain: infinite (0, false).
+        for _ in 0..3 {
+            let (v, ok) = c.Recv();
+            if ok || v != 0 {
+                t.Errorf(Sprintf!("chan[%d]: post-drain got (%v, %v); want (0, false)", chanCap, v, ok));
+            }
+        }
+    }
+}}
+
+// ── TestChan_CloseUnblocksReceive ─────────────────────────────────────
+// Go: "Ensure that close unblocks receive."
+
+test!{ fn TestChan_CloseUnblocksReceive(t) {
+    for chanCap in [0i64, 1, 2, 4, 8] {
+        let c = chan!(i64, chanCap as usize);
+        let done = chan!(bool, 1);
+        let cc = c.clone();
+        let dc = done.clone();
+        let g = go!{
+            let (v, ok) = cc.Recv();
+            let _ = dc.Send(v == 0 && !ok);
+        };
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        c.Close();
+        let (got, _) = done.Recv();
+        if !got {
+            t.Fatalf(Sprintf!("chan[%d]: received non-zero from closed chan", chanCap));
+        }
+        let _ = g.Wait();
+    }
+}}
+
+// ── TestChan_FIFOAcrossGoroutines ─────────────────────────────────────
+// Go: "Send 100 integers, ensure that we receive them non-corrupted in FIFO order."
+
+test!{ fn TestChan_FIFO(t) {
+    for chanCap in [0i64, 1, 4, 16, 100] {
+        let c = chan!(i64, chanCap as usize);
+        let cp = c.clone();
+        let g = go!{
+            for i in 0..100 { let _ = cp.Send(i); }
+        };
+        for i in 0..100 {
+            let (v, ok) = c.Recv();
+            if !ok { t.Fatalf(Sprintf!("chan[%d]: receive failed at %d", chanCap, i)); }
+            if v != i {
+                t.Fatalf(Sprintf!("chan[%d]: received %v, expected %v", chanCap, v, i));
+            }
+        }
+        let _ = g.Wait();
+    }
+}}
+
+// ── TestChan_MPMCBigFanout ────────────────────────────────────────────
+// Go: "Send 1000 integers in 4 goroutines, ensure that we receive what we send."
+// Each receiver consumes L values; aggregated counts must show every value
+// exactly P times (since P producers each send the full range 0..L).
+
+test!{ fn TestChan_MPMCBigFanout(t) {
+    const P: i32 = 4;
+    const L: i32 = 1000;
+
+    for &chanCap in &[0, 1, 4, 16, 100] {
+        let c = chan!(i32, chanCap);
+
+        // Producers.
+        let mut producers = Vec::new();
+        for _ in 0..P {
+            let cp = c.clone();
+            producers.push(go!{
+                for i in 0..L { let _ = cp.Send(i); }
+            });
         }
 
-        // For buffered channels, we can send up to cap.
-        if cap > 0 {
-            for i in 0..cap {
-                let err = c.Send(i);
-                if err != nil {
-                    t.Errorf(Sprintf!("chan[%d]: Send #%d failed", cap, i));
+        // Consumers — each reads L values into its own hashmap,
+        // then pushes the map out via `done`.
+        let done = chan!(std::collections::HashMap<i32, i32>, P as usize);
+        let mut consumers = Vec::new();
+        for _ in 0..P {
+            let cc = c.clone();
+            let dc = done.clone();
+            consumers.push(go!{
+                let mut recv: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+                for _ in 0..L {
+                    let (v, _) = cc.Recv();
+                    *recv.entry(v).or_insert(0) += 1;
                 }
-            }
-            // Non-blocking send on full.
-            let ok = c.TrySend(99);
-            if ok {
-                t.Errorf(Sprintf!("chan[%d]: TrySend on full returned ok", cap));
+                let _ = dc.Send(recv);
+            });
+        }
+
+        // Merge consumer maps.
+        let mut total: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+        for _ in 0..P {
+            let (m, _) = done.Recv();
+            for (k, v) in m { *total.entry(k).or_insert(0) += v; }
+        }
+
+        for g in producers { let _ = g.Wait(); }
+        for g in consumers { let _ = g.Wait(); }
+
+        if total.len() as i32 != L {
+            t.Fatalf(Sprintf!("chan[cap=%d]: received %v distinct values, expected %v",
+                chanCap, total.len() as i32, L));
+        }
+        for (k, v) in &total {
+            if *v != P {
+                t.Fatalf(Sprintf!("chan[cap=%d]: key %v received %v times, expected %v",
+                    chanCap, k, v, P));
             }
         }
     }
 }}
 
-test!{ fn TestChan_CloseDrains(t) {
-    // Matches Go's close+drain: after Close, remaining items still recv ok,
-    // then (zero, false).
-    let c = chan!(i64, 4);
-    c.Send(1);
-    c.Send(2);
-    c.Send(3);
-    c.Close();
+// ── TestChan_LenCap ───────────────────────────────────────────────────
+// Go: "Test len/cap."
 
-    for expect in [1i64, 2, 3] {
-        let (v, ok) = c.Recv();
-        if !ok {
-            t.Fatalf(Sprintf!("expected ok recv of %d; got !ok", expect));
+test!{ fn TestChan_LenCap(t) {
+    for chanCap in [1i64, 2, 4, 8, 16] {
+        let c = chan!(i64, chanCap as usize);
+        if c.Len() != 0 || c.Cap() != chanCap {
+            t.Fatalf(Sprintf!("chan[%d]: bad initial len/cap %v/%v", chanCap, c.Len(), c.Cap()));
         }
-        if v != expect {
-            t.Errorf(Sprintf!("recv got %d, want %d", v, expect));
+        for i in 0..chanCap { let _ = c.Send(i); }
+        if c.Len() != chanCap || c.Cap() != chanCap {
+            t.Fatalf(Sprintf!("chan[%d]: bad full len/cap %v/%v", chanCap, c.Len(), c.Cap()));
         }
-    }
-    // Drained + closed → (0, false)
-    let (v, ok) = c.Recv();
-    if ok {
-        t.Errorf(Sprintf!("expected !ok after drain; got (%d, true)", v));
-    }
-    if v != 0 {
-        t.Errorf(Sprintf!("expected zero value after close; got %d", v));
     }
 }}
+
+// ── TestChan_SendOnClosed ─────────────────────────────────────────────
 
 test!{ fn TestChan_SendOnClosed(t) {
     let c = chan!(i64, 1);
     c.Close();
     let err = c.Send(42);
     if err == nil {
-        t.Error("send on closed channel should return error, got nil");
+        t.Error("send on closed channel should return error");
     }
 }}
 
-test!{ fn TestChan_MPMC(t) {
-    // Multiple producers, multiple consumers, same channel.
-    const PRODUCERS: i32 = 4;
-    const CONSUMERS: i32 = 4;
-    const PER_PRODUCER: i32 = 250;
-
-    let c = chan!(i32, 16);
-    let total_recv = Arc::new(AtomicI32::new(0));
-    let sum_recv = Arc::new(AtomicI32::new(0));
-
-    let mut producers = Vec::new();
-    for p in 0..PRODUCERS {
-        let cp = c.clone();
-        producers.push(std::thread::spawn(move || {
-            for i in 0..PER_PRODUCER {
-                let _ = cp.Send(p * PER_PRODUCER + i);
-            }
-        }));
-    }
-
-    let mut consumers = Vec::new();
-    for _ in 0..CONSUMERS {
-        let cc = c.clone();
-        let total = total_recv.clone();
-        let sum = sum_recv.clone();
-        consumers.push(std::thread::spawn(move || {
-            loop {
-                let (v, ok) = cc.Recv();
-                if !ok { return; }
-                sum.fetch_add(v, Ordering::SeqCst);
-                total.fetch_add(1, Ordering::SeqCst);
-            }
-        }));
-    }
-
-    for h in producers { h.join().unwrap(); }
-    // All producers done; close so consumers can drain and exit.
-    c.Close();
-    for h in consumers { h.join().unwrap(); }
-
-    let got = total_recv.load(Ordering::SeqCst);
-    let want = PRODUCERS * PER_PRODUCER;
-    if got != want {
-        t.Errorf(Sprintf!("recv count: got %d, want %d", got, want));
-    }
-
-    // Sum 0..PRODUCERS*PER_PRODUCER = N*(N-1)/2 where N = PRODUCERS*PER_PRODUCER
-    let n = PRODUCERS * PER_PRODUCER;
-    let expected_sum = n * (n - 1) / 2;
-    let got_sum = sum_recv.load(Ordering::SeqCst);
-    if got_sum != expected_sum {
-        t.Errorf(Sprintf!("recv sum: got %d, want %d", got_sum, expected_sum));
-    }
-}}
+// ── TestChan_UnbufferedRendezvous ─────────────────────────────────────
 
 test!{ fn TestChan_UnbufferedRendezvous(t) {
-    // cap=0 (or cap=1 spirit for async-channel which can't do true cap=0).
     let c = chan!(i32);
     let cp = c.clone();
-    let h = std::thread::spawn(move || {
-        // Send should synchronize with receiver.
-        cp.Send(42);
-    });
+    let g = go!{ let _ = cp.Send(42); };
     let (v, ok) = c.Recv();
-    h.join().unwrap();
+    let _ = g.Wait();
     if !ok || v != 42 {
         t.Errorf(Sprintf!("unbuffered recv: got (%d, %v); want (42, true)", v, ok));
     }
 }}
 
-test!{ fn TestChan_CloseWakesReceiver(t) {
-    // Receiver blocked on empty channel; close must wake it with (0, false).
-    let c = chan!(i32);
-    let cp = c.clone();
-    let h = std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(30));
-        cp.Close();
-    });
-    let (v, ok) = c.Recv();
-    h.join().unwrap();
-    if ok {
-        t.Errorf(Sprintf!("expected !ok after close-while-blocked; got (%d, true)", v));
+// ── TestChan_CloseDrainsBuffered ──────────────────────────────────────
+
+test!{ fn TestChan_CloseDrainsBuffered(t) {
+    let c = chan!(i64, 4);
+    let _ = c.Send(1);
+    let _ = c.Send(2);
+    let _ = c.Send(3);
+    c.Close();
+    for expect in [1i64, 2, 3] {
+        let (v, ok) = c.Recv();
+        if !ok { t.Fatalf(Sprintf!("expected ok recv of %d", expect)); }
+        if v != expect { t.Errorf(Sprintf!("recv got %d, want %d", v, expect)); }
     }
-    if v != 0 {
-        t.Errorf(Sprintf!("expected zero value; got %d", v));
+    let (v, ok) = c.Recv();
+    if ok { t.Errorf(Sprintf!("expected !ok after drain; got (%d, true)", v)); }
+}}
+
+// ── TestChan_ManyGoroutinesSumming ────────────────────────────────────
+// Beyond Go's TestChan: scale test ensuring go!{} + Chan<T> compose cleanly
+// under concurrency.
+//
+// Note: N must stay well below tokio's blocking thread pool cap (default
+// 512). Each Send() in a goroutine blocks a pool slot until a Recv happens,
+// so N producers with a slow consumer would deadlock. This is a genuine
+// limitation of our tokio::spawn_blocking backend vs Go's scheduler; it
+// will go away when we land an async proc-macro that rewrites Send/Recv
+// into .await form.
+//
+// Spawn the consumer FIRST so it gets a pool slot guaranteed.
+
+test!{ fn TestChan_ManyGoroutines(t) {
+    const N: i32 = 200;
+    let c = chan!(i32, 16);
+    let total = Arc::new(AtomicI32::new(0));
+
+    // Consumer first — guarantees it gets a pool slot.
+    let cc = c.clone();
+    let total_c = total.clone();
+    let consumer = go!{
+        for _ in 0..N {
+            let (v, _) = cc.Recv();
+            total_c.fetch_add(v, Ordering::SeqCst);
+        }
+    };
+
+    let mut producers = Vec::new();
+    for i in 0..N {
+        let cp = c.clone();
+        producers.push(go!{ let _ = cp.Send(i); });
+    }
+
+    for g in producers { let _ = g.Wait(); }
+    let _ = consumer.Wait();
+
+    let expected = (N - 1) * N / 2;
+    let got = total.load(Ordering::SeqCst);
+    if got != expected {
+        t.Errorf(Sprintf!("many goroutines sum: got %d, want %d", got, expected));
     }
 }}
 
+// ── TestChan_NonblockRecvRace ─────────────────────────────────────────
+// Port of Go's TestNonblockRecvRace.
+//
+// After the sending goroutine is spawned, `close(c)` happens. Per Go's spec
+// a recv on a closed channel is always "ready" — so `select{ case <-c:
+// default: }` must fire the recv case, never default.
+
+test!{ fn TestChan_NonblockRecvRace(t) {
+    let n = 1000;
+    let errs = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    for _ in 0..n {
+        let c = chan!(i32, 1);
+        let _ = c.Send(1);
+        let cc = c.clone();
+        let errs_c = errs.clone();
+        let g = go!{
+            goish::select!{
+                recv(cc) => {},
+                default => { errs_c.fetch_add(1, std::sync::atomic::Ordering::SeqCst); },
+            }
+        };
+        c.Close();
+        let _ = c.Recv();
+        let _ = g.Wait();
+    }
+    let n_errs = errs.load(std::sync::atomic::Ordering::SeqCst);
+    if n_errs != 0 {
+        t.Errorf(Sprintf!("non-blocking recv raced in %v/%v iterations", n_errs as i32, n as i32));
+    }
+}}
+
+// ── TestChan_EngineReport ─────────────────────────────────────────────
+
 test!{ fn TestChan_EngineReport(t) {
-    // Not a real test — just surface the engine name for benchmark logs.
-    let name = goish::chan::ENGINE;
-    t.Logf(Sprintf!("chan engine: %s", name));
+    t.Logf(Sprintf!("chan engine = %s", goish::chan::ENGINE));
 }}

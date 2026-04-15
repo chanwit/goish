@@ -1,18 +1,40 @@
-// goroutine: `go!{...}` → spawn a goroutine.
+// goroutine: `go!{...}` → spawn a goroutine on the tokio blocking pool.
 //
 //   Go                                  goish
 //   ─────────────────────────────────   ──────────────────────────────────
 //   go worker(jobs)                     go!{ worker(jobs); };
 //   go func() { ... }()                 go!{ ... };
 //
-// Implementation note: v0.1 spawns an OS thread (std::thread::spawn), not a
-// green thread. Tens of thousands of goroutines won't scale here like they
-// do in Go — that's deferred until we have a real scheduler. The `go!{}`
-// macro returns a `JoinHandle` so you can .Wait() on it if desired.
+// Implementation: `tokio::task::spawn_blocking`. Tokio maintains a pool of
+// OS threads (default 512) that get reused across goroutines, so spawn cost
+// is amortized vs plain `std::thread::spawn`. The body stays synchronous —
+// flume's `Send/Recv` block cleanly on the blocking pool.
+//
+// This isn't true M:N green-thread scheduling (that would require async
+// bodies + a proc-macro to rewrite channel ops into `.await`). It IS
+// materially lighter than `std::thread::spawn` per-goroutine.
 
-use std::thread::JoinHandle;
+use std::sync::OnceLock;
+use std::sync::atomic::Ordering;
+use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
 
-/// Wrapper around `std::thread::JoinHandle` with Go-style `Wait()`.
+/// Global runtime shared across all `go!{}` calls in a process.
+pub(crate) fn runtime() -> &'static Runtime {
+    static RT: OnceLock<Runtime> = OnceLock::new();
+    RT.get_or_init(|| {
+        let mut b = tokio::runtime::Builder::new_multi_thread();
+        b.enable_all();
+        if let Ok(n) = std::env::var("GOISH_BLOCKING_POOL_SIZE") {
+            if let Ok(n) = n.parse::<usize>() {
+                b.max_blocking_threads(n);
+            }
+        }
+        b.build().expect("goish: failed to build tokio runtime")
+    })
+}
+
+/// Handle to a live goroutine. `Wait()` blocks until it finishes.
 pub struct Goroutine {
     handle: Option<JoinHandle<()>>,
 }
@@ -24,9 +46,8 @@ impl Goroutine {
     where
         F: FnOnce() + Send + 'static,
     {
-        use std::sync::atomic::Ordering;
         crate::runtime::LIVE_GOROUTINES.fetch_add(1, Ordering::SeqCst);
-        let handle = std::thread::spawn(move || {
+        let handle = runtime().spawn_blocking(move || {
             struct Guard;
             impl Drop for Guard {
                 fn drop(&mut self) {
@@ -39,11 +60,12 @@ impl Goroutine {
         Goroutine { handle: Some(handle) }
     }
 
-    /// Wait for the goroutine to finish. Returns nil error if it completed
-    /// normally, or an error if it panicked.
+    /// Wait for the goroutine to finish. Returns nil on clean exit, error on
+    /// panic.
+    #[allow(non_snake_case)]
     pub fn Wait(mut self) -> crate::errors::error {
         match self.handle.take() {
-            Some(h) => match h.join() {
+            Some(h) => match runtime().block_on(h) {
                 Ok(()) => crate::errors::nil,
                 Err(_) => crate::errors::New("goroutine panicked"),
             },
@@ -106,5 +128,24 @@ mod tests {
         };
         let err = g.Wait();
         assert!(err != crate::errors::nil);
+    }
+
+    #[test]
+    fn many_goroutines_via_pool() {
+        // Spawn 1000 goroutines — tokio's blocking pool reuses threads.
+        // Each sends to a shared channel; main recvs the sum.
+        let ch = crate::chan!(i64, 1000);
+        let mut handles = Vec::new();
+        for i in 0..1000i64 {
+            let c = ch.clone();
+            handles.push(crate::go!{ c.Send(i); });
+        }
+        let mut sum = 0i64;
+        for _ in 0..1000 {
+            let (v, _) = ch.Recv();
+            sum += v;
+        }
+        for h in handles { let _ = h.Wait(); }
+        assert_eq!(sum, (999 * 1000) / 2);
     }
 }

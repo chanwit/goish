@@ -107,8 +107,8 @@ benchmark!{ fn BenchmarkChanProdCons_4P1C(b) {
     std::hint::black_box(sum);
 }}
 
-// ── B5: Spawn-and-communicate (per-iteration OS thread spawn) ─────────
-// This dominates fan-out patterns. Measures spawn + 1 send + 1 recv + join.
+// ── B5a: std::thread::spawn + send ────────────────────────────────────
+// Baseline: plain OS thread spawn per iteration.
 
 benchmark!{ fn BenchmarkSpawnThreadAndSend(b) {
     while b.Loop() {
@@ -117,6 +117,30 @@ benchmark!{ fn BenchmarkSpawnThreadAndSend(b) {
         let h = thread::spawn(move || { cp.Send(1); });
         let _ = c.Recv();
         h.join().unwrap();
+    }
+}}
+
+// ── B5b: go!{} + send ────────────────────────────────────────────────
+// goish goroutines via tokio's spawn_blocking pool. Should be materially
+// cheaper than plain thread::spawn thanks to thread reuse.
+
+benchmark!{ fn BenchmarkGoroutineSpawnAndSend(b) {
+    while b.Loop() {
+        let c = chan!(i64, 1);
+        let cp = c.clone();
+        let h = goish::go!{ cp.Send(1); };
+        let _ = c.Recv();
+        let _ = h.Wait();
+    }
+}}
+
+// ── B5c: go!{} spawn only (no channel) ───────────────────────────────
+// Pure spawn cost; subtracted from B5b gives channel round-trip cost.
+
+benchmark!{ fn BenchmarkGoroutineSpawnOnly(b) {
+    while b.Loop() {
+        let h = goish::go!{ let _ = std::hint::black_box(1 + 1); };
+        let _ = h.Wait();
     }
 }}
 

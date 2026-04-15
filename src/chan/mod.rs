@@ -79,6 +79,36 @@ impl<T> Chan<T> {
         self.inner.try_send(v).is_ok()
     }
 
+    /// `select!`-internal: "is a recv case ready right now?"
+    ///
+    /// Go distinguishes three states visible to `select`:
+    ///   - value present         → case fires with (v, true)
+    ///   - channel closed+drained → case fires with (zero, false)
+    ///   - empty + still open    → case BLOCKS; default fires instead
+    ///
+    /// Plain `TryRecv` collapses the last two (both give `(zero, false)`).
+    /// This method returns `Some((v, ok))` when the case should fire, and
+    /// `None` when the case is blocked.
+    #[doc(hidden)]
+    pub fn __select_try_recv(&self) -> Option<(T, bool)>
+    where T: Default {
+        if let Some(v) = self.inner.try_recv() {
+            return Some((v, true));
+        }
+        if self.inner.is_closed() {
+            return Some((T::default(), false));
+        }
+        None
+    }
+
+    /// `select!`-internal: "is a send case ready right now?" Returns Err(v)
+    /// if the buffer is full (or rendezvous has no partner). Matches the
+    /// semantic Go's `select { case c <- v: }` uses.
+    #[doc(hidden)]
+    pub fn __select_try_send(&self, v: T) -> Result<(), T> {
+        self.inner.try_send(v)
+    }
+
     /// close(ch) — mark the channel closed. Remaining buffered items still
     /// recv; once drained, receivers return (zero, false).
     #[allow(non_snake_case)]
@@ -118,6 +148,124 @@ macro_rules! close {
     ($ch:expr) => {
         ($ch).Close()
     };
+}
+
+/// `select!{ ... }` — Go's select statement.
+///
+/// Supported arm forms:
+///   - `recv(c)              => { body }`   — case fires, value discarded
+///   - `recv(c) |v|          => { body }`   — bind received value
+///   - `recv(c) |v, ok|      => { body }`   — bind value + close-flag
+///   - `send(c, expr)        => { body }`   — send expr; fires on success
+///   - `default              => { body }`   — fallback if no case ready
+///
+/// Semantics:
+///   - All case channels are tested non-blocking.
+///   - If multiple are ready, the first in source order wins (Go's spec
+///     says uniform-random; this is a known simplification to revisit).
+///   - If none ready and `default` is present, default fires.
+///   - If none ready and no `default`, this select *currently* spins
+///     with a short sleep between polls. (Proper cross-channel parking
+///     via `flume::Selector` lands in the next iteration.)
+#[macro_export]
+macro_rules! select {
+    ($($tt:tt)*) => {
+        $crate::__select_parse!(@arms [] $($tt)*)
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __select_parse {
+    // recv(c) |v, ok| => { body }
+    (@arms [$($acc:tt)*] recv($ch:expr) |$v:ident, $ok:ident| => $body:block $(, $($rest:tt)*)?) => {
+        $crate::__select_parse!(@arms [$($acc)* (RecvBind2 ($ch) ($v) ($ok) ($body))] $($($rest)*)?)
+    };
+    // recv(c) |v| => { body }
+    (@arms [$($acc:tt)*] recv($ch:expr) |$v:ident| => $body:block $(, $($rest:tt)*)?) => {
+        $crate::__select_parse!(@arms [$($acc)* (RecvBind1 ($ch) ($v) ($body))] $($($rest)*)?)
+    };
+    // recv(c) => { body }
+    (@arms [$($acc:tt)*] recv($ch:expr) => $body:block $(, $($rest:tt)*)?) => {
+        $crate::__select_parse!(@arms [$($acc)* (RecvDrop ($ch) ($body))] $($($rest)*)?)
+    };
+    // send(c, v) => { body }
+    (@arms [$($acc:tt)*] send($ch:expr, $v:expr) => $body:block $(, $($rest:tt)*)?) => {
+        $crate::__select_parse!(@arms [$($acc)* (Send ($ch) ($v) ($body))] $($($rest)*)?)
+    };
+    // default => { body }
+    (@arms [$($acc:tt)*] default => $body:block $(,)?) => {
+        $crate::__select_parse!(@emit [$($acc)*] [$body])
+    };
+    // End of input, no default
+    (@arms [$($acc:tt)*]) => {
+        $crate::__select_parse!(@emit [$($acc)*] [])
+    };
+
+    // Emit: try each arm; if none fire and no default, spin-wait briefly.
+    (@emit [$($arms:tt)*] [$($def:tt)*]) => {{
+        #[allow(unused_mut, unused_assignments)]
+        let mut __goish_fired = false;
+        loop {
+            $crate::__select_parse!(@try __goish_fired $($arms)*);
+            if __goish_fired {
+                break;
+            }
+            $crate::__select_parse!(@default_or_spin __goish_fired [$($def)*]);
+            if __goish_fired {
+                break;
+            }
+        }
+    }};
+
+    // If default exists: fire it.
+    (@default_or_spin $fired:ident [$($def:tt)+]) => {{
+        { $($def)+ }
+        $fired = true;
+    }};
+    // No default: short sleep before retry.
+    (@default_or_spin $fired:ident []) => {{
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }};
+
+    // Try each arm:
+    (@try $fired:ident (RecvBind2 ($ch:expr) ($v:ident) ($ok:ident) ($body:block)) $($rest:tt)*) => {
+        if !$fired {
+            if let Some(($v, $ok)) = ($ch).__select_try_recv() {
+                $body
+                $fired = true;
+            }
+        }
+        $crate::__select_parse!(@try $fired $($rest)*);
+    };
+    (@try $fired:ident (RecvBind1 ($ch:expr) ($v:ident) ($body:block)) $($rest:tt)*) => {
+        if !$fired {
+            if let Some(($v, _)) = ($ch).__select_try_recv() {
+                $body
+                $fired = true;
+            }
+        }
+        $crate::__select_parse!(@try $fired $($rest)*);
+    };
+    (@try $fired:ident (RecvDrop ($ch:expr) ($body:block)) $($rest:tt)*) => {
+        if !$fired {
+            if ($ch).__select_try_recv().is_some() {
+                $body
+                $fired = true;
+            }
+        }
+        $crate::__select_parse!(@try $fired $($rest)*);
+    };
+    (@try $fired:ident (Send ($ch:expr) ($v:expr) ($body:block)) $($rest:tt)*) => {
+        if !$fired {
+            if ($ch).__select_try_send($v).is_ok() {
+                $body
+                $fired = true;
+            }
+        }
+        $crate::__select_parse!(@try $fired $($rest)*);
+    };
+    (@try $fired:ident) => {};
 }
 
 #[cfg(test)]
@@ -200,5 +348,69 @@ mod tests {
     #[test]
     fn engine_name_is_flume() {
         assert_eq!(crate::chan::ENGINE, "flume");
+    }
+
+    #[test]
+    fn select_default_fires_when_empty() {
+        let c = crate::chan!(i64, 1);
+        let mut took_default = false;
+        crate::select!{
+            recv(c) => {},
+            default => { took_default = true; },
+        }
+        assert!(took_default);
+    }
+
+    #[test]
+    fn select_recv_fires_when_ready() {
+        let c = crate::chan!(i64, 1);
+        c.Send(42);
+        let mut got = -1i64;
+        crate::select!{
+            recv(c) |v| => { got = v; },
+            default => {},
+        }
+        assert_eq!(got, 42);
+    }
+
+    #[test]
+    fn select_recv_fires_on_closed_drained() {
+        // Go's semantic: after close+drain, recv case is still "ready",
+        // firing with (zero, false) — NOT default.
+        let c = crate::chan!(i64, 1);
+        c.Close();
+        let mut fired = false;
+        let mut ok_seen = true;
+        crate::select!{
+            recv(c) |_v, ok| => { fired = true; ok_seen = ok; },
+            default => {},
+        }
+        assert!(fired, "recv case should fire on closed channel");
+        assert!(!ok_seen, "ok should be false on closed channel");
+    }
+
+    #[test]
+    fn select_send_fires_when_space() {
+        let c = crate::chan!(i64, 1);
+        let mut sent = false;
+        crate::select!{
+            send(c, 99) => { sent = true; },
+            default => {},
+        }
+        assert!(sent);
+        let (v, _) = c.Recv();
+        assert_eq!(v, 99);
+    }
+
+    #[test]
+    fn select_send_default_when_full() {
+        let c = crate::chan!(i64, 1);
+        c.Send(1); // fill
+        let mut took_default = false;
+        crate::select!{
+            send(c, 99) => {},
+            default => { took_default = true; },
+        }
+        assert!(took_default);
     }
 }

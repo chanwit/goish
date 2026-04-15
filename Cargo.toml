@@ -19,9 +19,12 @@ exclude = [
 ]
 
 [dependencies]
-# Channel engine: flume picked after v0.5 bake-off against async-channel.
-# Benchmarks: 2× faster unbuffered rendezvous, 3.5× less memory for 100k
-# channels, consistent wins on ping-pong and producer/consumer throughput.
+# Runtime: tokio + flume.
+#   - tokio::task::spawn_blocking backs the `go!{}` macro: sync bodies run
+#     on tokio's pooled blocking threads (vs fresh std::thread per spawn).
+#   - flume backs Chan<T>: winner of v0.5 channel bake-off (see commit
+#     b996384 — 2× faster rendezvous, 3.5× less RSS vs async-channel).
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 flume = { version = "0.11", default-features = false, features = ["async"] }
 serde = "1"
 serde_json = "1"
