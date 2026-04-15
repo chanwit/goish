@@ -162,8 +162,26 @@ pub fn Repeat(s: impl AsRef<str>, count: int) -> string {
 }
 
 /// ASCII-only fold (Go does full Unicode; close enough for now).
+/// `strings.EqualFold(s, t)` — Unicode case-insensitive equality. Uses
+/// Rust's `char::to_lowercase` for folding so Greek/Latin/Cyrillic etc
+/// compare correctly (not just ASCII).
 pub fn EqualFold(s: impl AsRef<str>, t: impl AsRef<str>) -> bool {
-    s.as_ref().eq_ignore_ascii_case(t.as_ref())
+    let mut si = s.as_ref().chars();
+    let mut ti = t.as_ref().chars();
+    loop {
+        let a = si.next();
+        let b = ti.next();
+        match (a, b) {
+            (None, None) => return true,
+            (None, _) | (_, None) => return false,
+            (Some(a), Some(b)) => {
+                if a == b { continue; }
+                let a_low: Vec<char> = a.to_lowercase().collect();
+                let b_low: Vec<char> = b.to_lowercase().collect();
+                if a_low != b_low { return false; }
+            }
+        }
+    }
 }
 
 // ── strings.Builder ────────────────────────────────────────────────────
@@ -212,6 +230,21 @@ impl Builder {
 
     pub fn String(&self) -> string {
         self.inner.clone()
+    }
+
+    /// `b.Cap()` — underlying capacity of the backing buffer. Used by
+    /// Go's tests; here we forward to String::capacity.
+    #[allow(non_snake_case)]
+    pub fn Cap(&self) -> int { self.inner.capacity() as int }
+
+    /// `b.Write(p)` — append raw bytes (must be valid UTF-8 for goish;
+    /// Go's Builder accepts arbitrary bytes since []byte ⊂ string there).
+    #[allow(non_snake_case)]
+    pub fn Write(&mut self, p: &[crate::types::byte]) -> (int, crate::errors::error) {
+        match std::str::from_utf8(p) {
+            Ok(s) => { self.inner.push_str(s); (p.len() as int, crate::errors::nil) },
+            Err(_) => (0, crate::errors::New("strings.Builder.Write: invalid UTF-8")),
+        }
     }
 
     pub fn Len(&self) -> int {
@@ -289,6 +322,28 @@ impl Reader {
         }
         self.pos -= 1;
         crate::errors::nil
+    }
+
+    /// `r.ReadAt(p, off)` — read at an absolute offset without advancing
+    /// the internal cursor. Matches Go's io.ReaderAt interface.
+    #[allow(non_snake_case)]
+    pub fn ReadAt(&self, p: &mut [crate::types::byte], off: crate::types::int64) -> (int, crate::errors::error) {
+        if off < 0 {
+            return (0, crate::errors::New("strings.Reader.ReadAt: negative offset"));
+        }
+        let off = off as usize;
+        if off >= self.data.len() {
+            return (0, crate::io::EOF());
+        }
+        let bytes = self.data.as_bytes();
+        let available = bytes.len() - off;
+        let n = available.min(p.len());
+        p[..n].copy_from_slice(&bytes[off..off + n]);
+        if n < p.len() {
+            (n as int, crate::io::EOF())
+        } else {
+            (n as int, crate::errors::nil)
+        }
     }
 
     pub fn Seek(&mut self, offset: crate::types::int64, whence: int) -> (crate::types::int64, crate::errors::error) {
@@ -440,6 +495,144 @@ pub fn IndexByte(s: impl AsRef<str>, b: crate::types::byte) -> int {
 pub fn IndexRune(s: impl AsRef<str>, r: char) -> int {
     let s = s.as_ref();
     s.find(r).map(|i| i as int).unwrap_or(-1)
+}
+
+/// `strings.Cut(s, sep)` — slices s around the first instance of sep.
+/// Returns (before, after, found). If sep not in s, returns (s, "", false).
+#[allow(non_snake_case)]
+pub fn Cut(s: impl AsRef<str>, sep: impl AsRef<str>) -> (string, string, bool) {
+    let s = s.as_ref(); let sep = sep.as_ref();
+    match s.find(sep) {
+        Some(i) => (s[..i].to_string(), s[i + sep.len()..].to_string(), true),
+        None => (s.to_string(), String::new(), false),
+    }
+}
+
+/// `strings.CutPrefix(s, prefix)` — if prefix matches, returns (after, true); else (s, false).
+#[allow(non_snake_case)]
+pub fn CutPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> (string, bool) {
+    let s = s.as_ref(); let p = prefix.as_ref();
+    match s.strip_prefix(p) {
+        Some(rest) => (rest.to_string(), true),
+        None => (s.to_string(), false),
+    }
+}
+
+/// `strings.CutSuffix(s, suffix)` — if suffix matches, returns (before, true); else (s, false).
+#[allow(non_snake_case)]
+pub fn CutSuffix(s: impl AsRef<str>, suffix: impl AsRef<str>) -> (string, bool) {
+    let s = s.as_ref(); let suf = suffix.as_ref();
+    match s.strip_suffix(suf) {
+        Some(rest) => (rest.to_string(), true),
+        None => (s.to_string(), false),
+    }
+}
+
+/// `strings.TrimLeft(s, cutset)` — drop leading runes in `cutset`.
+#[allow(non_snake_case)]
+pub fn TrimLeft(s: impl AsRef<str>, cutset: impl AsRef<str>) -> string {
+    let cut: Vec<char> = cutset.as_ref().chars().collect();
+    s.as_ref().trim_start_matches(|c: char| cut.contains(&c)).to_string()
+}
+
+/// `strings.TrimRight(s, cutset)` — drop trailing runes in `cutset`.
+#[allow(non_snake_case)]
+pub fn TrimRight(s: impl AsRef<str>, cutset: impl AsRef<str>) -> string {
+    let cut: Vec<char> = cutset.as_ref().chars().collect();
+    s.as_ref().trim_end_matches(|c: char| cut.contains(&c)).to_string()
+}
+
+/// `strings.LastIndexByte(s, c)` — last index of the byte `c` in `s`, or -1.
+#[allow(non_snake_case)]
+pub fn LastIndexByte(s: impl AsRef<str>, c: crate::types::byte) -> int {
+    s.as_ref().as_bytes().iter().rposition(|&x| x == c).map(|i| i as int).unwrap_or(-1)
+}
+
+/// `strings.LastIndexAny(s, chars)` — greatest index of a rune in `chars`
+/// appearing in `s`, or -1.
+#[allow(non_snake_case)]
+pub fn LastIndexAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> int {
+    let s = s.as_ref(); let chars = chars.as_ref();
+    let set: Vec<char> = chars.chars().collect();
+    let mut best: i64 = -1;
+    for (i, c) in s.char_indices() {
+        if set.contains(&c) { best = i as i64; }
+    }
+    best
+}
+
+/// `strings.IndexFunc(s, f)` — first index where f(rune) is true, or -1.
+#[allow(non_snake_case)]
+pub fn IndexFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> int {
+    for (i, c) in s.as_ref().char_indices() {
+        if f(c) { return i as int; }
+    }
+    -1
+}
+
+/// `strings.LastIndexFunc(s, f)` — last index where f(rune) is true, or -1.
+#[allow(non_snake_case)]
+pub fn LastIndexFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> int {
+    let mut best: i64 = -1;
+    for (i, c) in s.as_ref().char_indices() {
+        if f(c) { best = i as i64; }
+    }
+    best
+}
+
+/// `strings.TrimFunc(s, f)` — trim runes satisfying f from both ends.
+#[allow(non_snake_case)]
+pub fn TrimFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> string {
+    s.as_ref().trim_matches(|c: char| f(c)).to_string()
+}
+
+/// `strings.TrimLeftFunc(s, f)` — trim runes satisfying f from the start.
+#[allow(non_snake_case)]
+pub fn TrimLeftFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> string {
+    s.as_ref().trim_start_matches(|c: char| f(c)).to_string()
+}
+
+/// `strings.TrimRightFunc(s, f)` — trim runes satisfying f from the end.
+#[allow(non_snake_case)]
+pub fn TrimRightFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> string {
+    s.as_ref().trim_end_matches(|c: char| f(c)).to_string()
+}
+
+/// `strings.SplitAfter(s, sep)` — like Split but keeps sep at the end of
+/// each chunk.
+#[allow(non_snake_case)]
+pub fn SplitAfter(s: impl AsRef<str>, sep: impl AsRef<str>) -> slice<string> {
+    let s = s.as_ref(); let sep = sep.as_ref();
+    if sep.is_empty() {
+        // Go's behavior: split after every rune.
+        return s.chars().map(|c| c.to_string()).collect();
+    }
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    loop {
+        match s[start..].find(sep) {
+            Some(i) => {
+                let end = start + i + sep.len();
+                out.push(s[start..end].to_string());
+                start = end;
+            }
+            None => {
+                out.push(s[start..].to_string());
+                break;
+            }
+        }
+    }
+    out
+}
+
+/// `strings.FieldsFunc(s, f)` — split s around runs of runes where f is true.
+#[allow(non_snake_case)]
+pub fn FieldsFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> slice<string> {
+    s.as_ref()
+        .split(|c: char| f(c))
+        .filter(|seg| !seg.is_empty())
+        .map(|seg| seg.to_string())
+        .collect()
 }
 
 #[allow(non_snake_case)]

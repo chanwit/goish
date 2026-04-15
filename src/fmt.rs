@@ -211,12 +211,29 @@ pub fn go_format(fmt_str: &str, args: &[&dyn Display]) -> String {
 }
 
 fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usize>, flags: &str) -> String {
+    fn fmt_float_go(f: f64, prec: usize, upper: bool) -> String {
+        if f.is_nan()       { return "NaN".to_string(); }
+        if f.is_infinite()  { return if f < 0.0 { "-Inf".to_string() } else { "+Inf".to_string() }; }
+        if upper { format!("{:.*}", prec, f).to_uppercase() } else { format!("{:.*}", prec, f) }
+    }
+
     let mut value = match verb {
         'q' => format!("\"{}\"", raw),
-        'f' | 'F' => match precision {
-            // Go's default precision for %f is 6.
-            Some(p) => raw.parse::<f64>().map(|f| format!("{:.*}", p, f)).unwrap_or_else(|_| raw.to_string()),
-            None => raw.parse::<f64>().map(|f| format!("{:.6}", f)).unwrap_or_else(|_| raw.to_string()),
+        'f' | 'F' => {
+            let p = precision.unwrap_or(6);
+            raw.parse::<f64>().map(|f| fmt_float_go(f, p, verb == 'F')).unwrap_or_else(|_| raw.to_string())
+        },
+        'e' | 'E' => {
+            let p = precision.unwrap_or(6);
+            raw.parse::<f64>()
+                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p as i64, 64))
+                .unwrap_or_else(|_| raw.to_string())
+        },
+        'g' | 'G' => {
+            let p = precision.map(|p| p as i64).unwrap_or(-1);
+            raw.parse::<f64>()
+                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p, 64))
+                .unwrap_or_else(|_| raw.to_string())
         },
         'x' => raw.parse::<i128>().map(|n| format!("{:x}", n)).unwrap_or_else(|_| raw.to_string()),
         'X' => raw.parse::<i128>().map(|n| format!("{:X}", n)).unwrap_or_else(|_| raw.to_string()),
@@ -230,14 +247,27 @@ fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usi
         _ => raw.to_string(),
     };
 
+    // Sign flag: `%+d` / `%+f` / etc — prepend '+' for non-negative
+    // numeric values.
+    if flags.contains('+') && matches!(verb, 'd' | 'f' | 'F' | 'e' | 'E' | 'g' | 'G') && !value.starts_with('-') && !value.starts_with('+') {
+        // Suppress for NaN/Inf — Go's "%+f" of +Inf is "+Inf" already.
+        if value != "NaN" && !value.starts_with("+Inf") && !value.starts_with("-Inf") {
+            value = format!("+{}", value);
+        }
+    }
+
     if let Some(w) = width {
         if value.chars().count() < w {
             let pad = w - value.chars().count();
-            let zero_pad = flags.contains('0') && !flags.contains('-') && matches!(verb, 'd' | 'f' | 'x' | 'X' | 'o' | 'b');
+            let zero_pad = flags.contains('0') && !flags.contains('-') && matches!(verb, 'd' | 'f' | 'F' | 'e' | 'E' | 'g' | 'G' | 'x' | 'X' | 'o' | 'b');
             let pad_char = if zero_pad { '0' } else { ' ' };
             let padding: String = std::iter::repeat(pad_char).take(pad).collect();
             value = if flags.contains('-') {
                 format!("{}{}", value, padding)
+            } else if zero_pad && (value.starts_with('-') || value.starts_with('+')) {
+                // Pad between the sign and the digits: "-00042" not "00-42".
+                let (sign, body) = value.split_at(1);
+                format!("{}{}{}", sign, padding, body)
             } else {
                 format!("{}{}", padding, value)
             };
