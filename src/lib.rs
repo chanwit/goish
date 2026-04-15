@@ -41,6 +41,10 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
+// Our doc comments use Go-syntax cheat-sheets with `[brackets]` and `<T>`
+// that rustdoc would otherwise interpret as intra-doc-links / HTML tags.
+#![allow(rustdoc::broken_intra_doc_links)]
+#![allow(rustdoc::invalid_html_tags)]
 
 pub mod bufio;
 pub mod bytes;

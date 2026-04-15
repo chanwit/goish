@@ -29,6 +29,7 @@ fmt::stringer! {
 
 // A result the worker emits back.
 #[derive(Clone, Default)]
+#[allow(dead_code)]
 struct Result { job_id: int, square: int, worker: int }
 
 fn worker(id: int, jobs: Chan<Job>, results: Chan<Result>) {
