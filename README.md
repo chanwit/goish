@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.4"      # 0.4.1 = latest
+goish = "0.4"      # 0.4.2 = latest
 ```
 
 Then in every file where you want Go-shaped code:
@@ -128,7 +128,7 @@ fmt::Println!("color:", Color { r: 255, g: 0, b: 0 }); // → color: #ff0000
 let jobs: Chan<int> = chan!(int, 4);
 let g = go!{
     for i in 1..=3 {
-        jobs.Send(i);
+        jobs.Send(i);           // looks sync, proc-macro rewrites to .send(i).await
     }
 };
 for _ in 0..3 {
@@ -137,6 +137,12 @@ for _ in 0..3 {
 }
 let _ = g.Wait();
 ```
+
+Goroutines run as tokio async tasks — ~200 B each. **Proven at 1,000,000
+concurrent goroutines** (see `tests/million_goroutines.rs`), which is what
+Go's scheduler handles natively. Inside `go!{}`, channel method calls look
+identical to outside — a proc-macro (`goish-macros`) rewrites `.Send`,
+`.Recv`, `.Wait` into their async equivalents at compile time.
 
 ### `defer!`
 
