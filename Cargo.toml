@@ -1,0 +1,45 @@
+[package]
+name = "goish"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
+description = "Write Rust using Go idioms — a Go-flavored standard library for Rust"
+repository = "https://github.com/chanwit/goish"
+homepage = "https://github.com/chanwit/goish"
+documentation = "https://docs.rs/goish"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["go", "golang", "idioms", "stdlib", "port"]
+categories = ["development-tools", "rust-patterns", "api-bindings"]
+exclude = [
+    "refs/*",
+    "/.claude/*",
+    "/.memsearch/*",
+]
+
+[dependencies]
+crossbeam-channel = "0.5"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "hello"
+path = "examples/hello.rs"
+
+[[example]]
+name = "config"
+path = "examples/config.rs"
+
+[[example]]
+name = "literals"
+path = "examples/literals.rs"
+
+[[example]]
+name = "worker"
+path = "examples/worker.rs"
+
+[[example]]
+name = "pipeline"
+path = "examples/pipeline.rs"

@@ -1,0 +1,19 @@
+# Build artifacts
+/target
+
+# Lockfile — this is a library crate; downstream binaries generate their own.
+Cargo.lock
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Claude Code local state
+/.claude/
+/.memsearch/
+
+# Reference / scratch material (not part of the published crate)
+/refs/
