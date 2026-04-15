@@ -1,6 +1,6 @@
 [package]
 name = "goish"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
@@ -20,6 +20,9 @@ exclude = [
 
 [dependencies]
 crossbeam-channel = "0.5"
+serde = "1"
+serde_json = "1"
+regex = "1"
 
 [lib]
 path = "src/lib.rs"
@@ -43,3 +46,7 @@ path = "examples/worker.rs"
 [[example]]
 name = "pipeline"
 path = "examples/pipeline.rs"
+
+[[example]]
+name = "webscrape"
+path = "examples/webscrape.rs"

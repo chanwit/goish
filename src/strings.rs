@@ -223,6 +223,230 @@ impl std::fmt::Display for Builder {
     }
 }
 
+// ── strings.Reader ─────────────────────────────────────────────────────
+//
+//   Go                                  goish
+//   ─────────────────────────────────   ──────────────────────────────────
+//   r := strings.NewReader("hello")     let r = strings::NewReader("hello");
+//   n, err := r.Read(p)                 let (n, err) = r.Read(&mut p);
+
+#[derive(Debug, Clone)]
+pub struct Reader {
+    data: String,
+    pos: usize,
+}
+
+impl Reader {
+    pub fn Len(&self) -> int {
+        (self.data.len().saturating_sub(self.pos)) as int
+    }
+
+    pub fn Size(&self) -> crate::types::int64 {
+        self.data.len() as crate::types::int64
+    }
+
+    pub fn Read(&mut self, p: &mut [crate::types::byte]) -> (int, crate::errors::error) {
+        if self.pos >= self.data.len() {
+            return (0, crate::io::EOF());
+        }
+        let bytes = self.data.as_bytes();
+        let n = (bytes.len() - self.pos).min(p.len());
+        p[..n].copy_from_slice(&bytes[self.pos..self.pos + n]);
+        self.pos += n;
+        (n as int, crate::errors::nil)
+    }
+
+    pub fn ReadByte(&mut self) -> (crate::types::byte, crate::errors::error) {
+        let bytes = self.data.as_bytes();
+        if self.pos >= bytes.len() {
+            return (0, crate::io::EOF());
+        }
+        let b = bytes[self.pos];
+        self.pos += 1;
+        (b, crate::errors::nil)
+    }
+
+    pub fn UnreadByte(&mut self) -> crate::errors::error {
+        if self.pos == 0 {
+            return crate::errors::New("strings.Reader.UnreadByte: at beginning of string");
+        }
+        self.pos -= 1;
+        crate::errors::nil
+    }
+
+    pub fn Seek(&mut self, offset: crate::types::int64, whence: int) -> (crate::types::int64, crate::errors::error) {
+        let new_pos: i64 = match whence {
+            0 => offset,
+            1 => self.pos as i64 + offset,
+            2 => self.data.len() as i64 + offset,
+            _ => return (0, crate::errors::New("strings.Reader.Seek: invalid whence")),
+        };
+        if new_pos < 0 {
+            return (0, crate::errors::New("strings.Reader.Seek: negative position"));
+        }
+        self.pos = new_pos as usize;
+        (new_pos, crate::errors::nil)
+    }
+}
+
+impl std::io::Read for Reader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let bytes = self.data.as_bytes();
+        if self.pos >= bytes.len() {
+            return Ok(0);
+        }
+        let n = (bytes.len() - self.pos).min(buf.len());
+        buf[..n].copy_from_slice(&bytes[self.pos..self.pos + n]);
+        self.pos += n;
+        Ok(n)
+    }
+}
+
+/// strings.NewReader(s) — construct a Reader over the string.
+#[allow(non_snake_case)]
+pub fn NewReader(s: impl Into<String>) -> Reader {
+    Reader { data: s.into(), pos: 0 }
+}
+
+// ── strings.Replacer ───────────────────────────────────────────────────
+//
+//   Go                                  goish
+//   ─────────────────────────────────   ──────────────────────────────────
+//   r := strings.NewReplacer("a","1", "b","2")
+//                                       let r = strings::NewReplacer(&["a","1", "b","2"]);
+//   r.Replace(s)                        r.Replace(s)
+
+#[derive(Debug, Clone)]
+pub struct Replacer {
+    pairs: Vec<(String, String)>,
+}
+
+impl Replacer {
+    pub fn Replace(&self, s: impl AsRef<str>) -> string {
+        let s = s.as_ref();
+        let mut out = String::with_capacity(s.len());
+        let bytes = s.as_bytes();
+        let mut i = 0usize;
+        'outer: while i < bytes.len() {
+            for (old, new) in &self.pairs {
+                if old.is_empty() { continue; }
+                let ob = old.as_bytes();
+                if i + ob.len() <= bytes.len() && &bytes[i..i + ob.len()] == ob {
+                    out.push_str(new);
+                    i += ob.len();
+                    continue 'outer;
+                }
+            }
+            // No pair matched; copy one UTF-8 char.
+            let ch = s[i..].chars().next().unwrap();
+            out.push(ch);
+            i += ch.len_utf8();
+        }
+        out
+    }
+
+    pub fn WriteString<W: std::io::Write>(&self, w: &mut W, s: impl AsRef<str>) -> (int, crate::errors::error) {
+        let result = self.Replace(s);
+        match w.write(result.as_bytes()) {
+            Ok(n) => (n as int, crate::errors::nil),
+            Err(e) => (0, crate::errors::New(&e.to_string())),
+        }
+    }
+}
+
+/// strings.NewReplacer("old1","new1","old2","new2",...)
+///
+/// Takes a slice of alternating old/new strings. Panics on odd count.
+#[allow(non_snake_case)]
+pub fn NewReplacer(pairs: &[impl AsRef<str>]) -> Replacer {
+    if pairs.len() % 2 != 0 {
+        panic!("strings.NewReplacer: odd argument count");
+    }
+    let pairs = pairs.chunks(2)
+        .map(|c| (c[0].as_ref().to_string(), c[1].as_ref().to_string()))
+        .collect();
+    Replacer { pairs }
+}
+
+// ── strings.Map ────────────────────────────────────────────────────────
+//
+//   Go                                  goish
+//   ─────────────────────────────────   ──────────────────────────────────
+//   strings.Map(fn, s)                  strings::Map(|r| …, s)
+//
+// fn returns a char; if it returns '\0' the rune is dropped (Go uses
+// negative rune; we use '\0' since char cannot be negative).
+
+#[allow(non_snake_case)]
+pub fn Map(mut f: impl FnMut(char) -> char, s: impl AsRef<str>) -> string {
+    let mut out = String::with_capacity(s.as_ref().len());
+    for c in s.as_ref().chars() {
+        let r = f(c);
+        if r != '\0' {
+            out.push(r);
+        }
+    }
+    out
+}
+
+// ── strings.ContainsAny / IndexAny / ContainsRune ──────────────────────
+
+#[allow(non_snake_case)]
+pub fn ContainsAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> bool {
+    let set: Vec<char> = chars.as_ref().chars().collect();
+    s.as_ref().chars().any(|c| set.contains(&c))
+}
+
+#[allow(non_snake_case)]
+pub fn ContainsRune(s: impl AsRef<str>, r: char) -> bool {
+    s.as_ref().contains(r)
+}
+
+#[allow(non_snake_case)]
+pub fn IndexAny(s: impl AsRef<str>, chars: impl AsRef<str>) -> int {
+    let s = s.as_ref();
+    let set: Vec<char> = chars.as_ref().chars().collect();
+    for (i, c) in s.char_indices() {
+        if set.contains(&c) {
+            return i as int;
+        }
+    }
+    -1
+}
+
+#[allow(non_snake_case)]
+pub fn IndexByte(s: impl AsRef<str>, b: crate::types::byte) -> int {
+    s.as_ref().as_bytes().iter().position(|x| *x == b).map(|i| i as int).unwrap_or(-1)
+}
+
+#[allow(non_snake_case)]
+pub fn IndexRune(s: impl AsRef<str>, r: char) -> int {
+    let s = s.as_ref();
+    s.find(r).map(|i| i as int).unwrap_or(-1)
+}
+
+#[allow(non_snake_case)]
+pub fn Title(s: impl AsRef<str>) -> string {
+    // Go's deprecated strings.Title: uppercase the first letter of each word.
+    let s = s.as_ref();
+    let mut out = String::with_capacity(s.len());
+    let mut at_word_boundary = true;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            at_word_boundary = true;
+            out.push(c);
+        } else if at_word_boundary {
+            for uc in c.to_uppercase() {
+                out.push(uc);
+            }
+            at_word_boundary = false;
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -319,5 +543,63 @@ mod tests {
         assert_eq!(n, 2);
         let (n, _) = b.WriteRune('漢');
         assert_eq!(n, 3);
+    }
+
+    #[test]
+    fn reader_reads_bytes() {
+        let mut r = NewReader("hello");
+        let mut buf = [0u8; 3];
+        let (n, _) = r.Read(&mut buf);
+        assert_eq!(n, 3);
+        assert_eq!(&buf, b"hel");
+        let (n, _) = r.Read(&mut buf);
+        assert_eq!(n, 2);
+        assert_eq!(&buf[..2], b"lo");
+    }
+
+    #[test]
+    fn reader_seek() {
+        let mut r = NewReader("abcdef");
+        r.Seek(2, 0);
+        let (b, _) = r.ReadByte();
+        assert_eq!(b, b'c');
+        r.Seek(-1, 2);
+        let (b, _) = r.ReadByte();
+        assert_eq!(b, b'f');
+    }
+
+    #[test]
+    fn replacer_replaces_multiple() {
+        let r = NewReplacer(&["a", "1", "b", "2", "c", "3"]);
+        assert_eq!(r.Replace("abc cab"), "123 312");
+    }
+
+    #[test]
+    fn replacer_leaves_unmatched() {
+        let r = NewReplacer(&["foo", "FOO"]);
+        assert_eq!(r.Replace("foo bar baz"), "FOO bar baz");
+    }
+
+    #[test]
+    fn map_transforms_chars() {
+        let shout = Map(|c| c.to_ascii_uppercase(), "hello");
+        assert_eq!(shout, "HELLO");
+        let drop_vowels = Map(|c| if "aeiouAEIOU".contains(c) { '\0' } else { c }, "HELLO");
+        assert_eq!(drop_vowels, "HLL");
+    }
+
+    #[test]
+    fn contains_any_and_index_any() {
+        assert!(ContainsAny("hello", "xyz!o"));
+        assert!(!ContainsAny("hello", "xyz"));
+        assert_eq!(IndexAny("hello", "lo"), 2);
+        assert_eq!(IndexAny("abc", "xyz"), -1);
+        assert_eq!(IndexRune("héllo", 'é'), 1);
+        assert_eq!(IndexByte("hello", b'l'), 2);
+    }
+
+    #[test]
+    fn title_upcases_words() {
+        assert_eq!(Title("hello world"), "Hello World");
     }
 }

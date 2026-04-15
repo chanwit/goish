@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.2"
+goish = "0.3"
 ```
 
 Then in every file where you want Go-shaped code:
@@ -201,6 +201,21 @@ fmt::Printf!("took %s\n", elapsed);   // e.g. "100.3ms"
 | **`hex`** | `encoding/hex` | EncodeToString/DecodeString |
 | **`flag`** | `flag` | String/Int/Bool/Float64/Duration + Parse/Args/Arg |
 | **`const_block!`** | `const (…) with iota` | auto-incrementing constants |
+| **`bytes`** | `bytes` *(complete)* | `Buffer`/`Reader`/`NewReader` + Equal/Index/Split/Join/Trim/Replace/Fields/…  |
+| **`strings`** | `strings` *(extended)* | + `Reader`/`Replacer`/`Map` + IndexAny/ContainsAny/Title |
+| **`path`** | `path` | slash-only Base/Dir/Ext/Join/Clean/Split/Match (URLs) |
+| **`sort`** | `sort` *(extended)* | + Search/SearchInts/SearchStrings/IntSlice/Reverse/ReverseInts |
+| **`runtime`** | `runtime` | NumCPU/GOMAXPROCS/Gosched/GOOS/GOARCH/NumGoroutine/Version |
+| **`exec`** | `os/exec` | Command/Run/Output/CombinedOutput/LookPath |
+| **`binary`** | `encoding/binary` | BigEndian/LittleEndian + Uvarint/Varint |
+| **`csv`** | `encoding/csv` | Reader/Writer with RFC 4180 quoting |
+| **`hash::{crc32,fnv}`** | `hash/crc32`, `hash/fnv` | IEEE CRC-32, FNV-1/1a 32/64 |
+| **`mime`** | `mime` | TypeByExtension/ExtensionsByType/AddExtensionType |
+| **`container::{list,heap}`** | `container/list`, `container/heap` | doubly linked list, generic binary heap |
+| **`url`** | `net/url` | Parse/URL/Userinfo + Values + QueryEscape/PathEscape |
+| **`crypto::{md5,sha1,sha256}`** | `crypto/md5`, `crypto/sha1`, `crypto/sha256` | hand-rolled (no deps) |
+| **`json`** | `encoding/json` | Marshal/Unmarshal/MarshalIndent over `Value` |
+| **`regexp`** | `regexp` | Compile/MustCompile/MatchString/FindString/ReplaceAll/Split |
 
 ## Known gaps
 
@@ -223,6 +238,7 @@ cargo run --example config      # strings + strconv config parser
 cargo run --example literals    # slice! / map! / chan! / len / append / delete
 cargo run --example worker      # goroutines + channel + defer + time::Since
 cargo run --example pipeline    # sync.WaitGroup + sort + math + filepath + log + context
+cargo run --example webscrape   # url + regexp + json + csv + sha256 + path  (v0.3)
 ```
 
 ## Design priority

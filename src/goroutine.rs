@@ -24,9 +24,19 @@ impl Goroutine {
     where
         F: FnOnce() + Send + 'static,
     {
-        Goroutine {
-            handle: Some(std::thread::spawn(f)),
-        }
+        use std::sync::atomic::Ordering;
+        crate::runtime::LIVE_GOROUTINES.fetch_add(1, Ordering::SeqCst);
+        let handle = std::thread::spawn(move || {
+            struct Guard;
+            impl Drop for Guard {
+                fn drop(&mut self) {
+                    crate::runtime::LIVE_GOROUTINES.fetch_sub(1, Ordering::SeqCst);
+                }
+            }
+            let _g = Guard;
+            f();
+        });
+        Goroutine { handle: Some(handle) }
     }
 
     /// Wait for the goroutine to finish. Returns nil error if it completed
