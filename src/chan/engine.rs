@@ -1,17 +1,24 @@
-//! chan/engine_flume: flume-backed channel engine.
+//! chan/engine: flume-backed channel engine.
 //!
 //! Flume is MPMC, bounded/unbounded, has both sync and async receivers.
-//! The one gap vs Go: no explicit `close()` method — closure is implicit
-//! on drop of all senders. We emulate Go's `close(ch)` via a shared
-//! `AtomicBool` that senders check before attempting to send.
+//! Gap vs Go: no explicit `close()` that wakes parked receivers. We emulate
+//! via a shared `AtomicBool` (fast check for senders) + a closable
+//! `tokio::sync::Semaphore` that parked async receivers select on. When
+//! `Chan::Close()` fires, the semaphore is closed and every async waiter
+//! wakes within one scheduler cycle.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 pub struct Inner<T> {
     tx: flume::Sender<T>,
     rx: flume::Receiver<T>,
     closed: Arc<AtomicBool>,
+    /// Never-acquired-as-permit semaphore; `.close()` on it makes every
+    /// pending `acquire()` return `Err(AcquireError)`. Async receivers
+    /// select-await on this so `Chan::Close()` wakes them.
+    close_signal: Arc<Semaphore>,
 }
 
 impl<T> Inner<T> {
@@ -21,7 +28,11 @@ impl<T> Inner<T> {
         } else {
             flume::bounded(cap)
         };
-        Inner { tx, rx, closed: Arc::new(AtomicBool::new(false)) }
+        Inner {
+            tx, rx,
+            closed: Arc::new(AtomicBool::new(false)),
+            close_signal: Arc::new(Semaphore::new(0)),
+        }
     }
 
     pub fn is_closed(&self) -> bool {
@@ -30,10 +41,7 @@ impl<T> Inner<T> {
 
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
-        // Drop the internal sender clone bank by... actually we can't force
-        // flume to disconnect. Strategy: signal via the atomic flag; senders
-        // check before each send; receivers keep draining until empty, then
-        // observe the flag. See Chan::Recv for the combined drain+flag check.
+        self.close_signal.close();
     }
 
     pub fn send(&self, v: T) -> Result<(), T> {
@@ -68,9 +76,6 @@ impl<T> Inner<T> {
     }
 
     pub fn recv(&self) -> Option<T> {
-        // Loop with short timeout so that a Close() call from another thread
-        // wakes us within the poll interval. flume has no native close(); this
-        // polling is the cost of emulating Go's close broadcast on flume.
         loop {
             match self.rx.try_recv() {
                 Ok(v) => return Some(v),
@@ -88,25 +93,24 @@ impl<T> Inner<T> {
     }
 
     pub async fn recv_async(&self) -> Option<T> {
-        // Async variant: use flume's recv_async inside a select with a
-        // periodic closed-flag check via tokio-less polling. For simplicity
-        // we reuse the sync timeout loop in block_on-friendly form: each
-        // iteration yields on the runtime between checks.
         loop {
             match self.rx.try_recv() {
                 Ok(v) => return Some(v),
                 Err(flume::TryRecvError::Disconnected) => return None,
                 Err(flume::TryRecvError::Empty) => {
                     if self.is_closed() { return None; }
-                    // Brief async wait; on any executor that supports timers
-                    // this lets Close() propagate. With no runtime, the
-                    // flume recv_async will wake on any send, so the polling
-                    // cadence is only relevant in close-while-parked cases.
-                    let fut = self.rx.recv_async();
-                    match fut.await {
-                        Ok(v) => return Some(v),
-                        Err(_) => {
-                            if self.is_closed() { return None; }
+                    // Park until either a value arrives OR Close() fires.
+                    tokio::select! {
+                        biased;
+                        res = self.rx.recv_async() => match res {
+                            Ok(v) => return Some(v),
+                            Err(_) => return None,
+                        },
+                        _ = self.close_signal.acquire() => {
+                            // close_signal is closed → we've been told to
+                            // shut down. Retry the loop: if there's still a
+                            // value buffered, we should drain it; otherwise
+                            // the is_closed check returns None.
                             continue;
                         }
                     }
@@ -129,6 +133,7 @@ impl<T> Clone for Inner<T> {
             tx: self.tx.clone(),
             rx: self.rx.clone(),
             closed: self.closed.clone(),
+            close_signal: self.close_signal.clone(),
         }
     }
 }

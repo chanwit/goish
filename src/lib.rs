@@ -72,6 +72,11 @@ pub mod unicode;          // unicode + unicode/utf8
 
 // ── Built-ins (Go keyword / language-level things) ─────────────────────
 
+#[doc(hidden)]
+pub mod __macros {
+    pub use goish_macros::rewrite_go_body;
+}
+
 pub mod chan;
 pub mod consts;
 pub mod defer;

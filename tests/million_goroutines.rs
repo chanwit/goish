@@ -61,10 +61,10 @@ fn hundred_k_producers_one_consumer() {
     let consumer = go!{
         let mut sum = 0i64;
         for _ in 0..N {
-            let (v, _) = cc.recv().await;
+            let (v, _) = cc.Recv();
             sum += v;
         }
-        let _ = done_c.send(true).await;
+        let _ = done_c.Send(true);
         let _ = sum;
     };
 
@@ -72,7 +72,7 @@ fn hundred_k_producers_one_consumer() {
     for i in 0..N {
         let c = ch.clone();
         let _ = go!{
-            c.send(i as i64).await;
+            c.Send(i as i64);
         };
     }
 
@@ -103,7 +103,7 @@ fn million_goroutines_per_request_channels() {
         let reply_server = reply.clone();
         // Server goroutine — sends i back on its private reply channel.
         let _ = go!{
-            reply_server.send(i as i64).await;
+            reply_server.Send(i as i64);
         };
         replies.push(reply);
     }
@@ -112,7 +112,7 @@ fn million_goroutines_per_request_channels() {
     let counter_c = counter.clone();
     let aggregator = go!{
         for reply in replies {
-            let (_, _) = reply.recv().await;
+            let (_, _) = reply.Recv();
             counter_c.fetch_add(1, Ordering::Relaxed);
         }
     };

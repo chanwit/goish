@@ -97,15 +97,23 @@ impl Goroutine {
     }
 }
 
-/// `go!{ stmts }` — spawn a goroutine running the async block.
+/// `go!{ stmts }` — spawn a goroutine running the block.
 ///
-/// Channel ops inside the block must use the async form:
-///   c.send(v).await / c.recv().await / time::Sleep requires tokio::time::sleep.
+/// The block can use goish's usual sync-looking API (`c.Send(v)`,
+/// `c.Recv()`, `g.Wait()`). A proc-macro rewriter (`goish_macros::
+/// rewrite_go_body!`) walks the body AST and rewrites those calls into
+/// their async form (`c.send(v).await`, etc.) before `tokio::spawn`ing.
+/// The `.await` is invisible at the call site.
+///
+/// Collateral damage: any `.Send(x)`, `.Recv()`, or `.Wait()` method call
+/// on a non-goish type inside `go!{}` is ALSO rewritten into async form,
+/// which may not compile. Rename the conflicting method or call it
+/// outside `go!{}`.
 #[macro_export]
 macro_rules! go {
     ($($tt:tt)*) => {
         $crate::goroutine::Goroutine::spawn(async move {
-            $($tt)*
+            $crate::__macros::rewrite_go_body!($($tt)*);
         })
     };
 }
@@ -127,12 +135,14 @@ mod tests {
     }
 
     #[test]
-    fn go_with_channel_async() {
+    fn go_with_channel_looks_sync() {
+        // Inside go!{} we write .Send (uppercase, sync form). The proc-macro
+        // rewrites it to .send(…).await so the body is actually async.
         let ch = crate::chan!(i64, 4);
         let producer = ch.clone();
         let g = crate::go!{
             for i in 1i64..=3 {
-                producer.send(i).await;
+                producer.Send(i);
             }
         };
         let _ = g.Wait();
@@ -163,7 +173,7 @@ mod tests {
         let mut handles = Vec::with_capacity(10_000);
         for i in 0..10_000i64 {
             let c = ch.clone();
-            handles.push(crate::go!{ c.send(i).await; });
+            handles.push(crate::go!{ c.Send(i); });
         }
         let mut sum = 0i64;
         for _ in 0..10_000 {
