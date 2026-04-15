@@ -144,6 +144,40 @@ Go's scheduler handles natively. Inside `go!{}`, channel method calls look
 identical to outside — a proc-macro (`goish-macros`) rewrites `.Send`,
 `.Recv`, `.Wait` into their async equivalents at compile time.
 
+### net/http
+
+```rust
+use goish::prelude::*;
+
+fn main() {
+    http::HandleFunc("/hello", |w, r| {
+        Fprintf!(w, "hi %s", r.URL.Path);
+    });
+    log::Fatalf!("%s", http::ListenAndServe(":8080", nil));
+}
+```
+
+Client:
+
+```rust
+let (mut resp, err) = http::Get("http://api.example.com/v1/status");
+if err != nil { log::Fatalf!("%s", err); }
+defer!{ resp.Body.Close(); }
+let body = resp.Body.String();
+fmt::Println!(body);
+```
+
+Context-bound deadlines cancel in-flight requests, same shape as Go:
+
+```rust
+let (ctx, _) = context::WithTimeout(context::Background(), 5i64 * time::Second);
+let (req, _) = http::NewRequestWithContext(ctx, "GET", url, &[]);
+let (resp, err) = http::Do(req);   // aborts after 5s if server is slow
+```
+
+Inside handlers, `select!` on `r.Context().Done()` to abort work when the
+client disconnects. Backed by hyper 1.x + tokio; goroutine-per-connection.
+
 ### `defer!`
 
 ```rust
@@ -211,6 +245,24 @@ benchmark!{ fn BenchmarkJoin(b) {
 }}
 ```
 
+**Go's `TestMain`** ports as `test_main!` with a custom harness. In a
+`harness = false` test target, use `test_h!` (not `test!`) and wire
+setup/teardown around `m.Run()`:
+
+```rust
+// tests/my_test.rs — registered with harness = false in Cargo.toml
+use goish::prelude::*;
+
+test_h!{ fn TestAddition(t) { if 2+2 != 4 { t.Error("math broke"); } } }
+
+test_main!{ fn TestMain(m) {
+    setup();
+    let code = m.Run();
+    teardown();
+    os::Exit(code);
+}}
+```
+
 Real Go tests ported as regression fixtures live in `tests/`:
 - `tests/path_test.rs` — direct port of `go/src/path/path_test.go`
 - `tests/itoa_test.rs` — direct port of `go/src/strconv/itoa_test.go`
@@ -269,7 +321,8 @@ if r.is_none() { t.Fatal("expected panic"); }
 | **`crypto::{md5,sha1,sha256}`** | `crypto/md5`, `crypto/sha1`, `crypto/sha256` | hand-rolled (no deps) |
 | **`json`** | `encoding/json` | Marshal/Unmarshal/MarshalIndent over `Value` |
 | **`regexp`** | `regexp` | Compile/MustCompile/MatchString/FindString/ReplaceAll/Split |
-| **`testing`** | `testing` | `T`/`M`/`B` + `test!`/`benchmark!`/`test_main!` + `Struct!` for Go-style ports |
+| **`testing`** | `testing` | `T`/`M`/`B` + `test!`/`test_h!`/`benchmark!`/`test_main!` + `Struct!` |
+| **`net/http`** | `net/http` | Server + Client (hyper-backed): HandleFunc/ListenAndServe/ServeMux/Request/Response/ResponseWriter/Client/Get/Post/Do/NewRequestWithContext |
 
 ## Known gaps
 
@@ -289,6 +342,7 @@ cargo run --example literals    # slice! / map! / chan! / len / append / delete
 cargo run --example worker      # goroutines + channel + defer + time::Since
 cargo run --example pipeline    # sync.WaitGroup + sort + math + filepath + log + context
 cargo run --example webscrape   # url + regexp + json + csv + sha256 + path  (v0.3)
+cargo run --example webserver   # net/http server + client, in Go-shaped Rust (v0.5)
 ```
 
 ## Design priority
@@ -297,6 +351,9 @@ The top priority is **Go idioms and call-site syntax** — if a Go programmer
 reads a goish program, it should look like Go. Rust idioms (`Option`, `Some`,
 `&mut`, trait-bound generics) live *under* the hood. When a Rust idiom has to
 leak, it's called out explicitly and a wrapper is designed to minimise it.
+
+For the goroutine + channel runtime decision (tokio + flume, 1M goroutines),
+see [`docs/scheduler.md`](docs/scheduler.md).
 
 ## License
 

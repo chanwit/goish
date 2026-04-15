@@ -3,7 +3,7 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.4.2"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
@@ -32,7 +32,7 @@ exclude = [
 #   - flume backs Chan<T>: winner of v0.4 channel bake-off (see commit
 #     b996384 — 2× faster rendezvous, 3.5× less RSS vs async-channel).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
-goish-macros = { version = "0.4.2", path = "goish-macros" }
+goish-macros = { version = "0.5.0", path = "goish-macros" }
 flume = { version = "0.11", default-features = false, features = ["async"] }
 serde = "1"
 serde_json = "1"
@@ -46,6 +46,10 @@ hyper-util = { version = "0.1", features = ["tokio", "http1", "server", "server-
 http = "1"
 http-body-util = "0.1"
 bytes = "1"
+
+# testing harness: `test!` registers into a linker-backed inventory so
+# `test_main!` (in harness=false test targets) can discover + run them.
+inventory = "0.3"
 
 [lib]
 path = "src/lib.rs"
@@ -77,3 +81,8 @@ path = "examples/webscrape.rs"
 [[example]]
 name = "webserver"
 path = "examples/webserver.rs"
+
+[[test]]
+name = "test_main_harness"
+path = "tests/test_main_harness.rs"
+harness = false

@@ -307,6 +307,57 @@ macro_rules! test {
                 eprintln!("--- SKIP: {} ({})", __t.Name(), __t.log_contents());
             }
         }
+
+    };
+}
+
+/// `test_h!{ fn TestX(t) { … } }` — variant for **custom-harness** test
+/// files (`harness = false`). Emits a plain function + an inventory
+/// registration so `test_main!`'s generated `main()` can discover and
+/// run it via `m.Run()`.
+///
+/// Use `test!` for files running under the default libtest harness
+/// (the common case); switch to `test_h!` only in files where you've
+/// set `harness = false` and are using `test_main!`.
+///
+/// Rationale: rustc's `#[test]` attribute (which `test!` emits) hides
+/// the fn from ordinary module scope under a custom harness, which
+/// breaks inventory's link-time fn-pointer capture.
+#[macro_export]
+macro_rules! test_h {
+    (fn $name:ident ( $t:ident ) $body:block) => {
+        #[allow(non_snake_case, dead_code)]
+        fn $name() {
+            let __t = $crate::testing::T::new(stringify!($name));
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let $t: &$crate::testing::T = &__t;
+                $body
+            }));
+            let finished = match outcome {
+                Ok(()) => __t.finish($crate::testing::__priv::Outcome::Ok),
+                Err(e) if $crate::testing::__priv::is_abort_panic(&e) => {
+                    __t.finish($crate::testing::__priv::Outcome::Aborted)
+                }
+                Err(e) => {
+                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                        s.to_string()
+                    } else if let Some(s) = e.downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        "unknown panic".to_string()
+                    };
+                    __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
+                }
+            };
+            if let Err(log) = finished { panic!("{}", log); }
+        }
+
+        $crate::__goish_inventory::submit! {
+            $crate::testing::RegisteredTest {
+                name: stringify!($name),
+                run: $name,
+            }
+        }
     };
 }
 
@@ -489,31 +540,124 @@ macro_rules! benchmark {
     };
 }
 
-// ── test_main! / M — stub that runs the user body then exits ───────────
+// ── test_main! / M — real TestMain harness backed by `inventory` ──────
 //
-// Under the default `#[test]` harness we can't actually replace `main()`,
-// so test_main! is a no-op that the test runner detects and reports. For
-// true TestMain semantics, users set `harness = false` in Cargo.toml and
-// the macro generates a `fn main()`. We detect which mode via cfg: if a
-// `__goish_custom_harness` cfg is set, generate main; otherwise a warning.
+// Under the default `#[test]` harness, `test_main!` remains inert
+// (the user body type-checks but never runs) — libtest owns `main()`.
+//
+// Under a custom harness (`harness = false` in `[[test]]` in Cargo.toml),
+// `test_main!` expands to a real `fn main()` that:
+//   1. Parses `-run` / `-v` / `-short` command-line flags
+//   2. Constructs `M`
+//   3. Executes the user's TestMain body (so setup/teardown runs)
+//   4. User calls `m.Run()` which iterates every `test!` registered in
+//      the `inventory` crate's linker table, running each one
+//   5. `m.Run()` returns Go's style exit code (0 pass / 1 fail); the
+//      user's TestMain typically ends with `os::Exit(m.Run())`.
 
-pub struct M;
-
-impl M {
-    #[allow(non_snake_case)]
-    pub fn Run(&self) -> int { 0 }
+/// A test registered by the `test!` macro. `inventory::submit!` stores
+/// one of these per test at link time; `M::Run()` walks the whole list.
+pub struct RegisteredTest {
+    pub name: &'static str,
+    pub run: fn(),
 }
 
+inventory::collect!(RegisteredTest);
+
+/// Go's `*testing.M` — the value TestMain receives and calls `.Run()` on.
+pub struct M {
+    filter: Option<String>,
+    verbose: bool,
+}
+
+impl M {
+    #[doc(hidden)]
+    pub fn new() -> Self {
+        M {
+            filter: std::env::args().find_map(|a| {
+                a.strip_prefix("-run=")
+                    .or_else(|| a.strip_prefix("-test.run="))
+                    .map(|s| s.to_owned())
+            }),
+            verbose: std::env::args().any(|a| {
+                matches!(a.as_str(), "-v" | "--verbose" | "-test.v")
+            }),
+        }
+    }
+
+    /// `m.Run()` — run every registered test (optionally filtered by
+    /// `-run=<regex>`). Returns 0 if all passed, 1 otherwise.
+    #[allow(non_snake_case)]
+    pub fn Run(&self) -> int {
+        let pat: Option<crate::regexp::Regexp> =
+            self.filter.as_deref().map(|p| {
+                let (re, _err) = crate::regexp::Compile(p);
+                re
+            });
+
+        let mut ran = 0usize;
+        let mut failed = 0usize;
+        for t in inventory::iter::<RegisteredTest>() {
+            if let Some(re) = &pat {
+                if !re.MatchString(t.name) { continue; }
+            }
+            if self.verbose { eprintln!("=== RUN   {}", t.name); }
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (t.run)()));
+            ran += 1;
+            match outcome {
+                Ok(()) => {
+                    if self.verbose { eprintln!("--- PASS: {}", t.name); }
+                }
+                Err(_) => {
+                    failed += 1;
+                    eprintln!("--- FAIL: {}", t.name);
+                }
+            }
+        }
+        eprintln!("TestMain: ran {} tests, {} failed", ran, failed);
+        if failed == 0 { 0 } else { 1 }
+    }
+}
+
+impl Default for M {
+    fn default() -> Self { M::new() }
+}
+
+/// `test_main!{ fn TestMain(m) { … } }` — generate a Go-shape TestMain.
+///
+/// Behaviour depends on whether the test target is using the default
+/// libtest harness or a custom one (`harness = false`):
+///
+///   - default harness:   user body is type-checked but never runs
+///   - custom harness:    macro emits `fn main()` that runs the user
+///                        body, which typically ends with `m.Run()`
+///
+/// To switch a test file into custom-harness mode, add to Cargo.toml:
+///
+///   [[test]]
+///   name = "mytest"
+///   path = "tests/mytest.rs"
+///   harness = false
 #[macro_export]
 macro_rules! test_main {
     (fn $name:ident ( $m:ident ) $body:block) => {
-        // In default-harness mode, TestMain is documented but inert.
-        // The user body is compiled for type-checking only.
+        // User's TestMain body — usable both as an ordinary fn (under
+        // default harness) and callable from the generated main() below
+        // (under custom harness).
         #[allow(dead_code, non_snake_case)]
-        fn $name() {
-            let __m = $crate::testing::M;
-            let $m: &$crate::testing::M = &__m;
+        fn $name(__m: &$crate::testing::M) {
+            let $m: &$crate::testing::M = __m;
             $body
+        }
+
+        // Generate a main(). Under default harness this is harmless
+        // (libtest provides its own main and the two don't collide
+        // because `cargo test` uses `--test` which renames user main).
+        // Under `harness = false`, this IS the entrypoint.
+        #[allow(dead_code)]
+        fn main() {
+            let __m = $crate::testing::M::new();
+            $name(&__m);
         }
     };
 }

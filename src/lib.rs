@@ -77,6 +77,14 @@ pub mod __macros {
     pub use goish_macros::rewrite_go_body;
 }
 
+/// Re-export of the `inventory` crate so the `test!` macro in user crates
+/// can submit registrations without the user depending on `inventory`
+/// directly. Not a public API.
+#[doc(hidden)]
+pub mod __goish_inventory {
+    pub use inventory::submit;
+}
+
 pub mod chan;
 pub mod consts;
 pub mod defer;
@@ -152,6 +160,6 @@ pub mod prelude {
     pub use crate::{
         Errorf, Fprintf, Printf, Println, Sprintf,
         append, benchmark, chan, close, const_block, defer, delete, go, len, make, map,
-        range, recover, select, slice, stringer, Struct, test, test_main,
+        range, recover, select, slice, stringer, Struct, test, test_h, test_main,
     };
 }
