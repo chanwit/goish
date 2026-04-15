@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.3"
+goish = "0.4"
 ```
 
 Then in every file where you want Go-shaped code:
@@ -173,6 +173,42 @@ let elapsed = time::Since(start);
 fmt::Printf!("took %s\n", elapsed);   // e.g. "100.3ms"
 ```
 
+### testing (v0.4) — port Go tests line-by-line
+
+```rust
+use goish::prelude::*;
+
+// Go:   type PathTest struct { path, result string }
+Struct!{ type PathTest struct { path, result string } }
+
+// Go:   var tests = []PathTest{ {"", "."}, {"abc", "abc"}, ... }
+fn tests() -> slice<PathTest> { slice!([]PathTest{
+    PathTest!("",    "."),
+    PathTest!("abc", "abc"),
+    // ...
+})}
+
+test!{ fn TestClean(t) {
+    for test in &tests() {
+        let s = path::Clean(&test.path);
+        if s != test.result {
+            t.Errorf(Sprintf!("Clean(%q) = %q, want %q", test.path, s, test.result));
+        }
+    }
+}}
+
+benchmark!{ fn BenchmarkJoin(b) {
+    b.ReportAllocs();
+    while b.Loop() {
+        path::Join(&slice!([]string{"a", "b"}));
+    }
+}}
+```
+
+Real Go tests ported as regression fixtures live in `tests/`:
+- `tests/path_test.rs` — direct port of `go/src/path/path_test.go`
+- `tests/itoa_test.rs` — direct port of `go/src/strconv/itoa_test.go`
+
 ## Packages (current status)
 
 | goish | Go package | status |
@@ -216,6 +252,7 @@ fmt::Printf!("took %s\n", elapsed);   // e.g. "100.3ms"
 | **`crypto::{md5,sha1,sha256}`** | `crypto/md5`, `crypto/sha1`, `crypto/sha256` | hand-rolled (no deps) |
 | **`json`** | `encoding/json` | Marshal/Unmarshal/MarshalIndent over `Value` |
 | **`regexp`** | `regexp` | Compile/MustCompile/MatchString/FindString/ReplaceAll/Split |
+| **`testing`** | `testing` | `T`/`M`/`B` + `test!`/`benchmark!`/`test_main!` + `Struct!` for Go-style ports |
 
 ## Known gaps
 

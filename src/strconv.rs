@@ -95,34 +95,61 @@ pub fn ParseBool(s: impl AsRef<str>) -> (bool, error) {
 }
 
 pub fn FormatInt(n: int64, base: int) -> string {
-    match base {
-        10 => n.to_string(),
-        16 => format!("{:x}", n),
-        8 => format!("{:o}", n),
-        2 => format!("{:b}", n),
-        b if (2..=36).contains(&b) => {
-            let (neg, mut nn) = if n < 0 {
-                (true, (-(n as i128)) as u128)
-            } else {
-                (false, n as u128)
-            };
-            if nn == 0 {
-                return "0".to_string();
-            }
-            let mut s = String::new();
-            let base_u = b as u128;
-            while nn > 0 {
-                let d = (nn % base_u) as u32;
-                s.insert(0, std::char::from_digit(d, b as u32).unwrap_or('?'));
-                nn /= base_u;
-            }
-            if neg {
-                s.insert(0, '-');
-            }
-            s
-        }
-        _ => panic!("strconv: illegal number base {}", base),
+    if !(2..=36).contains(&base) {
+        panic!("strconv: illegal number base {}", base);
     }
+    // Compute absolute value in u128 so i64::MIN negates cleanly.
+    let (neg, mut nn) = if n < 0 {
+        (true, (n as i128).unsigned_abs())
+    } else {
+        (false, n as u128)
+    };
+    if nn == 0 {
+        return "0".to_string();
+    }
+    let mut s = String::new();
+    let base_u = base as u128;
+    while nn > 0 {
+        let d = (nn % base_u) as u32;
+        s.insert(0, std::char::from_digit(d, base as u32).unwrap_or('?'));
+        nn /= base_u;
+    }
+    if neg {
+        s.insert(0, '-');
+    }
+    s
+}
+
+pub fn FormatUint(n: u64, base: int) -> string {
+    if !(2..=36).contains(&base) {
+        panic!("strconv: illegal number base {}", base);
+    }
+    if n == 0 {
+        return "0".to_string();
+    }
+    let mut s = String::new();
+    let mut nn = n as u128;
+    let base_u = base as u128;
+    while nn > 0 {
+        let d = (nn % base_u) as u32;
+        s.insert(0, std::char::from_digit(d, base as u32).unwrap_or('?'));
+        nn /= base_u;
+    }
+    s
+}
+
+/// AppendInt appends the string form of n in base, to dst, and returns the
+/// extended buffer.
+#[allow(non_snake_case)]
+pub fn AppendInt(mut dst: Vec<crate::types::byte>, n: int64, base: int) -> Vec<crate::types::byte> {
+    dst.extend_from_slice(FormatInt(n, base).as_bytes());
+    dst
+}
+
+#[allow(non_snake_case)]
+pub fn AppendUint(mut dst: Vec<crate::types::byte>, n: u64, base: int) -> Vec<crate::types::byte> {
+    dst.extend_from_slice(FormatUint(n, base).as_bytes());
+    dst
 }
 
 pub fn FormatBool(b: bool) -> string {
