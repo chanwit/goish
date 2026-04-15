@@ -126,6 +126,9 @@ pub mod prelude {
     pub use crate::fmt;
     pub use crate::hash;
     pub use crate::io;
+    pub use crate::io::{Reader as _GoishIoReader, Writer as _GoishIoWriter,
+                        Closer as _GoishIoCloser, Seeker as _GoishIoSeeker,
+                        ReaderAt as _GoishIoReaderAt, WriterAt as _GoishIoWriterAt};
     pub use crate::log;
     pub use crate::math;
     pub use crate::mime;

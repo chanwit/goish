@@ -63,6 +63,96 @@ pub fn Exit(code: int) -> ! {
     std::process::exit(code as i32)
 }
 
+/// os.Environ() — the environment as a list of "key=value" strings.
+#[allow(non_snake_case)]
+pub fn Environ() -> slice<string> {
+    std::env::vars().map(|(k, v)| format!("{}={}", k, v)).collect()
+}
+
+/// os.Clearenv() — removes all environment variables for the current process.
+#[allow(non_snake_case)]
+pub fn Clearenv() {
+    let keys: Vec<String> = std::env::vars().map(|(k, _)| k).collect();
+    for k in keys {
+        unsafe { std::env::remove_var(k); }
+    }
+}
+
+/// os.Expand(s, mapping) — replaces $var or ${var} in s with mapping(var).
+#[allow(non_snake_case)]
+pub fn Expand(s: impl AsRef<str>, mapping: impl Fn(&str) -> string) -> string {
+    let s = s.as_ref();
+    let bytes = s.as_bytes();
+    let mut out = String::with_capacity(s.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'$' && i + 1 < bytes.len() {
+            let (name, w) = get_shell_name(&bytes[i + 1..]);
+            if w == 0 {
+                // $ not followed by a valid name char (e.g. "$+", "$}").
+                out.push('$');
+                i += 1;
+                continue;
+            }
+            if !name.is_empty() {
+                out.push_str(&mapping(&name));
+            }
+            i += 1 + w;
+            continue;
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
+/// os.ExpandEnv(s) — shorthand for Expand(s, os.Getenv).
+#[allow(non_snake_case)]
+pub fn ExpandEnv(s: impl AsRef<str>) -> string {
+    Expand(s, |k| Getenv(k))
+}
+
+fn get_shell_name(s: &[u8]) -> (String, usize) {
+    if s.is_empty() { return (String::new(), 0); }
+    if s[0] == b'{' {
+        // ${...}: scan until } or end.
+        if s.len() < 2 { return (String::new(), 1); }
+        if s[1] == b'}' { return (String::new(), 2); } // invalid ${}; consume 2
+        let mut i = 1;
+        while i < s.len() && s[i] != b'}' {
+            if !is_shell_special_var(s[i]) && !is_alpha_num(s[i]) {
+                // invalid — Go returns "" and consumes chars up to here.
+                return (String::new(), i + 1);
+            }
+            i += 1;
+        }
+        if i >= s.len() {
+            // No closing brace: Go's implementation eats the characters.
+            return (String::new(), s.len());
+        }
+        let name = std::str::from_utf8(&s[1..i]).unwrap_or("").to_string();
+        (name, i + 1)
+    } else if is_shell_special_var(s[0]) {
+        let name = (s[0] as char).to_string();
+        (name, 1)
+    } else if is_alpha_num(s[0]) {
+        let mut i = 0;
+        while i < s.len() && is_alpha_num(s[i]) { i += 1; }
+        let name = std::str::from_utf8(&s[..i]).unwrap_or("").to_string();
+        (name, i)
+    } else {
+        (String::new(), 0)
+    }
+}
+
+fn is_shell_special_var(c: u8) -> bool {
+    matches!(c, b'*' | b'#' | b'$' | b'@' | b'!' | b'?' | b'-') || (c >= b'0' && c <= b'9')
+}
+
+fn is_alpha_num(c: u8) -> bool {
+    c == b'_' || (c >= b'a' && c <= b'z') || (c >= b'A' && c <= b'Z') || (c >= b'0' && c <= b'9')
+}
+
 /// os.Hostname() → (name, error)
 #[allow(non_snake_case)]
 pub fn Hostname() -> (string, error) {

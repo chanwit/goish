@@ -12,76 +12,304 @@
 // Split function: lines (strips trailing \n and \r\n).
 
 use crate::errors::{error, nil, New};
-use crate::types::{byte, int, string};
-use std::io::{BufRead, Read as _, Write as _};
+use crate::types::{byte, int, rune, string};
+use std::io::{BufRead, Read, Write as _};
 
-pub struct Scanner<R: BufRead> {
+/// ErrTooLong — returned by Scan() when a single token exceeds MaxTokenSize.
+#[allow(non_snake_case)]
+pub fn ErrTooLong() -> error { New("bufio.Scanner: token too long") }
+
+/// ErrFinalToken — a SplitFunc can return this to deliver a last token after EOF.
+#[allow(non_snake_case)]
+pub fn ErrFinalToken() -> error { New("final token") }
+
+/// MaxScanTokenSize — default cap on Scan token size.
+pub const MaxScanTokenSize: usize = 64 * 1024;
+
+/// SplitFunc: called repeatedly by Scanner.Scan with the current buffer.
+///
+/// Returns (advance, token, err) where:
+/// - advance: number of bytes to consume from the buffer
+/// - token: the token for this call (None if nothing yet; need more data)
+/// - err: non-nil halts the scan
+pub type SplitFunc = fn(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error);
+
+pub struct Scanner<R: Read> {
     reader: R,
-    buf: String,
+    split: SplitFunc,
+    max_token: usize,
+    buffer: Vec<byte>,
+    /// valid bytes inside `buffer` not yet consumed.
+    start: usize,
+    end: usize,
+    /// The last token yielded, if any.
+    token: Vec<byte>,
     last_err: error,
+    at_eof: bool,
     done: bool,
+    empties: usize,
 }
 
 #[allow(non_snake_case)]
-pub fn NewScanner<R: BufRead>(r: R) -> Scanner<R> {
+pub fn NewScanner<R: Read>(r: R) -> Scanner<R> {
     Scanner {
         reader: r,
-        buf: String::new(),
+        split: ScanLines,
+        max_token: MaxScanTokenSize,
+        buffer: Vec::with_capacity(4096),
+        start: 0, end: 0,
+        token: Vec::new(),
         last_err: nil,
+        at_eof: false,
         done: false,
+        empties: 0,
     }
 }
 
-impl<R: BufRead> Scanner<R> {
-    /// sc.Scan() — returns true when a new line is available, false at EOF.
-    /// After returning false, call Err() to check for a non-EOF error.
+impl<R: Read> Scanner<R> {
+    /// Set the split function.
+    pub fn Split(&mut self, f: SplitFunc) { self.split = f; }
+
+    /// Limits the size of a single token, also acts as the upper bound on
+    /// the buffer. Returns nothing; Go's signature is (n int).
+    pub fn MaxTokenSize(&mut self, n: int) { self.max_token = n.max(0) as usize; }
+
+    /// Returns non-EOF error encountered, or nil.
+    pub fn Err(&self) -> &error { &self.last_err }
+
+    /// The most recent token's bytes.
+    pub fn Bytes(&self) -> &[byte] { &self.token }
+
+    /// The most recent token as a string.
+    pub fn Text(&self) -> &str {
+        std::str::from_utf8(&self.token).unwrap_or("")
+    }
+
+    /// Advance the scanner to the next token.
     pub fn Scan(&mut self) -> bool {
-        if self.done {
-            return false;
-        }
-        self.buf.clear();
-        match self.reader.read_line(&mut self.buf) {
-            Ok(0) => {
+        if self.done { return false; }
+        loop {
+            // Try to split what we have.
+            let data = &self.buffer[self.start..self.end];
+            let (advance, token, err) = (self.split)(data, self.at_eof);
+            if err != nil {
+                self.last_err = err;
                 self.done = true;
-                false
+                if let Some(tok) = token {
+                    self.token = tok;
+                    return true;
+                }
+                return false;
             }
-            Ok(_) => {
-                // Strip trailing \n and \r\n (Go behavior).
-                if self.buf.ends_with('\n') {
-                    self.buf.pop();
-                    if self.buf.ends_with('\r') {
-                        self.buf.pop();
+            if advance < 0 || (advance as usize) > data.len() {
+                self.last_err = New("bufio.Scanner: SplitFunc returned invalid advance");
+                self.done = true;
+                return false;
+            }
+            self.start += advance as usize;
+            if let Some(tok) = token {
+                self.token = tok;
+                if advance > 0 { self.empties = 0; }
+                else {
+                    self.empties += 1;
+                    if self.empties > 100 {
+                        self.last_err = New("bufio.Scanner: too many empty tokens without progress");
+                        self.done = true;
+                        return false;
                     }
                 }
-                true
+                return true;
             }
-            Err(e) => {
-                self.last_err = New(&format!("bufio.Scanner: {}", e));
+            // Need more data. Move or grow.
+            if self.start > 0 {
+                self.buffer.copy_within(self.start..self.end, 0);
+                self.end -= self.start;
+                self.start = 0;
+            }
+            if self.end >= self.buffer.len() {
+                // Grow, up to max_token.
+                let cap = self.buffer.capacity();
+                let new_cap = (cap * 2).max(4096).max(self.end + 1);
+                if new_cap > self.max_token {
+                    self.last_err = ErrTooLong();
+                    self.done = true;
+                    return false;
+                }
+                self.buffer.resize(new_cap, 0);
+            }
+            if self.at_eof {
+                // End of stream; emit final tokens.
                 self.done = true;
-                false
+                if self.end > 0 {
+                    // Try one more split forcing EOF.
+                    let data = &self.buffer[self.start..self.end];
+                    let (_, token2, err2) = (self.split)(data, true);
+                    if err2 != nil { self.last_err = err2; }
+                    if let Some(tok) = token2 {
+                        self.token = tok;
+                        self.start = self.end;
+                        return true;
+                    }
+                }
+                return false;
+            }
+            // Read more.
+            let mut scratch = [0u8; 4096];
+            let avail = self.buffer.len() - self.end;
+            let want = std::cmp::min(avail, scratch.len());
+            match self.reader.read(&mut scratch[..want]) {
+                Ok(0) => {
+                    self.at_eof = true;
+                }
+                Ok(n) => {
+                    self.buffer[self.end..self.end + n].copy_from_slice(&scratch[..n]);
+                    self.end += n;
+                }
+                Err(e) => {
+                    let msg = format!("{}", e);
+                    if msg.to_lowercase().contains("unexpectedeof") || msg.to_lowercase().contains("eof") {
+                        self.at_eof = true;
+                    } else {
+                        self.last_err = New(&format!("bufio.Scanner: {}", e));
+                        self.done = true;
+                        return false;
+                    }
+                }
             }
         }
     }
+}
 
-    /// sc.Text() — the current line, as a string slice.
-    pub fn Text(&self) -> &str {
-        &self.buf
-    }
+// ─── Built-in SplitFuncs ──────────────────────────────────────────────
 
-    /// sc.Bytes() — the current line, as a byte slice.
-    pub fn Bytes(&self) -> &[byte] {
-        self.buf.as_bytes()
-    }
+/// ScanBytes is a split function that returns each byte as a token.
+#[allow(non_snake_case)]
+pub fn ScanBytes(data: &[byte], _at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+    if data.is_empty() { return (0, None, nil); }
+    (1, Some(vec![data[0]]), nil)
+}
 
-    /// sc.Err() — non-EOF error encountered, or nil.
-    pub fn Err(&self) -> &error {
-        &self.last_err
+/// ScanRunes is a split function that yields each UTF-8 rune as a token.
+#[allow(non_snake_case)]
+pub fn ScanRunes(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+    if data.is_empty() { return (0, None, nil); }
+    // ASCII fast path.
+    if data[0] < 0x80 { return (1, Some(vec![data[0]]), nil); }
+    let width = match data[0] {
+        0xC0..=0xDF => 2,
+        0xE0..=0xEF => 3,
+        0xF0..=0xF7 => 4,
+        _ => { /* invalid lead */
+            return (1, Some({
+            let mut buf = vec![0u8; 4];
+            let n = crate::unicode::utf8::EncodeRune(&mut buf, crate::unicode::RuneError);
+            buf.truncate(n as usize);
+            buf
+        }), nil);
+        }
+    };
+    if data.len() < width {
+        if at_eof {
+            return (data.len() as int, Some({
+            let mut buf = vec![0u8; 4];
+            let n = crate::unicode::utf8::EncodeRune(&mut buf, crate::unicode::RuneError);
+            buf.truncate(n as usize);
+            buf
+        }), nil);
+        }
+        return (0, None, nil);
     }
+    // Validate continuation bytes.
+    for i in 1..width {
+        if (data[i] & 0xC0) != 0x80 {
+            return (1, Some({
+            let mut buf = vec![0u8; 4];
+            let n = crate::unicode::utf8::EncodeRune(&mut buf, crate::unicode::RuneError);
+            buf.truncate(n as usize);
+            buf
+        }), nil);
+        }
+    }
+    (width as int, Some(data[..width].to_vec()), nil)
+}
+
+/// ScanLines is a split function that yields each line of text, stripped of
+/// any trailing \r\n or \n marker.
+#[allow(non_snake_case)]
+pub fn ScanLines(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+    if at_eof && data.is_empty() { return (0, None, nil); }
+    if let Some(i) = data.iter().position(|&b| b == b'\n') {
+        // Drop the trailing \r if present.
+        let tok_end = if i > 0 && data[i-1] == b'\r' { i - 1 } else { i };
+        return ((i + 1) as int, Some(data[..tok_end].to_vec()), nil);
+    }
+    if at_eof {
+        return (data.len() as int, Some(data.to_vec()), nil);
+    }
+    (0, None, nil)
+}
+
+/// ScanWords is a split function that yields each whitespace-separated word.
+#[allow(non_snake_case)]
+pub fn ScanWords(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+    // Skip leading whitespace.
+    let mut start = 0usize;
+    while start < data.len() {
+        let (r, size) = decode_rune(&data[start..]);
+        if !IsSpace(r) { break; }
+        start += size;
+    }
+    // Find end of word.
+    let mut i = start;
+    while i < data.len() {
+        let (r, size) = decode_rune(&data[i..]);
+        if IsSpace(r) {
+            return ((i + next_rune_size(&data[i..])) as int, Some(data[start..i].to_vec()), nil);
+        }
+        i += size;
+    }
+    if at_eof && data.len() > start {
+        return (data.len() as int, Some(data[start..].to_vec()), nil);
+    }
+    // Need more data.
+    (start as int, None, nil)
+}
+
+fn decode_rune(data: &[byte]) -> (rune, usize) {
+    if data.is_empty() { return (crate::unicode::RuneError, 0); }
+    let c = data[0];
+    if c < 0x80 { return (c as rune, 1); }
+    let (expected, first) = match c {
+        0xC0..=0xDF => (2, (c & 0x1F) as u32),
+        0xE0..=0xEF => (3, (c & 0x0F) as u32),
+        0xF0..=0xF7 => (4, (c & 0x07) as u32),
+        _ => return (crate::unicode::RuneError, 1),
+    };
+    if data.len() < expected { return (crate::unicode::RuneError, 1); }
+    let mut acc = first;
+    for i in 1..expected {
+        let b = data[i];
+        if (b & 0xC0) != 0x80 { return (crate::unicode::RuneError, 1); }
+        acc = (acc << 6) | ((b & 0x3F) as u32);
+    }
+    (acc as rune, expected)
+}
+
+fn next_rune_size(data: &[byte]) -> usize {
+    let (_, size) = decode_rune(data);
+    if size == 0 { 1 } else { size }
+}
+
+/// IsSpace reports whether r is a Unicode whitespace rune, matching bufio's
+/// internal isSpace (= unicode.IsSpace).
+#[allow(non_snake_case)]
+pub fn IsSpace(r: rune) -> bool {
+    crate::unicode::IsSpace(r)
 }
 
 /// Convenience: read all lines from a reader into a `slice<string>`.
 #[allow(non_snake_case)]
-pub fn ReadLines<R: BufRead>(r: R) -> (crate::types::slice<string>, error) {
+pub fn ReadLines<R: Read>(r: R) -> (crate::types::slice<string>, error) {
     let mut sc = NewScanner(r);
     let mut lines = crate::types::slice::<string>::new();
     while sc.Scan() {
