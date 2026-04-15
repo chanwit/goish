@@ -146,27 +146,69 @@ impl IntoMux for crate::errors::error {
 pub struct Server {
     pub Addr: string,
     pub Handler: ServeMux,
+    shutdown: Arc<tokio::sync::Notify>,
+}
+
+impl Clone for Server {
+    fn clone(&self) -> Self {
+        Server {
+            Addr: self.Addr.clone(),
+            Handler: self.Handler.clone(),
+            shutdown: self.shutdown.clone(),
+        }
+    }
 }
 
 impl Server {
     pub fn new(addr: &str, handler: ServeMux) -> Self {
-        Server { Addr: addr.to_owned(), Handler: handler }
+        Server {
+            Addr: addr.to_owned(),
+            Handler: handler,
+            shutdown: Arc::new(tokio::sync::Notify::new()),
+        }
     }
 
     #[allow(non_snake_case)]
     pub fn ListenAndServe(&self) -> error {
         let addr_s = self.Addr.clone();
         let handler = self.Handler.clone();
+        let shutdown = self.shutdown.clone();
         super::block_on(async move {
             let addr = match parse_addr(&addr_s) {
                 Ok(a) => a,
                 Err(e) => return e,
             };
-            match run_server(addr, handler).await {
-                Ok(()) => nil,
+            match run_server(addr, handler, shutdown).await {
+                Ok(()) => New("http: Server closed"),
                 Err(e) => New(&format!("http: {}", e)),
             }
         })
+    }
+
+    /// `srv.Shutdown(ctx)` — stop accepting new connections and wait
+    /// for the listener to exit. Mirrors Go's `http.Server.Shutdown`.
+    /// Returns when the accept loop has wound down, or when `ctx`
+    /// fires, whichever comes first.
+    #[allow(non_snake_case)]
+    pub fn Shutdown(&self, ctx: crate::context::Context) -> error {
+        self.shutdown.notify_waiters();
+        // Race the shutdown against ctx cancellation, matching Go's
+        // "if ctx expires first we give up waiting" semantic.
+        super::block_on(async move {
+            let done = ctx.Done();
+            tokio::select! {
+                _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => nil,
+                _ = done.recv() => ctx.Err(),
+            }
+        })
+    }
+
+    /// `srv.Close()` — immediate close (no graceful drain). Equivalent
+    /// to `Shutdown(context::Background())` with a zero-delay race.
+    #[allow(non_snake_case)]
+    pub fn Close(&self) -> error {
+        self.shutdown.notify_waiters();
+        nil
     }
 }
 
@@ -180,24 +222,35 @@ fn parse_addr(addr: &str) -> Result<SocketAddr, error> {
         .map_err(|e| New(&format!("http: parse addr {:?}: {}", addr, e)))
 }
 
-async fn run_server(addr: SocketAddr, handler: ServeMux) -> Result<(), std::io::Error> {
+async fn run_server(
+    addr: SocketAddr,
+    handler: ServeMux,
+    shutdown: Arc<tokio::sync::Notify>,
+) -> Result<(), std::io::Error> {
     use hyper::server::conn::http1;
     use hyper_util::rt::TokioIo;
     use tokio::net::TcpListener;
 
     let listener = TcpListener::bind(addr).await?;
     loop {
-        let (stream, remote) = listener.accept().await?;
-        let handler = handler.clone();
-        tokio::spawn(async move {
-            let io = TokioIo::new(stream);
-            let service = hyper::service::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
+        tokio::select! {
+            accepted = listener.accept() => {
+                let (stream, remote) = accepted?;
                 let handler = handler.clone();
-                let remote = remote;
-                async move { Ok::<_, Infallible>(serve_one(handler, remote, req).await) }
-            });
-            let _ = http1::Builder::new().serve_connection(io, service).await;
-        });
+                tokio::spawn(async move {
+                    let io = TokioIo::new(stream);
+                    let service = hyper::service::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
+                        let handler = handler.clone();
+                        let remote = remote;
+                        async move { Ok::<_, Infallible>(serve_one(handler, remote, req).await) }
+                    });
+                    let _ = http1::Builder::new().serve_connection(io, service).await;
+                });
+            }
+            _ = shutdown.notified() => {
+                return Ok(());
+            }
+        }
     }
 }
 

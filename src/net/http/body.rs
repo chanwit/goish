@@ -30,6 +30,7 @@ impl Body {
     }
 
     /// Close the body. After close, subsequent reads return EOF.
+    /// Go: `resp.Body.Close()`.
     #[allow(non_snake_case)]
     pub fn Close(&self) -> error {
         let mut g = self.inner.lock().unwrap();
@@ -39,23 +40,25 @@ impl Body {
         nil
     }
 
-    /// Read the full body as bytes (shortcut for `io.ReadAll(body)`).
+    /// Drain the body and return every remaining byte. Goish-specific
+    /// shortcut — Go code typically writes `body, _ := io.ReadAll(resp.Body)`.
+    /// `&self` thanks to interior `Mutex`, so `resp` doesn't need `mut`.
     #[allow(non_snake_case)]
-    pub fn Bytes(&mut self) -> crate::types::slice<u8> {
+    pub fn Bytes(&self) -> crate::types::slice<u8> {
         let mut out = Vec::new();
-        self.read_to_end(&mut out);
+        self.drain_into(&mut out);
         out
     }
 
-    /// Read the full body as a UTF-8 string. Invalid UTF-8 is replaced
-    /// with U+FFFD.
+    /// Drain the body and decode as UTF-8 (lossy). Shortcut equivalent to
+    /// `string(body)` after an `io.ReadAll` in Go.
     #[allow(non_snake_case)]
-    pub fn String(&mut self) -> string {
+    pub fn String(&self) -> string {
         let b = self.Bytes();
         String::from_utf8_lossy(&b).into_owned()
     }
 
-    fn read_to_end(&mut self, out: &mut Vec<u8>) {
+    fn drain_into(&self, out: &mut Vec<u8>) {
         let mut g = self.inner.lock().unwrap();
         match &mut *g {
             BodyInner::Buffered { data, pos, closed } => {
@@ -67,8 +70,10 @@ impl Body {
     }
 }
 
-// Implement std::io::Read so io::ReadAll(&mut body) / io::Copy(...) both
-// work via goish's blanket Reader/Writer impls.
+// Implement std::io::Read so `io::ReadAll(&mut body)` / `io::Copy(&mut dst, &mut body)`
+// keep working via goish's blanket Reader impl. std::io::Read requires
+// `&mut self`, so reads through the stream interface carry the `mut`;
+// the Go-shaped `.Bytes()` / `.String()` shortcuts above don't.
 impl std::io::Read for Body {
     fn read(&mut self, p: &mut [u8]) -> std::io::Result<usize> {
         let mut g = self.inner.lock().unwrap();

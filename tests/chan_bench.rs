@@ -149,6 +149,7 @@ benchmark!{ fn BenchmarkGoroutineSpawnOnly(b) {
 // for external measurement.
 
 test!{ fn Benchmark_Z_MemoryFootprint(t) {
+    let _ = t;
     const N: usize = 100_000;
     let mut keep: Vec<goish::chan::Chan<i64>> = Vec::with_capacity(N);
     let start = Instant::now();

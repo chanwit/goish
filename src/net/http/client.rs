@@ -7,10 +7,10 @@
 
 use crate::errors::{error, nil, New};
 use crate::net::http::body::Body;
-use crate::net::http::request::{Header, Request};
+use crate::net::http::request::{Header, IntoReqBody, Request};
 use crate::net::http::response::Response;
 use crate::net::url::URL;
-use crate::types::{byte, int, int64, string};
+use crate::types::{int, int64, string};
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -29,7 +29,7 @@ impl Client {
     /// `client.Get(url)` — issue a GET. Shortcut for `Do(NewRequest("GET", url, nil))`.
     #[allow(non_snake_case)]
     pub fn Get(&self, url: &str) -> (Response, error) {
-        let (req, err) = Request::new("GET", url, &[]);
+        let (req, err) = Request::new("GET", url, nil);
         if err != nil { return (Response::empty(0), err); }
         self.Do(req)
     }
@@ -37,15 +37,15 @@ impl Client {
     /// `client.Head(url)` — issue a HEAD.
     #[allow(non_snake_case)]
     pub fn Head(&self, url: &str) -> (Response, error) {
-        let (req, err) = Request::new("HEAD", url, &[]);
+        let (req, err) = Request::new("HEAD", url, nil);
         if err != nil { return (Response::empty(0), err); }
         self.Do(req)
     }
 
-    /// `client.Post(url, contentType, body)` — issue a POST with the
-    /// given body bytes.
+    /// `client.Post(url, contentType, body)` — issue a POST. `body`
+    /// accepts `nil`, `&[u8]`, `Vec<u8>`, or `&str`.
     #[allow(non_snake_case)]
-    pub fn Post(&self, url: &str, content_type: &str, body: &[byte]) -> (Response, error) {
+    pub fn Post<B: IntoReqBody>(&self, url: &str, content_type: &str, body: B) -> (Response, error) {
         let (mut req, err) = Request::new("POST", url, body);
         if err != nil { return (Response::empty(0), err); }
         req.Header.Set("Content-Type", content_type);
@@ -97,9 +97,10 @@ pub fn Get(url: &str) -> (Response, error) { DefaultClient().Get(url) }
 #[allow(non_snake_case)]
 pub fn Head(url: &str) -> (Response, error) { DefaultClient().Head(url) }
 
-/// `http.Post(url, contentType, body)`
+/// `http.Post(url, contentType, body)` — `body` accepts `nil`, `&[u8]`,
+/// `Vec<u8>`, or `&str` (see `IntoReqBody`).
 #[allow(non_snake_case)]
-pub fn Post(url: &str, content_type: &str, body: &[byte]) -> (Response, error) {
+pub fn Post<B: IntoReqBody>(url: &str, content_type: &str, body: B) -> (Response, error) {
     DefaultClient().Post(url, content_type, body)
 }
 
@@ -113,10 +114,10 @@ pub fn PostForm(url: &str, values: &crate::net::url::Values) -> (Response, error
 #[allow(non_snake_case)]
 pub fn Do(req: Request) -> (Response, error) { DefaultClient().Do(req) }
 
-/// `http.NewRequest(method, url, body)` — re-exported at the http::
-/// namespace alongside the client funcs for call-site parity with Go.
+/// `http.NewRequest(method, url, body)` — body accepts `nil`, `&[u8]`,
+/// `Vec<u8>`, or `&str` (see `IntoReqBody`).
 #[allow(non_snake_case)]
-pub fn NewRequest(method: &str, url: &str, body: &[byte]) -> (Request, error) {
+pub fn NewRequest<B: IntoReqBody>(method: &str, url: &str, body: B) -> (Request, error) {
     Request::new(method, url, body)
 }
 
@@ -125,11 +126,11 @@ pub fn NewRequest(method: &str, url: &str, body: &[byte]) -> (Request, error) {
 /// context is cancelled, any in-flight `Do(req)` terminates with an
 /// error. Mirrors Go's `http.NewRequestWithContext`.
 #[allow(non_snake_case)]
-pub fn NewRequestWithContext(
+pub fn NewRequestWithContext<B: IntoReqBody>(
     ctx: crate::context::Context,
     method: &str,
     url: &str,
-    body: &[byte],
+    body: B,
 ) -> (Request, error) {
     let (mut req, err) = Request::new(method, url, body);
     if err != nil { return (req, err); }

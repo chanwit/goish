@@ -97,11 +97,27 @@ pub struct Request {
     ctx: crate::context::Context,
 }
 
+/// Argument-converter for request bodies. Lets `NewRequest(method, url, body)`
+/// accept `nil`, `&[u8]`, `Vec<u8>`, or `&str` — matching Go's `nil` /
+/// `strings.NewReader(s)` / `bytes.NewReader(b)` call-site variants.
+pub trait IntoReqBody {
+    fn into_req_body(self) -> Vec<u8>;
+}
+impl IntoReqBody for &[u8] { fn into_req_body(self) -> Vec<u8> { self.to_vec() } }
+impl IntoReqBody for Vec<u8> { fn into_req_body(self) -> Vec<u8> { self } }
+impl IntoReqBody for &str { fn into_req_body(self) -> Vec<u8> { self.as_bytes().to_vec() } }
+impl IntoReqBody for &String { fn into_req_body(self) -> Vec<u8> { self.as_bytes().to_vec() } }
+// `nil` (errors::error with None payload) means "no body".
+impl IntoReqBody for crate::errors::error {
+    fn into_req_body(self) -> Vec<u8> { Vec::new() }
+}
+
 impl Request {
     /// `http.NewRequest(method, url, body)` — build an outgoing request.
-    /// Body may be `nil` (passed as empty `&[u8]`).
+    /// Body accepts `nil`, `&[u8]`, `Vec<u8>`, or `&str` — see `IntoReqBody`.
     #[allow(non_snake_case)]
-    pub fn new(method: &str, target: &str, body: &[u8]) -> (Request, crate::errors::error) {
+    pub fn new<B: IntoReqBody>(method: &str, target: &str, body: B) -> (Request, crate::errors::error) {
+        let body_bytes = body.into_req_body();
         let (u, err) = crate::net::url::Parse(target);
         if err != crate::errors::nil {
             return (
@@ -120,14 +136,14 @@ impl Request {
             );
         }
         let host = u.Host.clone();
-        let cl = body.len() as crate::types::int64;
+        let cl = body_bytes.len() as crate::types::int64;
         (
             Request {
                 Method: method.to_owned(),
                 URL: u,
                 Proto: "HTTP/1.1".to_owned(),
                 Header: Header::new(),
-                Body: Body::from_bytes(body.to_vec()),
+                Body: Body::from_bytes(body_bytes),
                 Host: host,
                 RemoteAddr: String::new(),
                 ContentLength: cl,

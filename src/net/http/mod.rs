@@ -23,7 +23,7 @@ mod status;
 
 pub use body::Body;
 pub use client::{Client, DefaultClient, Do, Get, Head, NewRequest, NewRequestWithContext, Post, PostForm};
-pub use request::Request;
+pub use request::{IntoReqBody, Request};
 pub use response::{Response, ResponseWriter};
 pub use server::{HandleFunc, Handler, HandlerFunc, IntoMux, ListenAndServe, Server, ServeMux};
 pub use status::*;

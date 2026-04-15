@@ -223,9 +223,6 @@ macro_rules! __goish_cast {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::types::*;
-
     Struct!{ type PathTest struct { path, result string } }
 
     #[test]

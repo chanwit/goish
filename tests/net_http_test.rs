@@ -48,7 +48,7 @@ fn get_simple_200() {
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (mut resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/hello", port));
+    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/hello", port));
     assert!(err == nil, "Get err: {}", err);
     assert_eq!(resp.StatusCode, 200);
     assert_eq!(resp.Body.String(), "hello /hello");
@@ -81,10 +81,10 @@ fn post_echoes_body() {
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (mut resp, err) = net::http::Post(
+    let (resp, err) = net::http::Post(
         &format!("http://127.0.0.1:{}/echo", port),
         "text/plain",
-        b"hello world",
+        "hello world",   // &str body — no explicit b"…" / .as_bytes() needed
     );
     assert!(err == nil);
     assert_eq!(resp.StatusCode, 200);
@@ -104,7 +104,7 @@ fn handler_sets_custom_status() {
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (mut resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/teapot", port));
+    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/teapot", port));
     assert!(err == nil);
     assert_eq!(resp.StatusCode, 418);
     assert_eq!(resp.Body.String(), "I'm a teapot");
@@ -122,7 +122,7 @@ fn query_string_propagates_to_handler() {
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (mut resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/q?name=alice", port));
+    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/q?name=alice", port));
     assert!(err == nil);
     assert_eq!(resp.Body.String(), "hi alice");
 }
@@ -138,9 +138,9 @@ fn longest_prefix_wins_on_serve_mux() {
     wait_listener(port);
 
     let url_base = format!("http://127.0.0.1:{}", port);
-    let (mut r1, _) = net::http::Get(&format!("{}/api/other", url_base));
+    let (r1, _) = net::http::Get(&format!("{}/api/other", url_base));
     assert_eq!(r1.Body.String(), "root");
-    let (mut r2, _) = net::http::Get(&format!("{}/api/users/42", url_base));
+    let (r2, _) = net::http::Get(&format!("{}/api/users/42", url_base));
     assert_eq!(r2.Body.String(), "users");
 }
 
@@ -157,10 +157,40 @@ fn client_sees_server_headers_and_custom_content_type() {
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (mut resp, _) = net::http::Get(&format!("http://127.0.0.1:{}/j", port));
+    let (resp, _) = net::http::Get(&format!("http://127.0.0.1:{}/j", port));
     assert_eq!(resp.Header.Get("Content-Type"), "application/json");
     assert_eq!(resp.Header.Get("X-Custom"), "yes");
     assert_eq!(resp.Body.String(), "{\"ok\":true}");
+}
+
+#[test]
+fn shutdown_stops_the_accept_loop() {
+    // Spin up a server, shut it down, verify new connections fail.
+    let port = free_port();
+    let mux = net::http::ServeMux::new();
+    mux.HandleFunc("/ping", |w, _r| { let _ = w.Write(b"pong"); });
+    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv_handle = srv.clone();
+    let server_goroutine = go!{ let _ = srv_handle.ListenAndServe(); };
+    wait_listener(port);
+
+    // Happy request while server is up.
+    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ping", port));
+    assert!(err == nil);
+    assert_eq!(resp.Body.String(), "pong");
+
+    // Graceful shutdown.
+    let _ = srv.Shutdown(context::Background());
+    time::Sleep(time::Millisecond * 100i64);
+
+    // New connection should fail now (refused, reset, or empty).
+    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ping", port));
+    assert!(
+        err != nil || resp.StatusCode == 0,
+        "expected failure after shutdown; got {} {}", resp.StatusCode, resp.Body.String()
+    );
+
+    let _ = server_goroutine;
 }
 
 #[test]
@@ -189,15 +219,16 @@ fn client_context_deadline_aborts_request() {
         ctx,
         "GET",
         &format!("http://127.0.0.1:{}/slow", port),
-        &[],
+        nil,
     );
     assert!(err == nil);
 
     let start = std::time::Instant::now();
     let (resp, err) = net::http::Do(req);
+    let _ = resp;
     let elapsed = start.elapsed();
 
-    assert!(err != nil, "expected timeout error; got resp.StatusCode = {}", resp.StatusCode);
+    assert!(err != nil, "expected timeout error");
     assert!(elapsed < std::time::Duration::from_millis(250), "cancelled quickly; got {:?}", elapsed);
     assert!(
         format!("{}", err).contains("deadline") || format!("{}", err).contains("canceled"),
@@ -234,7 +265,7 @@ fn handler_can_select_on_request_context() {
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (mut resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ctx", port));
+    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ctx", port));
     assert!(err == nil);
     assert_eq!(resp.StatusCode, 200);
     assert_eq!(resp.Body.String(), "done");
@@ -242,7 +273,7 @@ fn handler_can_select_on_request_context() {
 
 #[test]
 fn header_canonicalization_is_correct() {
-    let mut h = net::http::Request::new("GET", "http://x/", &[]).0.Header;
+    let mut h = net::http::Request::new("GET", "http://x/", nil).0.Header;
     h.Set("content-type", "text/html");
     h.Set("X-FOO-BAR", "yes");
     assert_eq!(h.Get("Content-Type"), "text/html");

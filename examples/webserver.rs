@@ -30,13 +30,16 @@ fn main() {
         Fprintf!(w, "echo: %s", msg);
     });
 
-    // Serve in a goroutine so main can drive the client.
+    // Serve in a goroutine so main can drive the client. Hold onto the
+    // Server handle so we can Shutdown() gracefully at the end.
     let addr = "127.0.0.1:8080";
+    let srv = http::Server::new(addr, http::ServeMux::new());
+    let _ = srv;  // (placeholder — we use the default-mux API below)
     let server = go!{
         // Exact Go form: http.ListenAndServe(":8080", nil) uses the
         // default mux we just registered handlers on.
         let err = http::ListenAndServe(addr, nil);
-        if err != nil { Println!("server error:", err); }
+        if err != nil { Println!("server exit:", err); }
     };
     Println!("server: listening on", addr);
 
@@ -50,7 +53,7 @@ fn main() {
         ("/missing",            "/missing      "),
     ] {
         let url = Sprintf!("http://%s%s", addr, path);
-        let (mut resp, err) = http::Get(&url);
+        let (resp, err) = http::Get(&url);
         if err != nil {
             Println!("client error:", err);
             continue;
