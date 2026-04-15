@@ -13,6 +13,134 @@
 
 use std::fmt::Display;
 
+/// Arg variant used by `Errorf!` — keeps both the Display surface and
+/// the typed error identity so `%w` can reach the wrap target.
+pub enum FmtArg<'a> {
+    Disp(&'a (dyn Display + 'a)),
+    Err(&'a crate::errors::error),
+}
+
+impl<'a> FmtArg<'a> {
+    fn as_display(&self) -> &(dyn Display + 'a) {
+        match self {
+            FmtArg::Disp(d) => *d,
+            FmtArg::Err(e) => *e,
+        }
+    }
+    fn as_error(&self) -> Option<&'a crate::errors::error> {
+        match self { FmtArg::Err(e) => Some(*e), _ => None }
+    }
+}
+
+/// Autoref-based specialization so `fmt_arg!($x)` picks `FmtArg::Err`
+/// when `$x` is an `error`, and `FmtArg::Disp` otherwise. Not a public API.
+#[doc(hidden)]
+pub mod __fmt_arg {
+    use super::*;
+    pub struct Wrap<'a, T: ?Sized>(pub &'a T);
+
+    // Copy so the ref trait impl can consume self by value (sidesteps
+    // lifetime-collapse on `&self`).
+    impl<'a, T: ?Sized> Copy for Wrap<'a, T> {}
+    impl<'a, T: ?Sized> Clone for Wrap<'a, T> { fn clone(&self) -> Self { *self } }
+
+    pub trait ViaError<'a> { fn fmt_arg(self) -> FmtArg<'a>; }
+    pub trait ViaDisplay<'a> { fn fmt_arg(self) -> FmtArg<'a>; }
+
+    impl<'a> ViaError<'a> for Wrap<'a, crate::errors::error> {
+        fn fmt_arg(self) -> FmtArg<'a> { FmtArg::Err(self.0) }
+    }
+    impl<'a, T: Display> ViaDisplay<'a> for &'a Wrap<'a, T> {
+        fn fmt_arg(self) -> FmtArg<'a> { FmtArg::Disp(self.0) }
+    }
+}
+
+/// Internal: `errorf_impl(fmt, &[...])` returns (message, optional wrap target).
+/// A `%w` verb binds the next arg as the wrap target — its error chain
+/// becomes the returned error's source.
+pub fn errorf_impl(fmt_str: &str, args: &[FmtArg]) -> crate::errors::error {
+    let (msg, wrap) = go_format_errorf(fmt_str, args);
+    match wrap {
+        Some(w) => crate::errors::New_with_source(&msg, w.clone()),
+        None => crate::errors::New(&msg),
+    }
+}
+
+/// Format scanner that understands `%w`. Substitutes each `%w` with its
+/// arg's Error() string; records the first %w's error as the wrap target
+/// (Go's semantics for fmt.Errorf).
+pub fn go_format_errorf(fmt_str: &str, args: &[FmtArg]) -> (String, Option<crate::errors::error>) {
+    let bytes = fmt_str.as_bytes();
+    let mut out = String::with_capacity(fmt_str.len() * 2);
+    let mut arg_idx = 0usize;
+    let mut i = 0usize;
+    let mut wrap_target: Option<crate::errors::error> = None;
+
+    while i < bytes.len() {
+        if bytes[i] != b'%' {
+            out.push(bytes[i] as char);
+            i += 1;
+            continue;
+        }
+        i += 1;
+        if i >= bytes.len() {
+            out.push('%');
+            break;
+        }
+        if bytes[i] == b'%' { out.push('%'); i += 1; continue; }
+
+        // Flags / width / precision parsing (duplicate go_format's logic).
+        let mut flags = String::new();
+        while i < bytes.len() && matches!(bytes[i], b'-' | b'+' | b' ' | b'0' | b'#') {
+            flags.push(bytes[i] as char); i += 1;
+        }
+        let mut width: Option<usize> = None;
+        let ws = i;
+        while i < bytes.len() && bytes[i].is_ascii_digit() { i += 1; }
+        if i > ws { width = fmt_str[ws..i].parse().ok(); }
+        let mut precision: Option<usize> = None;
+        if i < bytes.len() && bytes[i] == b'.' {
+            i += 1;
+            let ps = i;
+            while i < bytes.len() && bytes[i].is_ascii_digit() { i += 1; }
+            precision = fmt_str[ps..i].parse().ok();
+        }
+        if i >= bytes.len() { out.push('%'); break; }
+
+        let verb = bytes[i] as char;
+        i += 1;
+
+        if arg_idx >= args.len() {
+            out.push_str(&format!("%!{}(MISSING)", verb));
+            continue;
+        }
+        let arg = &args[arg_idx];
+        arg_idx += 1;
+
+        if verb == 'w' {
+            // Substitute with the error's Error() text, record wrap target.
+            match arg.as_error() {
+                Some(e) => {
+                    out.push_str(&format!("{}", e));
+                    if wrap_target.is_none() {
+                        wrap_target = Some(e.clone());
+                    }
+                }
+                None => {
+                    // Non-error arg at %w — Go emits "%!w(type=val)".
+                    out.push_str(&format!("%!w(string={})", arg.as_display()));
+                }
+            }
+            continue;
+        }
+
+        let raw = format!("{}", arg.as_display());
+        out.push_str(&apply_verb(&raw, verb, width, precision, &flags));
+    }
+
+    (out, wrap_target)
+}
+
 pub fn go_format(fmt_str: &str, args: &[&dyn Display]) -> String {
     let bytes = fmt_str.as_bytes();
     let mut out = String::with_capacity(fmt_str.len() * 2);
@@ -85,9 +213,10 @@ pub fn go_format(fmt_str: &str, args: &[&dyn Display]) -> String {
 fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usize>, flags: &str) -> String {
     let mut value = match verb {
         'q' => format!("\"{}\"", raw),
-        'f' => match precision {
+        'f' | 'F' => match precision {
+            // Go's default precision for %f is 6.
             Some(p) => raw.parse::<f64>().map(|f| format!("{:.*}", p, f)).unwrap_or_else(|_| raw.to_string()),
-            None => raw.parse::<f64>().map(|f| format!("{}", f)).unwrap_or_else(|_| raw.to_string()),
+            None => raw.parse::<f64>().map(|f| format!("{:.6}", f)).unwrap_or_else(|_| raw.to_string()),
         },
         'x' => raw.parse::<i128>().map(|n| format!("{:x}", n)).unwrap_or_else(|_| raw.to_string()),
         'X' => raw.parse::<i128>().map(|n| format!("{:X}", n)).unwrap_or_else(|_| raw.to_string()),
@@ -220,12 +349,18 @@ macro_rules! Fprintf {
     }};
 }
 
-/// fmt.Errorf(format, args...) — returns an error with the formatted message.
+/// fmt.Errorf(format, args...) — returns an error with the formatted
+/// message. Supports `%w` to wrap a single error; its `.Error()` text
+/// replaces the verb at format time, and the returned error unwraps to
+/// the original.
 #[macro_export]
 macro_rules! Errorf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
-        $crate::errors::New(
-            &$crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ])
+        #[allow(unused_imports)]
+        use $crate::fmt::__fmt_arg::{ViaError as _, ViaDisplay as _};
+        $crate::fmt::errorf_impl(
+            $fmt,
+            &[ $( $crate::fmt::__fmt_arg::Wrap(&$arg).fmt_arg() ),* ],
         )
     }};
 }

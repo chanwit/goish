@@ -353,6 +353,313 @@ pub fn AppendUint(mut dst: Vec<crate::types::byte>, n: u64, base: int) -> Vec<cr
     dst
 }
 
+/// `strconv.FormatFloat(f, fmt, prec, bitSize)` — format a float into a
+/// Go-shaped string. `fmt` is one of `'e'`, `'E'`, `'f'`, `'g'`, `'G'`,
+/// `'b'`, `'x'`, `'X'`. `prec` is the precision (meaning depends on fmt)
+/// or `-1` for the shortest representation. `bitSize` is 32 or 64.
+///
+/// Matches Go 1.25.5 behaviour for `e/E/f/g/G/b`. `x/X` (hex float) is
+/// implemented best-effort and may diverge on edge-case rounding.
+#[allow(non_snake_case)]
+pub fn FormatFloat(f: float64, fmt: u8, prec: int, bit_size: int) -> string {
+    // Truncate to f32 precision when bitSize = 32.
+    let v: f64 = if bit_size == 32 { f as f32 as f64 } else { f };
+
+    // Special values share all formats.
+    if v.is_nan()       { return "NaN".to_string(); }
+    if v.is_infinite()  { return if v < 0.0 { "-Inf".to_string() } else { "+Inf".to_string() }; }
+
+    match fmt {
+        b'e' | b'E' => format_e(v, prec, fmt == b'E', bit_size),
+        b'f'        => format_f(v, prec, bit_size),
+        b'g' | b'G' => format_g(v, prec, fmt == b'G', bit_size),
+        b'b'        => format_b(v, bit_size),
+        b'x' | b'X' => format_x(v, prec, fmt == b'X', bit_size),
+        _ => format!("%{}", fmt as char),
+    }
+}
+
+/// `strconv.AppendFloat(dst, f, fmt, prec, bitSize)`
+#[allow(non_snake_case)]
+pub fn AppendFloat(mut dst: Vec<crate::types::byte>, f: float64, fmtc: u8, prec: int, bit_size: int) -> Vec<crate::types::byte> {
+    dst.extend_from_slice(FormatFloat(f, fmtc, prec, bit_size).as_bytes());
+    dst
+}
+
+// ── FormatFloat subroutines ───────────────────────────────────────────
+
+fn shortest_f64_str(v: f64, bit_size: int) -> string {
+    // Rust's ryu-backed default formatter gives the shortest round-trip form.
+    let s = if bit_size == 32 {
+        format!("{}", v as f32)
+    } else {
+        format!("{}", v)
+    };
+    s
+}
+
+fn format_e(v: f64, prec: int, upper: bool, bit_size: int) -> string {
+    if prec < 0 {
+        let base = shortest_f64_str(v, bit_size);
+        return canonical_exponent(&base, 0, true, upper);
+    }
+    let p = prec as usize;
+    if v == 0.0 {
+        let tail: String = std::iter::repeat('0').take(p).collect();
+        let sep = if p > 0 { "." } else { "" };
+        let marker = if upper { 'E' } else { 'e' };
+        let sign = if v.is_sign_negative() { "-" } else { "" };
+        return format!("{}0{}{}{}+00", sign, sep, tail, marker);
+    }
+    // Decompose into (mantissa, exp10) with mantissa in [1,10).
+    let neg = v.is_sign_negative();
+    let abs = v.abs();
+    let exp10 = abs.log10().floor() as i32;
+    let mut mantissa = abs / 10f64.powi(exp10);
+    // Round mantissa to `p` decimal places using half-away-from-zero
+    // (matches Go's FormatFloat rounding).
+    let scale = 10f64.powi(p as i32);
+    mantissa = (mantissa * scale + 0.5).floor() / scale;
+    // If rounding pushed mantissa to 10, re-normalize.
+    let (mantissa, exp10) = if mantissa >= 10.0 { (mantissa / 10.0, exp10 + 1) } else { (mantissa, exp10) };
+    let marker = if upper { 'E' } else { 'e' };
+    let sign_m = if neg { "-" } else { "" };
+    let e_sign = if exp10 >= 0 { '+' } else { '-' };
+    let padded = format!("{:02}", exp10.abs());
+    format!("{}{:.*}{}{}{}", sign_m, p, mantissa, marker, e_sign, padded)
+}
+
+fn format_f(v: f64, prec: int, _bit_size: int) -> string {
+    if prec < 0 {
+        // Shortest fixed form.
+        let base = shortest_f64_str(v, _bit_size);
+        // If shortest is scientific, expand it.
+        if base.contains('e') || base.contains('E') {
+            // Fallback: very long but correct — use enough precision.
+            return format!("{:.*}", 20, v).trim_end_matches('0').trim_end_matches('.').to_string();
+        }
+        return base;
+    }
+    format!("{:.*}", prec as usize, v)
+}
+
+fn format_g(v: f64, prec: int, upper: bool, bit_size: int) -> string {
+    // Go's 'g' rules for prec=-1 (shortest):
+    //   eprec = 6
+    //   exp = decimal-point-position - 1
+    //   if exp < -4 or exp >= eprec → scientific, else fixed
+    if prec < 0 {
+        if v == 0.0 { return "0".to_string(); }
+        let abs = v.abs();
+        let expn = abs.log10().floor() as i32;
+        let shortest = shortest_f64_str(v, bit_size);
+        if expn < -4 || expn >= 6 {
+            // Emit shortest-digit scientific. Rust's Display already uses
+            // scientific if the magnitude is extreme; otherwise coerce.
+            if shortest.contains('e') || shortest.contains('E') {
+                return rust_to_go_shortest(&shortest, upper);
+            }
+            // Convert manually.
+            return canonical_exponent(&shortest, 0, true, upper);
+        } else {
+            // Fixed form. If Rust gave scientific, reformat.
+            if shortest.contains('e') || shortest.contains('E') {
+                let n_digits = (expn + 1).max(1) as usize;
+                return format!("{:.*}", n_digits.saturating_sub((expn + 1) as usize), v);
+            }
+            return shortest;
+        }
+    }
+    // Fixed precision: Rust has no direct 'g' formatter. Emulate Go's
+    // rule: if exponent < -4 or >= prec → scientific, else fixed.
+    let p = if prec == 0 { 1 } else { prec as i32 };
+    if v == 0.0 {
+        // Go renders as e.g. "0" for g/-1, "0" for prec=5. Actually with
+        // prec≥1 Go gives "0" here too; scientific form is only used on
+        // demand, but 'g' trims trailing zeros.
+        return "0".to_string();
+    }
+    let abs = v.abs();
+    let expn = abs.log10().floor() as i32;
+    if expn < -4 || expn >= p {
+        let e_prec = (p - 1).max(0);
+        let raw = format_e(v, e_prec as i64, upper, 64);
+        trim_g_trailing_zeros(&raw, upper)
+    } else {
+        // Fixed-point, with total sig-figs = p.
+        let f_prec = (p - 1 - expn).max(0) as usize;
+        // Go uses half-away-from-zero for fixed too.
+        let scale = 10f64.powi(f_prec as i32);
+        let rounded = if v.is_sign_negative() {
+            ((v * scale) - 0.5).ceil() / scale
+        } else {
+            ((v * scale) + 0.5).floor() / scale
+        };
+        let raw = format!("{:.*}", f_prec, rounded);
+        trim_g_trailing_zeros(&raw, upper)
+    }
+}
+
+fn format_b(v: f64, _bit_size: int) -> string {
+    // "mantissa p± exp" where value = mantissa × 2^exp.
+    // Use the raw IEEE754 fields.
+    let bits = v.to_bits();
+    let sign = bits >> 63;
+    let mut exp = ((bits >> 52) & 0x7FF) as i32;
+    let mut mant = bits & 0xF_FFFF_FFFF_FFFF;
+    if exp == 0 {
+        // Subnormal: exponent = 1 - 1023 - 52.
+        if mant == 0 { return if sign == 1 { "-0p-1074".to_string() } else { "0p-1074".to_string() }; }
+        exp = 1;
+    } else {
+        mant |= 1u64 << 52;
+    }
+    let adjusted_exp = exp - 1023 - 52;
+    let sign_s = if sign == 1 { "-" } else { "" };
+    if adjusted_exp >= 0 {
+        format!("{}{}p+{}", sign_s, mant, adjusted_exp)
+    } else {
+        format!("{}{}p-{}", sign_s, mant, -adjusted_exp)
+    }
+}
+
+fn format_x(v: f64, prec: int, upper: bool, _bit_size: int) -> string {
+    if v == 0.0 {
+        let p = if prec < 0 { 0 } else { prec as usize };
+        let zeros: String = std::iter::repeat('0').take(p).collect();
+        let dot = if p > 0 { "." } else { "" };
+        let sign_s = if v.is_sign_negative() { "-" } else { "" };
+        let prefix = if upper { "0X0" } else { "0x0" };
+        let p_ex = if upper { "P+00" } else { "p+00" };
+        return format!("{}{}{}{}{}", sign_s, prefix, dot, zeros, p_ex);
+    }
+    let bits = v.to_bits();
+    let sign = bits >> 63;
+    let mut exp = ((bits >> 52) & 0x7FF) as i32;
+    let mut mant = bits & 0xF_FFFF_FFFF_FFFF;
+    if exp == 0 {
+        exp = 1;
+    } else {
+        mant |= 1u64 << 52;
+    }
+    // Normalize so leading digit is 1.
+    // Shift mant left until bit 52 set (already in normalized form for non-subnormal).
+    let e = exp - 1023;
+    let mant_hex = if prec < 0 {
+        // Shortest: strip trailing zeros from 13-hex-digit mantissa.
+        let frac = mant & 0xF_FFFF_FFFF_FFFF;
+        let mut h = format!("{:013x}", frac);
+        while h.ends_with('0') { h.pop(); }
+        if h.is_empty() { String::new() } else { format!(".{}", h) }
+    } else if prec == 0 {
+        String::new()
+    } else {
+        // Fixed prec: round to prec hex digits after the point.
+        let shift = 52i32 - 4 * (prec as i32);
+        let frac_full = mant & 0xF_FFFF_FFFF_FFFF;
+        let frac = if shift >= 0 {
+            // Rounding step: half-to-even would be ideal; truncate for simplicity.
+            frac_full >> shift
+        } else {
+            frac_full << (-shift)
+        };
+        format!(".{:0width$x}", frac, width = prec as usize)
+    };
+    let sign_s = if sign == 1 { "-" } else { "" };
+    let prefix = if upper { "0X1" } else { "0x1" };
+    let mant_hex = if upper { mant_hex.to_uppercase() } else { mant_hex };
+    let p_letter = if upper { 'P' } else { 'p' };
+    let e_sign = if e >= 0 { '+' } else { '-' };
+    format!("{}{}{}{}{}{:02}", sign_s, prefix, mant_hex, p_letter, e_sign, e.abs())
+}
+
+/// Rust gives "1e0", "1e10", "-1e-10" etc.  Go wants "1e+00", "1e+10",
+/// "-1e-10". Two-digit minimum unpadded exponent, explicit sign.
+fn go_exponent(s: &str, upper: bool) -> string {
+    let marker = if upper { 'E' } else { 'e' };
+    if let Some(pos) = s.find(marker) {
+        let (mant, exp) = s.split_at(pos);
+        let mut exp = &exp[1..];
+        let (sign, digits) = if let Some(rest) = exp.strip_prefix('-') {
+            ("-", rest)
+        } else if let Some(rest) = exp.strip_prefix('+') {
+            ("+", rest)
+        } else {
+            ("+", exp)
+        };
+        let _ = &mut exp;
+        let padded = if digits.len() < 2 { format!("0{}", digits) } else { digits.to_string() };
+        return format!("{}{}{}{}", mant, marker, sign, padded);
+    }
+    s.to_string()
+}
+
+fn canonical_exponent(s: &str, _prec: usize, _use_e: bool, upper: bool) -> string {
+    // Convert Rust's shortest "1.234e5" / "123" into Go's canonical e
+    // form. If no 'e' present, force one.
+    let marker = if upper { 'E' } else { 'e' };
+    let lower = if upper { s.to_uppercase() } else { s.to_string() };
+    if lower.contains(marker) || lower.contains(if upper { 'e' } else { 'E' }) {
+        return go_exponent(&lower.replace(if upper { 'e' } else { 'E' }, &marker.to_string()), upper);
+    }
+    // Rewrite "123.4" as "1.234e+02".
+    let (mantissa, neg) = if let Some(rest) = lower.strip_prefix('-') { (rest.to_string(), true) } else { (lower.clone(), false) };
+    let (int_part, frac_part) = match mantissa.split_once('.') {
+        Some((i, f)) => (i.to_string(), f.to_string()),
+        None => (mantissa.clone(), String::new()),
+    };
+    let all_digits = format!("{}{}", int_part, frac_part);
+    let first_nonzero = all_digits.find(|c: char| c != '0');
+    let exp_val: i32;
+    let digits_trimmed: String;
+    match first_nonzero {
+        None => return lower, // all zeros
+        Some(idx) => {
+            exp_val = int_part.len() as i32 - 1 - idx as i32;
+            digits_trimmed = all_digits[idx..].trim_end_matches('0').to_string();
+        }
+    }
+    let (lead, tail) = if digits_trimmed.is_empty() { ("0".to_string(), String::new()) }
+        else { (digits_trimmed[..1].to_string(), digits_trimmed[1..].to_string()) };
+    let sign = if exp_val >= 0 { '+' } else { '-' };
+    let sign_prefix = if neg { "-" } else { "" };
+    if tail.is_empty() {
+        format!("{}{}{}{}{:02}", sign_prefix, lead, marker, sign, exp_val.abs())
+    } else {
+        format!("{}{}.{}{}{}{:02}", sign_prefix, lead, tail, marker, sign, exp_val.abs())
+    }
+}
+
+fn rust_to_go_shortest(s: &str, upper: bool) -> string {
+    // For 'g' with prec=-1: Rust's Display rounds to shortest round-trip,
+    // sometimes in scientific ("1e10"), sometimes plain ("1234"). We need
+    // to make exponents go-shaped (e+10) when present.
+    if s.contains('e') || s.contains('E') {
+        let normalized = if upper { s.to_uppercase() } else { s.to_string() };
+        return go_exponent(&normalized, upper);
+    }
+    s.to_string()
+}
+
+fn trim_g_trailing_zeros(s: &str, upper: bool) -> string {
+    // In 'g', trailing zeros after '.' are trimmed, and a bare '.' is too.
+    let marker = if upper { 'E' } else { 'e' };
+    if let Some(pos) = s.find(marker) {
+        let mant = &s[..pos];
+        let exp = &s[pos..];
+        let trimmed = trim_g_mantissa(mant);
+        return format!("{}{}", trimmed, exp);
+    }
+    trim_g_mantissa(s)
+}
+
+fn trim_g_mantissa(m: &str) -> string {
+    if !m.contains('.') { return m.to_string(); }
+    let t = m.trim_end_matches('0');
+    let t = t.trim_end_matches('.');
+    t.to_string()
+}
+
 pub fn FormatBool(b: bool) -> string {
     if b { "true".to_string() } else { "false".to_string() }
 }

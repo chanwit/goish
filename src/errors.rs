@@ -20,19 +20,25 @@ use std::fmt::{self, Display};
 pub struct GoError {
     msg: String,
     source: Option<Box<GoError>>,
+    /// When true, Display emits just `msg` (Errorf-produced errors, where
+    /// `msg` already contains the source's text verbatim). When false,
+    /// Display emits `msg: source` (the classic `Wrap` shape).
+    msg_includes_source: bool,
 }
 
 impl GoError {
     fn new(msg: impl Into<String>) -> Self {
-        GoError { msg: msg.into(), source: None }
+        GoError { msg: msg.into(), source: None, msg_includes_source: false }
     }
 }
 
 impl Display for GoError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.msg)?;
-        if let Some(ref src) = self.source {
-            write!(f, ": {}", src)?;
+        if !self.msg_includes_source {
+            if let Some(ref src) = self.source {
+                write!(f, ": {}", src)?;
+            }
         }
         Ok(())
     }
@@ -82,6 +88,24 @@ pub fn New(msg: &str) -> error {
     error(Some(GoError::new(msg)))
 }
 
+/// Internal helper — build an error with a specific source chain. Used
+/// by `fmt::Errorf!` when the format string contains `%w`. The `msg`
+/// already contains the wrapped error's text (the format scanner
+/// substituted `%w` with `.Error()`), so Display should emit only `msg`
+/// and not re-concatenate the source.
+#[doc(hidden)]
+#[allow(non_snake_case)]
+pub fn New_with_source(msg: &str, source: error) -> error {
+    match source.0 {
+        Some(inner) => error(Some(GoError {
+            msg: msg.to_string(),
+            source: Some(Box::new(inner)),
+            msg_includes_source: true,
+        })),
+        None => New(msg),
+    }
+}
+
 /// errors.Wrap(err, "context")  →  closest to Go's fmt.Errorf("ctx: %w", err).
 /// Returns nil if err is nil (matches Go's typical wrap helpers).
 pub fn Wrap(err: error, msg: &str) -> error {
@@ -89,6 +113,7 @@ pub fn Wrap(err: error, msg: &str) -> error {
         Some(inner) => error(Some(GoError {
             msg: msg.to_string(),
             source: Some(Box::new(inner)),
+            msg_includes_source: false,
         })),
         None => nil,
     }
