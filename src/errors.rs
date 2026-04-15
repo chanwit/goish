@@ -121,6 +121,45 @@ pub fn Unwrap(err: error) -> error {
     }
 }
 
+/// errors.Join(errs...) — combine multiple errors into one whose Error()
+/// string joins the individual messages with newlines. nil errors are
+/// skipped; if the resulting list is empty, returns nil.
+pub fn Join(errs: &[error]) -> error {
+    let msgs: Vec<&String> = errs
+        .iter()
+        .filter_map(|e| e.0.as_ref().map(|g| &g.msg))
+        .collect();
+    if msgs.is_empty() {
+        return nil;
+    }
+    let joined: String = msgs
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    error(Some(GoError::new(joined)))
+}
+
+/// errors.As(err, target) — if any error in the wrap chain has the same
+/// message as target, write it into *target and return true. In Go this is
+/// type-based; here we simulate with message-equality since our error type
+/// is a single concrete GoError.
+pub fn As(err: &error, target: &mut error) -> bool {
+    let target_msg = match &target.0 {
+        Some(t) => t.msg.clone(),
+        None => return false,
+    };
+    let mut cur = err.0.as_ref();
+    while let Some(e) = cur {
+        if e.msg == target_msg {
+            *target = error(Some(e.clone()));
+            return true;
+        }
+        cur = e.source.as_deref();
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,5 +208,30 @@ mod tests {
         let outer = Wrap(inner, "outer");
         assert_eq!(format!("{}", Unwrap(outer)), "inner");
         assert!(Unwrap(New("solo")) == nil);
+    }
+
+    #[test]
+    fn join_combines_messages() {
+        let e = Join(&[New("a"), New("b"), nil, New("c")]);
+        assert_eq!(format!("{}", e), "a\nb\nc");
+    }
+
+    #[test]
+    fn join_of_nils_is_nil() {
+        assert!(Join(&[nil, nil]) == nil);
+        assert!(Join(&[]) == nil);
+    }
+
+    #[test]
+    fn as_finds_wrapped_sentinel() {
+        let sentinel = New("not found");
+        let wrapped = Wrap(sentinel.clone(), "lookup");
+        let mut target = New("not found");
+        assert!(As(&wrapped, &mut target));
+        // target written with the matched error
+        assert_eq!(format!("{}", target), "not found");
+
+        let mut target = New("other");
+        assert!(!As(&wrapped, &mut target));
     }
 }

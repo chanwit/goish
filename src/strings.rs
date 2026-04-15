@@ -149,6 +149,80 @@ pub fn EqualFold(s: impl AsRef<str>, t: impl AsRef<str>) -> bool {
     s.as_ref().eq_ignore_ascii_case(t.as_ref())
 }
 
+// ── strings.Builder ────────────────────────────────────────────────────
+//
+//   Go                                  goish
+//   ─────────────────────────────────   ──────────────────────────────────
+//   var b strings.Builder               let mut b = strings::Builder::new();
+//   b.WriteString("hello ")             b.WriteString("hello ");
+//   b.WriteByte('!')                    b.WriteByte(b'!');
+//   b.WriteRune('λ')                    b.WriteRune('λ');
+//   s := b.String()                     let s = b.String();
+//   n := b.Len()                        let n = b.Len();
+//   b.Reset()                           b.Reset();
+
+#[derive(Debug, Clone, Default)]
+pub struct Builder {
+    inner: string,
+}
+
+impl Builder {
+    pub fn new() -> Self { Builder::default() }
+
+    pub fn WriteString(&mut self, s: impl AsRef<str>) -> (int, crate::errors::error) {
+        let s = s.as_ref();
+        self.inner.push_str(s);
+        (s.len() as int, crate::errors::nil)
+    }
+
+    pub fn WriteByte(&mut self, b: crate::types::byte) -> crate::errors::error {
+        // Go's WriteByte takes a byte; we accept only ASCII-valid bytes since
+        // Builder backs to a String (UTF-8). Non-ASCII bytes panic (matches
+        // Go's runtime behavior on invalid UTF-8 conversion).
+        if b < 0x80 {
+            self.inner.push(b as char);
+            crate::errors::nil
+        } else {
+            crate::errors::New("strings.Builder: non-ASCII byte; use WriteRune")
+        }
+    }
+
+    pub fn WriteRune(&mut self, r: char) -> (int, crate::errors::error) {
+        let n = r.len_utf8();
+        self.inner.push(r);
+        (n as int, crate::errors::nil)
+    }
+
+    pub fn String(&self) -> string {
+        self.inner.clone()
+    }
+
+    pub fn Len(&self) -> int {
+        self.inner.len() as int
+    }
+
+    pub fn Reset(&mut self) {
+        self.inner.clear();
+    }
+
+    pub fn Grow(&mut self, n: int) {
+        if n > 0 {
+            self.inner.reserve(n as usize);
+        }
+    }
+
+    /// Lowercase alias for the polymorphic `len!()` macro.
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+impl std::fmt::Display for Builder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,5 +295,29 @@ mod tests {
         assert_eq!(Repeat("ab", 3), "ababab");
         assert!(EqualFold("HELLO", "hello"));
         assert!(!EqualFold("hello", "world"));
+    }
+
+    #[test]
+    fn builder_writes_and_resets() {
+        let mut b = Builder::new();
+        b.WriteString("hello ");
+        b.WriteString("world");
+        b.WriteByte(b'!');
+        b.WriteRune('λ');
+        assert_eq!(b.String(), "hello world!λ");
+        assert_eq!(b.Len(), "hello world!λ".len() as int);
+        b.Reset();
+        assert_eq!(b.Len(), 0);
+    }
+
+    #[test]
+    fn builder_writerune_returns_bytes_written() {
+        let mut b = Builder::new();
+        let (n, _) = b.WriteRune('a');
+        assert_eq!(n, 1);
+        let (n, _) = b.WriteRune('λ');
+        assert_eq!(n, 2);
+        let (n, _) = b.WriteRune('漢');
+        assert_eq!(n, 3);
     }
 }

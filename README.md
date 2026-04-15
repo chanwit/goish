@@ -46,11 +46,11 @@ Add to `Cargo.toml`:
 goish = { git = "https://github.com/chanwit/goish" }
 ```
 
-Or, once published to crates.io:
+Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.1"
+goish = "0.2"
 ```
 
 Then in every file where you want Go-shaped code:
@@ -178,22 +178,29 @@ fmt::Printf!("took %s\n", elapsed);   // e.g. "100.3ms"
 | goish | Go package | status |
 |---|---|---|
 | `fmt` | `fmt` | Println/Printf/Sprintf/Fprintf/Errorf/Stringer |
-| `errors` | `errors` | New / Wrap / Is / Unwrap |
+| `errors` | `errors` | New/Wrap/Is/Unwrap + **Join/As** |
 | `bytes` | `bytes` | `Buffer` |
-| `strings` | `strings` | 20+ helpers |
+| `strings` | `strings` | 20+ helpers + **`Builder`** |
 | `strconv` | `strconv` | Atoi/Itoa/ParseInt/ParseFloat/ParseBool/Format* |
-| `time` | `time` | Now/Since/Until/Sleep + Duration arithmetic |
-| `os` | `os` | Args/Getenv/Exit + ReadFile/WriteFile/Mkdir/Remove + Hostname/Getwd |
+| `time` | `time` | Now/Since/Sleep + Duration arithmetic + **Format/Parse/Date + Ticker/Timer/AfterFunc** |
+| `os` | `os` | Args/Getenv/Exit + ReadFile/WriteFile/Mkdir + Hostname/Getwd + **File/Open/Create + Stdin/Stdout/Stderr** |
 | `io` | `io` | Reader/Writer traits, Copy, ReadAll, EOF |
-| `bufio` | `bufio` | `Scanner` (line) + `ReadLines` |
+| `bufio` | `bufio` | `Scanner` + **`NewReader`/`NewWriter`** |
 | `log` | `log` | Println/Printf/Fatalf/Panic with timestamp |
 | `sort` | `sort` | Ints/Strings/Float64s/Slice/SliceStable |
-| `math` | `math` | constants + Abs/Pow/Sqrt/Floor/Ceil/trig/log/IsNaN/IsInf |
+| `math` | `math` | constants + Abs/Pow/Sqrt/trig/log/IsNaN/IsInf |
 | `filepath` | `path/filepath` | Join/Base/Dir/Ext/Clean |
-| `sync` | `sync` | Mutex/RWMutex/WaitGroup/Once |
-| `context` | `context` | Background/WithCancel/WithTimeout |
+| `sync` | `sync` | Mutex/RWMutex/WaitGroup/Once + **`atomic::{Int32,Int64,Bool}`** |
+| `context` | `context` | Background/WithCancel/WithTimeout + **WithValue/WithDeadline** |
 | `chan` | channel builtins | `Chan<T>` + `chan!(T[, n])` (**see gaps**) |
 | `defer!` / `go!` | defer / go keywords | macro form |
+| **`unicode`** | `unicode` | IsLetter/IsDigit/IsSpace/IsUpper/IsLower/ToUpper/ToLower |
+| **`utf8`** | `unicode/utf8` | RuneCountInString/ValidString/DecodeRuneInString/EncodeRune/RuneLen |
+| **`rand`** | `math/rand` | Int/Intn/Int63/Float64/Seed/Shuffle (xoshiro256**, no deps) |
+| **`base64`** | `encoding/base64` | StdEncoding/URLEncoding/RawStdEncoding |
+| **`hex`** | `encoding/hex` | EncodeToString/DecodeString |
+| **`flag`** | `flag` | String/Int/Bool/Float64/Duration + Parse/Args/Arg |
+| **`const_block!`** | `const (…) with iota` | auto-incrementing constants |
 
 ## Known gaps
 

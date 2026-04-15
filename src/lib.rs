@@ -46,19 +46,24 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(rustdoc::invalid_html_tags)]
 
+pub mod base64;
 pub mod bufio;
 pub mod bytes;
 pub mod chan;
+pub mod consts;
 pub mod context;
 pub mod defer;
 pub mod errors;
 pub mod filepath;
+pub mod flag;
 pub mod fmt;
 pub mod goroutine;
+pub mod hex;
 pub mod io;
 pub mod log;
 pub mod math;
 pub mod os;
+pub mod rand;
 pub mod range;
 pub mod sort;
 pub mod strconv;
@@ -66,32 +71,40 @@ pub mod strings;
 pub mod sync;
 pub mod time;
 pub mod types;
+pub mod unicode;
+pub mod utf8;
 
 // Make Go primitive type names visible at the crate root so macros that
 // say `$crate::int` resolve correctly.
 pub use crate::types::*;
 
 pub mod prelude {
+    pub use crate::base64;
     pub use crate::bufio;
     pub use crate::bytes;
     pub use crate::chan::Chan;
     pub use crate::context;
     pub use crate::errors::{self, error, nil};
     pub use crate::filepath;
+    pub use crate::flag;
     pub use crate::fmt;
+    pub use crate::hex;
     pub use crate::io;
     pub use crate::log;
     pub use crate::math;
     pub use crate::os;
+    pub use crate::rand;
     pub use crate::sort;
     pub use crate::strconv;
     pub use crate::strings;
     pub use crate::sync;
     pub use crate::time;
+    pub use crate::unicode;
+    pub use crate::utf8;
     pub use crate::types::*;
     pub use crate::goroutine::Goroutine;
     pub use crate::{
         Errorf, Fprintf, Printf, Println, Sprintf,
-        append, chan, defer, delete, go, len, make, map, range, slice, stringer,
+        append, chan, const_block, defer, delete, go, len, make, map, range, slice, stringer,
     };
 }
