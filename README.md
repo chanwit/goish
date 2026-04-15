@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.4"      # 0.4.2 = latest
+goish = "0.5"      # latest
 ```
 
 Then in every file where you want Go-shaped code:
@@ -273,16 +273,12 @@ if r.is_none() { t.Fatal("expected panic"); }
 
 ## Known gaps
 
-- **`close(ch)` and `select!`** — `Chan<T>` bundles sender+receiver and is
-  `Clone`, so an explicit `Close()` can't reliably close the channel while
-  any clone still holds a sender. The common Go "sentinel job" pattern works
-  (see [`examples/worker.rs`](examples/worker.rs)). A proper close + a
-  `select!` macro will need a different sender/receiver split; tracking this
-  as its own design pass.
-- **Goroutines run on OS threads** (`std::thread::spawn`). No green-thread
-  scheduler; don't expect to spawn 100k of them.
 - **`string` is an alias for `String`** (owned, mutable). Go strings are
   immutable shared bytes; close enough for most code.
+- **`select!` is polling, not parking** — if every case is blocked and
+  there's no `default`, the macro spin-sleeps 1 ms between polls instead
+  of parking on a combined future. Works correctly; latency-sensitive
+  select-loops may want `default` + external sleep for now.
 
 ## Examples
 

@@ -10,9 +10,9 @@
 //   runtime.NumGoroutine()              runtime::NumGoroutine()   // best-effort
 //   runtime.Version()                   runtime::Version()
 //
-// Caveat: goroutines are OS threads in v0.3; NumGoroutine counts live
-// goroutines started through `go!` (best-effort). A real scheduler lands in
-// v0.4 (see issue #3).
+// Caveat: NumGoroutine counts live goroutines started through `go!`
+// (best-effort). Each goroutine is a tokio async task (~200 B); runtime
+// scales to 1M per process (tests/million_goroutines.rs).
 
 use crate::types::int;
 use std::sync::atomic::{AtomicUsize, Ordering};

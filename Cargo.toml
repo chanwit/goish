@@ -23,9 +23,13 @@ exclude = [
 
 [dependencies]
 # Runtime: tokio + flume.
-#   - tokio::task::spawn_blocking backs the `go!{}` macro: sync bodies run
-#     on tokio's pooled blocking threads (vs fresh std::thread per spawn).
-#   - flume backs Chan<T>: winner of v0.5 channel bake-off (see commit
+#   - tokio::task::spawn backs the `go!{}` macro: each goroutine is a
+#     ~200 B async task on a multi-thread runtime. Proven at 1,000,000
+#     concurrent goroutines (tests/million_goroutines.rs).
+#   - `goish-macros` rewrites `c.Send(v)` / `c.Recv()` / `g.Wait()` inside
+#     `go!{}` bodies to their `.await` forms at compile time, so the call
+#     site stays Go-shaped.
+#   - flume backs Chan<T>: winner of v0.4 channel bake-off (see commit
 #     b996384 — 2× faster rendezvous, 3.5× less RSS vs async-channel).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 goish-macros = { version = "0.4.2", path = "goish-macros" }
@@ -33,6 +37,15 @@ flume = { version = "0.11", default-features = false, features = ["async"] }
 serde = "1"
 serde_json = "1"
 regex = "1"
+
+# net/http (v0.5) — hyper + hyper-util for server/client, http for shared
+# low-level types, http-body-util for body helpers, bytes for zero-copy
+# byte buffers. All four are the canonical hyper 1.x split-crate stack.
+hyper = { version = "1", features = ["http1", "server", "client"] }
+hyper-util = { version = "0.1", features = ["tokio", "http1", "server", "server-graceful", "client-legacy"] }
+http = "1"
+http-body-util = "0.1"
+bytes = "1"
 
 [lib]
 path = "src/lib.rs"
@@ -60,3 +73,7 @@ path = "examples/pipeline.rs"
 [[example]]
 name = "webscrape"
 path = "examples/webscrape.rs"
+
+[[example]]
+name = "webserver"
+path = "examples/webserver.rs"

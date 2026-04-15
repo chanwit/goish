@@ -2,25 +2,37 @@
 //
 //   Go                                  goish
 //   ─────────────────────────────────   ──────────────────────────────────
-//   go worker(jobs)                     go!{ worker(jobs).await; };
-//   go func() { ... }()                 go!{ ... };
+//   go worker(jobs)                     go!{ worker(jobs); }
+//   go func() { ... }()                 go!{ ... }
 //
-// Each goroutine is a tokio async task — ~100 bytes of state, scales to
-// millions per process. Scheduled M:N across tokio's worker threads
-// (count = GOMAXPROCS or defaults to CPU count).
+// Each goroutine is a tokio async task — ~200 bytes of state, scales to
+// millions per process (proven in tests/million_goroutines.rs). Scheduled
+// M:N across tokio's worker threads (count = GOMAXPROCS or defaults to
+// CPU count).
 //
-// ## The `.await` leak
+// ## Go-shaped call sites inside `go!{}`
 //
-// Rust can't invisibly rewrite sync method calls into async, so inside a
-// `go!{}` body:
+// The `goish-macros` proc-macro walks the body AST of every `go!{}` block
+// and rewrites sync-looking method calls into their async forms before
+// `tokio::spawn`:
 //
-//   outside go!{}:  c.Send(v)              (blocking, sync)
-//   inside  go!{}:  c.send(v).await        (cooperative, async)
+//   written:   c.Send(v)          ↓
+//   expanded:  c.send(v).await
 //
-// Same goes for `c.recv().await`, `time::Sleep(d)` → `tokio::time::sleep(d).await`,
-// `g.wait().await` to join child goroutines. A follow-up proc-macro (goish v0.5.1)
-// will automate the rewrite so user code stays Go-shaped; for now, users write
-// the `.await` by hand.
+//   written:   let (v, ok) = c.Recv();   ↓
+//   expanded:  let (v, ok) = c.recv().await;
+//
+//   written:   g.Wait();           ↓
+//   expanded:  g.wait().await;
+//
+// The goroutine body therefore looks identical to code outside `go!{}`,
+// while under the hood every channel / join operation cooperates with the
+// scheduler instead of blocking an OS thread.
+//
+// Collateral: if a non-goish type inside `go!{}` defines its own `.Send`,
+// `.Recv`, or `.Wait` method, the rewriter will add `.await` to it too
+// and the body will fail to compile. Rename the conflicting method or
+// call it outside `go!{}`.
 
 use std::future::Future;
 use std::sync::OnceLock;

@@ -30,19 +30,21 @@ impl<T> Chan<T> {
     }
 
     /// `ch <- v` — blocks until a receiver is ready or there's room.
-    /// Returns nil on success, error if the channel is closed.
-    pub fn Send(&self, v: T) -> crate::errors::error {
-        match self.inner.send(v) {
-            Ok(()) => crate::errors::nil,
-            Err(_) => crate::errors::New("send on closed channel"),
+    ///
+    /// Panics on a closed channel (matches Go's runtime panic
+    /// `"send on closed channel"`).
+    pub fn Send(&self, v: T) {
+        if self.inner.send(v).is_err() {
+            panic!("send on closed channel");
         }
     }
 
     /// Async send — used by the `go!{}` macro inside async contexts.
-    pub async fn send(&self, v: T) -> crate::errors::error {
-        match self.inner.send_async(v).await {
-            Ok(()) => crate::errors::nil,
-            Err(_) => crate::errors::New("send on closed channel"),
+    ///
+    /// Panics on a closed channel.
+    pub async fn send(&self, v: T) {
+        if self.inner.send_async(v).await.is_err() {
+            panic!("send on closed channel");
         }
     }
 
@@ -74,8 +76,12 @@ impl<T> Chan<T> {
         }
     }
 
-    /// Non-blocking try-send. Returns true on success.
+    /// Non-blocking try-send. Returns true on success, false on full buffer.
+    /// Panics on closed channel (same as blocking `Send`).
     pub fn TrySend(&self, v: T) -> bool {
+        if self.inner.is_closed() {
+            panic!("send on closed channel");
+        }
         self.inner.try_send(v).is_ok()
     }
 
@@ -104,16 +110,27 @@ impl<T> Chan<T> {
     /// `select!`-internal: "is a send case ready right now?" Returns Err(v)
     /// if the buffer is full (or rendezvous has no partner). Matches the
     /// semantic Go's `select { case c <- v: }` uses.
+    ///
+    /// Panics on closed (Go: `select { case c <- v: }` on closed c panics
+    /// identically to a bare `c <- v`).
     #[doc(hidden)]
     pub fn __select_try_send(&self, v: T) -> Result<(), T> {
+        if self.inner.is_closed() {
+            panic!("send on closed channel");
+        }
         self.inner.try_send(v)
     }
 
     /// close(ch) — mark the channel closed. Remaining buffered items still
     /// recv; once drained, receivers return (zero, false).
+    ///
+    /// Panics if the channel is already closed (matches Go's runtime panic
+    /// `"close of closed channel"`).
     #[allow(non_snake_case)]
     pub fn Close(&self) {
-        self.inner.close();
+        if !self.inner.close() {
+            panic!("close of closed channel");
+        }
     }
 
     pub fn Len(&self) -> crate::types::int {
@@ -338,11 +355,38 @@ mod tests {
     }
 
     #[test]
-    fn send_on_closed_returns_error() {
+    #[should_panic(expected = "send on closed channel")]
+    fn send_on_closed_panics() {
         let ch = crate::chan!(i64, 1);
         ch.Close();
-        let err = ch.Send(42);
-        assert!(err != crate::errors::nil);
+        ch.Send(42);
+    }
+
+    #[test]
+    #[should_panic(expected = "close of closed channel")]
+    fn double_close_panics() {
+        let ch = crate::chan!(i64, 1);
+        ch.Close();
+        ch.Close();
+    }
+
+    #[test]
+    #[should_panic(expected = "send on closed channel")]
+    fn try_send_on_closed_panics() {
+        let ch = crate::chan!(i64, 1);
+        ch.Close();
+        ch.TrySend(1);
+    }
+
+    #[test]
+    #[should_panic(expected = "send on closed channel")]
+    fn select_send_on_closed_panics() {
+        let ch = crate::chan!(i64, 1);
+        ch.Close();
+        crate::select!{
+            send(ch, 1) => {},
+            default => {},
+        }
     }
 
     #[test]

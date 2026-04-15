@@ -95,6 +95,7 @@ pub use encoding::csv;
 pub use encoding::hex;
 pub use encoding::json;
 pub use math::rand;
+pub use net::http;
 pub use net::url;
 pub use os::exec;
 pub use path::filepath;
@@ -140,6 +141,7 @@ pub mod prelude {
     pub use crate::exec;
     pub use crate::filepath;
     pub use crate::hex;
+    pub use crate::http;
     pub use crate::json;
     pub use crate::rand;
     pub use crate::url;

@@ -4,13 +4,15 @@
 //   ─────────────────────────────────   ──────────────────────────────────
 //   ctx := context.Background()         let ctx = context::Background();
 //   ctx, cancel := context.WithCancel(p) let (ctx, cancel) = context::WithCancel(p);
-//   defer cancel()                      defer!{ cancel(); }
+//   defer cancel()                      defer!{ cancel.call(); }
 //   ctx, _ := context.WithTimeout(...)  let (ctx, _) = context::WithTimeout(p, d);
-//   <-ctx.Done()                        ctx.Done()  // blocks until cancelled
+//   <-ctx.Done()                        let (_, _) = ctx.Done().Recv();
+//   select { case <-ctx.Done(): ... }   select!{ recv(ctx.Done()) => {...}, ... }
 //   if ctx.Err() != nil { ... }         if ctx.Err() != nil { ... }
 //
-// Implemented with Arc<AtomicBool> for the cancel flag plus a condvar for
-// blocking waiters. No goroutine-per-context scheduling.
+// Done() returns a `Chan<()>` that is closed when this context (or any
+// ancestor) is cancelled. `Close()` on a goish channel wakes every parked
+// receiver, giving Go's `<-ctx.Done()` broadcast shape exactly.
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -27,17 +29,28 @@ struct ContextInner {
     err_mu: Mutex<Option<crate::errors::error>>,
     cv: Condvar,
     cv_mu: Mutex<()>,
+    done_ch: crate::chan::Chan<()>,
     parent: Option<Arc<ContextInner>>,
     values: Mutex<HashMap<String, Arc<dyn Any + Send + Sync>>>,
 }
 
 impl Context {
-    /// ctx.Done() — blocks until this context is cancelled (or parent is).
-    pub fn Done(&self) {
-        let mut g = self.inner.cv_mu.lock().unwrap();
-        while !self.is_cancelled() {
-            g = self.inner.cv.wait(g).unwrap();
-        }
+    /// ctx.Done() — returns a channel that is closed when this context
+    /// (or any ancestor) is cancelled. Usage:
+    ///
+    ///   let (_, _) = ctx.Done().Recv();          // block until cancel
+    ///   select!{ recv(ctx.Done()) => { ... } }   // non-blocking / racing
+    ///
+    /// Matches Go's `<-ctx.Done()` channel shape.
+    pub fn Done(&self) -> crate::chan::Chan<()> {
+        self.inner.done_ch.clone()
+    }
+
+    /// ctx.Wait() — convenience: blocks the current thread until this
+    /// context is cancelled. Equivalent to `ctx.Done().Recv()` but without
+    /// the tuple.
+    pub fn Wait(&self) {
+        let _ = self.inner.done_ch.Recv();
     }
 
     /// ctx.Err() — nil if not cancelled, otherwise the cancellation error.
@@ -84,9 +97,22 @@ fn new_inner(parent: Option<Arc<ContextInner>>) -> Arc<ContextInner> {
         err_mu: Mutex::new(None),
         cv: Condvar::new(),
         cv_mu: Mutex::new(()),
+        done_ch: crate::chan::Chan::<()>::new(0),
         parent,
         values: Mutex::new(HashMap::new()),
     })
+}
+
+fn fire_cancel(inner: &Arc<ContextInner>, reason: &'static str) {
+    if !inner.cancelled.swap(true, Ordering::SeqCst) {
+        *inner.err_mu.lock().unwrap() = Some(crate::errors::New(reason));
+        // Close the done channel — broadcasts to every parked receiver.
+        inner.done_ch.Close();
+        // Legacy condvar path — Wait() uses it when called on an
+        // already-cancelled context (recv short-circuits to (_, false)).
+        let _g = inner.cv_mu.lock().unwrap();
+        inner.cv.notify_all();
+    }
 }
 
 /// context.Background() — root context that is never cancelled.
@@ -102,14 +128,7 @@ pub struct CancelFunc {
 }
 
 impl CancelFunc {
-    pub fn call(&self) {
-        if !self.inner.cancelled.swap(true, Ordering::SeqCst) {
-            *self.inner.err_mu.lock().unwrap() =
-                Some(crate::errors::New(self.reason));
-            let _g = self.inner.cv_mu.lock().unwrap();
-            self.inner.cv.notify_all();
-        }
-    }
+    pub fn call(&self) { fire_cancel(&self.inner, self.reason); }
 }
 
 /// context.WithCancel(parent) — returns (ctx, cancel). Call cancel() to
@@ -121,6 +140,19 @@ pub fn WithCancel(parent: Context) -> (Context, CancelFunc) {
         inner: inner.clone(),
         reason: "context canceled",
     };
+    // If parent is already cancelled, fire immediately.
+    if parent.is_cancelled() {
+        fire_cancel(&inner, "context canceled");
+    } else {
+        // Otherwise spawn a tiny watcher: when parent closes its done
+        // channel, propagate to our child context.
+        let child = inner.clone();
+        let parent_done = parent.inner.done_ch.clone();
+        std::thread::spawn(move || {
+            let _ = parent_done.Recv();
+            fire_cancel(&child, "context canceled");
+        });
+    }
     (Context { inner }, cancel)
 }
 
@@ -147,12 +179,7 @@ pub fn WithTimeout(parent: Context, d: crate::time::Duration) -> (Context, Cance
     let ctx_inner = ctx.inner.clone();
     std::thread::spawn(move || {
         std::thread::sleep(d.to_std());
-        if !ctx_inner.cancelled.swap(true, Ordering::SeqCst) {
-            *ctx_inner.err_mu.lock().unwrap() =
-                Some(crate::errors::New("context deadline exceeded"));
-            let _g = ctx_inner.cv_mu.lock().unwrap();
-            ctx_inner.cv.notify_all();
-        }
+        fire_cancel(&ctx_inner, "context deadline exceeded");
     });
     (ctx, cancel)
 }
@@ -185,9 +212,40 @@ mod tests {
         let ctx = Background();
         let (ctx, _cancel) = WithTimeout(ctx, time::Millisecond * 30i64);
         assert!(ctx.Err() == crate::errors::nil);
-        ctx.Done();  // blocks until timeout
+        ctx.Wait();  // blocks until timeout
         assert!(ctx.Err() != crate::errors::nil);
         assert!(format!("{}", ctx.Err()).contains("deadline"));
+    }
+
+    #[test]
+    fn done_channel_closes_on_cancel() {
+        // ctx.Done() returns a channel; Close-on-cancel gives us a
+        // broadcast so multiple readers can race-detect cancellation.
+        let (ctx, cancel) = WithCancel(Background());
+        let d1 = ctx.Done();
+        let d2 = ctx.Done();
+        let start = std::time::Instant::now();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            cancel.call();
+        });
+        // Both should see (zero, false) once the channel is closed.
+        let (_, ok1) = d1.Recv();
+        let (_, ok2) = d2.Recv();
+        assert!(!ok1 && !ok2);
+        assert!(start.elapsed() >= std::time::Duration::from_millis(15));
+    }
+
+    #[test]
+    fn select_on_done_fires_when_cancelled() {
+        let (ctx, cancel) = WithCancel(Background());
+        cancel.call();
+        let mut fired = false;
+        crate::select!{
+            recv(ctx.Done()) => { fired = true; },
+            default => {},
+        }
+        assert!(fired, "select should see closed ctx.Done()");
     }
 
     #[test]
@@ -218,7 +276,7 @@ mod tests {
         let ctx = Background();
         let deadline = crate::time::Now().Add(crate::time::Millisecond * 30i64);
         let (ctx, _c) = WithDeadline(ctx, deadline);
-        ctx.Done();
+        ctx.Wait();
         assert!(format!("{}", ctx.Err()).contains("deadline"));
     }
 }

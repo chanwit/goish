@@ -186,13 +186,28 @@ test!{ fn TestChan_LenCap(t) {
 }}
 
 // ── TestChan_SendOnClosed ─────────────────────────────────────────────
+// Port of runtime/chan_test.go TestChanSendOnClosed — `c <- v` panics on
+// a closed channel.
 
 test!{ fn TestChan_SendOnClosed(t) {
     let c = chan!(i64, 1);
     c.Close();
-    let err = c.Send(42);
-    if err == nil {
-        t.Error("send on closed channel should return error");
+    let r = recover!{ c.Send(42); };
+    if r.is_none() {
+        t.Error("send on closed channel should panic");
+    }
+}}
+
+// ── TestChan_CloseOnClosed ────────────────────────────────────────────
+// Port of runtime/chan_test.go TestChanCloseOnClosed — `close(c)` panics
+// on a previously-closed channel.
+
+test!{ fn TestChan_CloseOnClosed(t) {
+    let c = chan!(i64, 1);
+    c.Close();
+    let r = recover!{ c.Close(); };
+    if r.is_none() {
+        t.Error("double-close should panic");
     }
 }}
 
@@ -228,16 +243,8 @@ test!{ fn TestChan_CloseDrainsBuffered(t) {
 
 // ── TestChan_ManyGoroutinesSumming ────────────────────────────────────
 // Beyond Go's TestChan: scale test ensuring go!{} + Chan<T> compose cleanly
-// under concurrency.
-//
-// Note: N must stay well below tokio's blocking thread pool cap (default
-// 512). Each Send() in a goroutine blocks a pool slot until a Recv happens,
-// so N producers with a slow consumer would deadlock. This is a genuine
-// limitation of our tokio::spawn_blocking backend vs Go's scheduler; it
-// will go away when we land an async proc-macro that rewrites Send/Recv
-// into .await form.
-//
-// Spawn the consumer FIRST so it gets a pool slot guaranteed.
+// under concurrency. Goroutines are async tasks, so there's no pool cap to
+// worry about — tests/million_goroutines.rs pushes this to 1M.
 
 test!{ fn TestChan_ManyGoroutines(t) {
     const N: i32 = 200;

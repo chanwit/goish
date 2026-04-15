@@ -39,9 +39,15 @@ impl<T> Inner<T> {
         self.closed.load(Ordering::SeqCst)
     }
 
-    pub fn close(&self) {
-        self.closed.store(true, Ordering::SeqCst);
-        self.close_signal.close();
+    /// Mark the channel closed. Returns `true` if this call performed the
+    /// transition (open → closed); `false` if the channel was already
+    /// closed — callers panic on the double-close case to match Go.
+    pub fn close(&self) -> bool {
+        let was_open = !self.closed.swap(true, Ordering::SeqCst);
+        if was_open {
+            self.close_signal.close();
+        }
+        was_open
     }
 
     pub fn send(&self, v: T) -> Result<(), T> {

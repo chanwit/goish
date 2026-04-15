@@ -121,8 +121,8 @@ benchmark!{ fn BenchmarkSpawnThreadAndSend(b) {
 }}
 
 // ── B5b: go!{} + send ────────────────────────────────────────────────
-// goish goroutines via tokio's spawn_blocking pool. Should be materially
-// cheaper than plain thread::spawn thanks to thread reuse.
+// goish goroutines are tokio async tasks (~200 B each). Should be
+// materially cheaper than plain thread::spawn (tasks vs OS threads).
 
 benchmark!{ fn BenchmarkGoroutineSpawnAndSend(b) {
     while b.Loop() {
@@ -177,13 +177,10 @@ fn approx_rss_kb() -> i64 {
 }
 
 // ── B7: Select-contended (2 goroutines racing on 2 channels) ──────────
+// ── B8: Select-fairness distribution ──────────────────────────────────
 //
-// We don't have goish select! yet. Skip — this benchmark lands when the
-// select! macro does in v0.5.1+. Placeholder so the suite has the slot
-// explicitly reserved in docs.
-
-// ── B8: Select-fairness distribution (requires select!) ───────────────
-// Same: reserved placeholder.
+// select! shipped in v0.4.2; concrete benchmarks for it live in
+// tests/chan_select_bench.rs (added alongside the close-panic work).
 
 // ── B9: N tight producer-consumer pairs in parallel ───────────────────
 // Tests contention between independent channel operations.

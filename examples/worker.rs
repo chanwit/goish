@@ -72,10 +72,8 @@ fn main() {
     }
 
     // Feed jobs, then one sentinel per worker to signal "stop".
-    //
-    // (Note: Chan<T> is bundled sender+receiver, so we can't reliably
-    // `close()` — see project_chan_design_deferred memory. Sentinels are
-    // the common Go pattern anyway for structured shutdown.)
+    // (close!(&jobs) also works — Go programs use either pattern; sentinels
+    // compose best when producers outnumber the consumers.)
     for i in 1i64..=n_jobs {
         jobs.Send(Job { id: i, n: i + 10 });
     }
