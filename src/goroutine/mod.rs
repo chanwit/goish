@@ -1,19 +1,28 @@
-// goroutine: `go!{...}` → spawn a goroutine on the tokio blocking pool.
+// goroutine: `go!{...}` → spawn a lightweight async task on tokio.
 //
 //   Go                                  goish
 //   ─────────────────────────────────   ──────────────────────────────────
-//   go worker(jobs)                     go!{ worker(jobs); };
+//   go worker(jobs)                     go!{ worker(jobs).await; };
 //   go func() { ... }()                 go!{ ... };
 //
-// Implementation: `tokio::task::spawn_blocking`. Tokio maintains a pool of
-// OS threads (default 512) that get reused across goroutines, so spawn cost
-// is amortized vs plain `std::thread::spawn`. The body stays synchronous —
-// flume's `Send/Recv` block cleanly on the blocking pool.
+// Each goroutine is a tokio async task — ~100 bytes of state, scales to
+// millions per process. Scheduled M:N across tokio's worker threads
+// (count = GOMAXPROCS or defaults to CPU count).
 //
-// This isn't true M:N green-thread scheduling (that would require async
-// bodies + a proc-macro to rewrite channel ops into `.await`). It IS
-// materially lighter than `std::thread::spawn` per-goroutine.
+// ## The `.await` leak
+//
+// Rust can't invisibly rewrite sync method calls into async, so inside a
+// `go!{}` body:
+//
+//   outside go!{}:  c.Send(v)              (blocking, sync)
+//   inside  go!{}:  c.send(v).await        (cooperative, async)
+//
+// Same goes for `c.recv().await`, `time::Sleep(d)` → `tokio::time::sleep(d).await`,
+// `g.wait().await` to join child goroutines. A follow-up proc-macro (goish v0.5.1)
+// will automate the rewrite so user code stays Go-shaped; for now, users write
+// the `.await` by hand.
 
+use std::future::Future;
 use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
 use tokio::runtime::Runtime;
@@ -25,29 +34,30 @@ pub(crate) fn runtime() -> &'static Runtime {
     RT.get_or_init(|| {
         let mut b = tokio::runtime::Builder::new_multi_thread();
         b.enable_all();
-        if let Ok(n) = std::env::var("GOISH_BLOCKING_POOL_SIZE") {
+        if let Ok(n) = std::env::var("GOMAXPROCS") {
             if let Ok(n) = n.parse::<usize>() {
-                b.max_blocking_threads(n);
+                b.worker_threads(n);
             }
         }
         b.build().expect("goish: failed to build tokio runtime")
     })
 }
 
-/// Handle to a live goroutine. `Wait()` blocks until it finishes.
+/// Handle to a live goroutine. `Wait()` blocks the caller until it finishes;
+/// `.wait().await` joins asynchronously when called from inside another
+/// `go!{}`.
 pub struct Goroutine {
     handle: Option<JoinHandle<()>>,
 }
 
 impl Goroutine {
-    /// Spawn a new goroutine running `f`. Normally users invoke this via
-    /// `go!{ ... }` rather than calling directly.
+    /// Spawn a new goroutine running the given future.
     pub fn spawn<F>(f: F) -> Goroutine
     where
-        F: FnOnce() + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
     {
         crate::runtime::LIVE_GOROUTINES.fetch_add(1, Ordering::SeqCst);
-        let handle = runtime().spawn_blocking(move || {
+        let handle = runtime().spawn(async move {
             struct Guard;
             impl Drop for Guard {
                 fn drop(&mut self) {
@@ -55,13 +65,13 @@ impl Goroutine {
                 }
             }
             let _g = Guard;
-            f();
+            f.await;
         });
         Goroutine { handle: Some(handle) }
     }
 
-    /// Wait for the goroutine to finish. Returns nil on clean exit, error on
-    /// panic.
+    /// `g.Wait()` — block the current (non-async) thread until the goroutine
+    /// finishes. Returns nil on clean exit, error on panic.
     #[allow(non_snake_case)]
     pub fn Wait(mut self) -> crate::errors::error {
         match self.handle.take() {
@@ -72,15 +82,29 @@ impl Goroutine {
             None => crate::errors::nil,
         }
     }
+
+    /// `g.wait().await` — async join for use inside another `go!{}`. This
+    /// form cooperates with the scheduler; prefer it when waiting from
+    /// another goroutine.
+    pub async fn wait(mut self) -> crate::errors::error {
+        match self.handle.take() {
+            Some(h) => match h.await {
+                Ok(()) => crate::errors::nil,
+                Err(_) => crate::errors::New("goroutine panicked"),
+            },
+            None => crate::errors::nil,
+        }
+    }
 }
 
-/// `go!{ stmts }` — spawn a goroutine running the block.
+/// `go!{ stmts }` — spawn a goroutine running the async block.
 ///
-/// Returns a `Goroutine` handle — ignore it if you don't need to wait.
+/// Channel ops inside the block must use the async form:
+///   c.send(v).await / c.recv().await / time::Sleep requires tokio::time::sleep.
 #[macro_export]
 macro_rules! go {
     ($($tt:tt)*) => {
-        $crate::goroutine::Goroutine::spawn(move || {
+        $crate::goroutine::Goroutine::spawn(async move {
             $($tt)*
         })
     };
@@ -91,7 +115,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     #[test]
-    fn go_runs_in_another_thread_and_wait_joins() {
+    fn go_runs_and_wait_joins() {
         let log: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
         let log_clone = log.clone();
         let g = crate::go!{
@@ -103,12 +127,12 @@ mod tests {
     }
 
     #[test]
-    fn go_with_channel() {
+    fn go_with_channel_async() {
         let ch = crate::chan!(i64, 4);
         let producer = ch.clone();
         let g = crate::go!{
             for i in 1i64..=3 {
-                producer.Send(i);
+                producer.send(i).await;
             }
         };
         let _ = g.Wait();
@@ -130,22 +154,23 @@ mod tests {
         assert!(err != crate::errors::nil);
     }
 
+    /// 10k goroutines — enough to prove we're not on a 512-slot pool
+    /// without blasting CI with 1M. The million-goroutine proof lives in
+    /// tests/million_goroutines.rs (run with `cargo test --release`).
     #[test]
-    fn many_goroutines_via_pool() {
-        // Spawn 1000 goroutines — tokio's blocking pool reuses threads.
-        // Each sends to a shared channel; main recvs the sum.
-        let ch = crate::chan!(i64, 1000);
-        let mut handles = Vec::new();
-        for i in 0..1000i64 {
+    fn ten_thousand_goroutines() {
+        let ch = crate::chan!(i64, 10_000);
+        let mut handles = Vec::with_capacity(10_000);
+        for i in 0..10_000i64 {
             let c = ch.clone();
-            handles.push(crate::go!{ c.Send(i); });
+            handles.push(crate::go!{ c.send(i).await; });
         }
         let mut sum = 0i64;
-        for _ in 0..1000 {
+        for _ in 0..10_000 {
             let (v, _) = ch.Recv();
             sum += v;
         }
         for h in handles { let _ = h.Wait(); }
-        assert_eq!(sum, (999 * 1000) / 2);
+        assert_eq!(sum, (9999 * 10_000) / 2);
     }
 }
