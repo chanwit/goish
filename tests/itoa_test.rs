@@ -100,10 +100,10 @@ test!{ fn TestItoa(t) {
 
     // Override when base is illegal — expect panic.
     //
-    // Go uses defer+recover; goish uses std::panic::catch_unwind as the
-    // closest Rust-intrinsic equivalent. The *intent* is identical.
-    let result = std::panic::catch_unwind(|| strconv::FormatUint(12345678, 1));
-    if result.is_ok() {
+    // Go uses defer+recover; goish uses recover!{} which maps the same
+    // pattern onto a single macro call.
+    let r = recover!{ strconv::FormatUint(12345678, 1) };
+    if r.is_none() {
         t.Fatal("expected panic due to illegal base");
     }
 }}

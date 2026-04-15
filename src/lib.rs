@@ -145,6 +145,6 @@ pub mod prelude {
     pub use crate::{
         Errorf, Fprintf, Printf, Println, Sprintf,
         append, benchmark, chan, const_block, defer, delete, go, len, make, map,
-        range, slice, stringer, Struct, test, test_main,
+        range, recover, slice, stringer, Struct, test, test_main,
     };
 }

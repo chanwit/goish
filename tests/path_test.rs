@@ -183,3 +183,13 @@ test!{ fn TestIsAbs(t) {
         }
     }
 }}
+
+// ── BenchmarkJoin — from path_test.go ─────────────────────────────────
+
+benchmark!{ fn BenchmarkJoin(b) {
+    b.ReportAllocs();
+    let parts = slice!([]string{"one", "two", "three", "four"});
+    while b.Loop() {
+        let _ = std::hint::black_box(path::Join(&parts));
+    }
+}}

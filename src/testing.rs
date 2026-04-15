@@ -358,51 +358,133 @@ pub fn AllocsPerRun<F: FnMut()>(_runs: int, mut f: F) -> f64 {
     0.0
 }
 
-// ── B (benchmark handle) — minimal stub ────────────────────────────────
+// ── B (benchmark handle) ──────────────────────────────────────────────
+
+use std::time::{Duration, Instant};
 
 pub struct B {
     pub N: int,
     report_allocs: AtomicBool,
+    bytes: std::sync::atomic::AtomicI64,
+    timer_running: bool,
+    elapsed: Duration,
+    last_start: Option<Instant>,
+    // Condition-style b.Loop() iteration state.
+    loop_counter: int,
 }
 
 impl B {
     #[doc(hidden)]
     pub fn new(n: int) -> B {
-        B { N: n, report_allocs: AtomicBool::new(false) }
+        B {
+            N: n,
+            report_allocs: AtomicBool::new(false),
+            bytes: std::sync::atomic::AtomicI64::new(0),
+            timer_running: true,
+            elapsed: Duration::ZERO,
+            last_start: Some(Instant::now()),
+            loop_counter: n,
+        }
     }
 
     /// b.Loop() — condition-style iteration (Go 1.24+). Returns true while
-    /// more iterations are needed. Decrements internal counter on each call.
+    /// more iterations are needed.
     #[allow(non_snake_case)]
     pub fn Loop(&mut self) -> bool {
-        if self.N > 0 { self.N -= 1; true } else { false }
+        if self.loop_counter > 0 {
+            self.loop_counter -= 1;
+            true
+        } else {
+            self.StopTimer();
+            false
+        }
+    }
+
+    /// b.ResetTimer() — discards measured time so far. Useful after expensive
+    /// setup that shouldn't count toward the benchmark.
+    #[allow(non_snake_case)]
+    pub fn ResetTimer(&mut self) {
+        self.elapsed = Duration::ZERO;
+        if self.timer_running {
+            self.last_start = Some(Instant::now());
+        }
     }
 
     #[allow(non_snake_case)]
-    pub fn ResetTimer(&self) {}
+    pub fn StartTimer(&mut self) {
+        if !self.timer_running {
+            self.timer_running = true;
+            self.last_start = Some(Instant::now());
+        }
+    }
+
     #[allow(non_snake_case)]
-    pub fn StartTimer(&self) {}
+    pub fn StopTimer(&mut self) {
+        if self.timer_running {
+            if let Some(t) = self.last_start.take() {
+                self.elapsed += t.elapsed();
+            }
+            self.timer_running = false;
+        }
+    }
+
     #[allow(non_snake_case)]
-    pub fn StopTimer(&self) {}
+    pub fn ReportAllocs(&self) {
+        self.report_allocs.store(true, Ordering::SeqCst);
+    }
+
+    /// b.SetBytes(n) — record per-iteration byte throughput for MB/s output.
     #[allow(non_snake_case)]
-    pub fn ReportAllocs(&self) { self.report_allocs.store(true, Ordering::SeqCst); }
-    #[allow(non_snake_case)]
-    pub fn SetBytes(&self, _n: int) {}
+    pub fn SetBytes(&self, n: int) {
+        self.bytes.store(n, Ordering::SeqCst);
+    }
+
+    /// Internal: finalize the benchmark and return a one-line report.
+    #[doc(hidden)]
+    pub fn report(&mut self, name: &str) -> String {
+        self.StopTimer();
+        let ns = self.elapsed.as_nanos() as f64;
+        let ran = self.N as f64 - self.loop_counter as f64;
+        let ran = if ran < 1.0 { self.N as f64 } else { ran };
+        let ns_per_op = if ran > 0.0 { ns / ran } else { 0.0 };
+        let mut s = format!("{:<40} {:>10} {:>14.2} ns/op",
+            name, self.N - self.loop_counter, ns_per_op);
+        let bytes = self.bytes.load(Ordering::SeqCst);
+        if bytes > 0 && ns > 0.0 {
+            let mb_per_s = (bytes as f64 * ran) / (ns / 1e9) / (1024.0 * 1024.0);
+            s.push_str(&format!(" {:>8.2} MB/s", mb_per_s));
+        }
+        s
+    }
 }
 
-/// `benchmark!{ fn BenchmarkX(b) { … } }` — registers a benchmark. In v0.4
-/// this compiles under `#[cfg(test)]` and runs as a normal `#[test]` with a
-/// small fixed N=1000 so it at least exercises the code; full statistical
-/// benchmarking is deferred.
+/// `benchmark!{ fn BenchmarkX(b) { … } }` — registers a benchmark as a
+/// regular `#[test]`.
+///
+/// - Runs with a default N of 1000. Override via the `GOISH_BENCH_N` env
+///   var at runtime. The body can also use `while b.Loop() { … }` which
+///   decrements the internal counter and honours StopTimer.
+/// - On completion the ns/op line prints to stderr (libtest captures it
+///   unless `--nocapture` is passed).
+/// - `cargo test` still runs them; to skip benchmarks, filter by test name
+///   prefix: `cargo test -- --skip Benchmark`.
 #[macro_export]
 macro_rules! benchmark {
     (fn $name:ident ( $b:ident ) $body:block) => {
         #[test]
         #[allow(non_snake_case)]
         fn $name() {
-            let mut __b = $crate::testing::B::new(1000);
-            let $b: &mut $crate::testing::B = &mut __b;
-            $body
+            let n: $crate::types::int = ::std::env::var("GOISH_BENCH_N")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1000);
+            let mut __b = $crate::testing::B::new(n);
+            {
+                let $b: &mut $crate::testing::B = &mut __b;
+                $body
+            }
+            let line = __b.report(stringify!($name));
+            ::std::eprintln!("{}", line);
         }
     };
 }
@@ -529,6 +611,16 @@ mod tests {
         let mut n = 0;
         while b.Loop() { n += 1; }
         assert_eq!(n, 3);
-        assert_eq!(b.N, 0);
+        // N is preserved for reporting; the internal counter tracks loop state.
+        assert_eq!(b.N, 3);
+    }
+
+    #[test]
+    fn b_report_format() {
+        let mut b = B::new(100);
+        while b.Loop() { std::hint::black_box(1 + 1); }
+        let line = b.report("BenchmarkX");
+        assert!(line.contains("BenchmarkX"));
+        assert!(line.contains("ns/op"));
     }
 }

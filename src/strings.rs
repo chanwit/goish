@@ -32,6 +32,23 @@ pub fn Contains(s: impl AsRef<str>, substr: impl AsRef<str>) -> bool {
     s.as_ref().contains(substr.as_ref())
 }
 
+/// strings.Compare(a, b) — returns -1 / 0 / 1 per lexicographic order.
+pub fn Compare(a: impl AsRef<str>, b: impl AsRef<str>) -> int {
+    use std::cmp::Ordering::*;
+    match a.as_ref().cmp(b.as_ref()) {
+        Less => -1,
+        Equal => 0,
+        Greater => 1,
+    }
+}
+
+/// strings.Clone(s) — returns a fresh copy of s. In Go this disentangles
+/// a string's underlying storage; in goish `String` is owned so it's a
+/// plain clone.
+pub fn Clone(s: impl AsRef<str>) -> string {
+    s.as_ref().to_string()
+}
+
 pub fn HasPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> bool {
     s.as_ref().starts_with(prefix.as_ref())
 }

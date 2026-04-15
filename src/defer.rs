@@ -45,6 +45,75 @@ macro_rules! defer {
     };
 }
 
+/// `recover!{ body }` — runs `body`; if it panics, captures the panic message
+/// as `Some(String)`. If it completes normally, returns `None`.
+///
+/// Maps Go's `defer func() { if r := recover(); r != nil { ... } }()` pattern.
+/// The difference: Go's defer-recover catches panics from surrounding code in
+/// the same function; Rust requires the risky code to live inside a closure.
+/// The goish macro wraps the block for you.
+///
+///   Go:
+///       defer func() {
+///           if r := recover(); r == nil {
+///               t.Fatal("expected panic")
+///           }
+///       }()
+///       FormatUint(12345678, 1)
+///
+///   goish:
+///       let r = recover!{ strconv::FormatUint(12345678, 1) };
+///       if r.is_none() { t.Fatal("expected panic"); }
+#[macro_export]
+macro_rules! recover {
+    ($($body:tt)*) => {{
+        let __result = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+            $($body)*
+        }));
+        match __result {
+            ::std::result::Result::Ok(_) => ::std::option::Option::<::std::string::String>::None,
+            ::std::result::Result::Err(e) => {
+                let msg = if let ::std::option::Option::Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let ::std::option::Option::Some(s) = e.downcast_ref::<::std::string::String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                ::std::option::Option::Some(msg)
+            }
+        }
+    }};
+}
+
+#[cfg(test)]
+mod recover_tests {
+    #[test]
+    fn recover_returns_none_on_no_panic() {
+        let r = crate::recover!{ let _x = 1 + 1; };
+        assert!(r.is_none());
+    }
+
+    #[test]
+    fn recover_captures_panic_message() {
+        let r = crate::recover!{ panic!("boom"); };
+        assert_eq!(r.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn recover_captures_string_panic() {
+        let r = crate::recover!{ panic!("{}", "formatted {}"); };
+        assert!(r.is_some());
+    }
+
+    #[test]
+    fn recover_matches_go_illegal_base_pattern() {
+        // Simulates itoa_test.go's illegal-base panic check.
+        let r = crate::recover!{ crate::strconv::FormatUint(12345678, 1); };
+        assert!(r.is_some());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};

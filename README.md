@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.4"
+goish = "0.4"      # 0.4.1 = latest
 ```
 
 Then in every file where you want Go-shaped code:
@@ -208,6 +208,17 @@ benchmark!{ fn BenchmarkJoin(b) {
 Real Go tests ported as regression fixtures live in `tests/`:
 - `tests/path_test.rs` — direct port of `go/src/path/path_test.go`
 - `tests/itoa_test.rs` — direct port of `go/src/strconv/itoa_test.go`
+- `tests/strings_compare_test.rs` — port of `go/src/strings/compare_test.go`
+- `tests/bytes_test.rs` — subset of `go/src/bytes/bytes_test.go` (Equal/Index/LastIndex/IndexByte)
+
+**Go's `defer-recover`** ports as `recover!{ … }`:
+
+```rust
+// Go:   defer func() { if r := recover(); r == nil { t.Fatal("want panic") } }()
+//       doPanickyThing()
+let r = recover!{ strconv::FormatUint(12345678, 1) };
+if r.is_none() { t.Fatal("expected panic"); }
+```
 
 ## Packages (current status)
 
