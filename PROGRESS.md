@@ -9,15 +9,19 @@ Overall score = unweighted mean of per-package "Overall %". Packages
 that goish does not target (unsafe, reflect, go/*, image, plugin, …)
 are listed under **Out of scope** and excluded from the rollup.
 
-## Overall: **63%**
+## Overall: **64%**
 
-_Last updated: v0.12.0 — 785 tests green._
+_Last updated: v0.13.0 — 833 tests green._
 
 ## Ported packages (in rollup)
 
 | Package | Go source | goish src | Tests ported | Impl % | Test % | **Overall** |
 |---|---|---|---|---|---|---|
 | **Builtins** (chan / defer / go / range / select / close / len / make / append / delete / map / slice) | – | `src/{chan,defer,range,types,struct_macro}.rs` | 27 (chan + runtime + select semantics) | 85% | 65% | **75%** |
+| `cmp` | `src/cmp` | `src/cmp.rs` | 6 | 85% | 75% | **80%** |
+| `slices` | `src/slices` | `src/slices.rs` | 14 | 70% | 65% | **70%** |
+| `maps` | `src/maps` | `src/maps.rs` | 6 | 80% | 70% | **75%** |
+| `iter` | `src/iter` | `src/iter.rs` | 5 | 60% | 55% | **60%** |
 | `bufio` | `src/bufio` | `src/bufio.rs` | 17 | 70% | 40% | **55%** |
 | `bytes` | `src/bytes` | `src/bytes.rs` | 4 | 55% | 30% | **40%** |
 | `container/heap` + `container/list` + `container/ring` | `src/container/*` | `src/container/*.rs` | 20 | 70% | 60% | **65%** |
@@ -58,14 +62,13 @@ _Last updated: v0.12.0 — 785 tests green._
 | `unicode` | `src/unicode` | `src/unicode/mod.rs` | 8 | 30% | 55% | **45%** |
 | `unicode/utf8` | `src/unicode/utf8` | `src/unicode/utf8.rs` | 6 | 75% | 65% | **70%** |
 
-**Count: 40 packages ported, mean 53%.**
+**Count: 44 packages ported, mean 64%.**
 
 ## Not yet ported — scheduled on milestones
 
 Tracked on [GitHub milestones v0.11–v0.19](https://github.com/chanwit/goish/milestones).
 Each bullet has a tracker issue + per-file porting issues.
 
-- **v0.13.0** (generics-era helpers) — `slices`, `maps`, `cmp`, `iter`.
 - **v0.14.0** (text toolkit) — `text/{template,tabwriter,scanner}`,
   `html`, `html/template`.
 - **v0.15.0** (networking depth) — `net/{netip,mail,smtp,textproto}`,
@@ -179,6 +182,7 @@ into a milestone.
 | v0.10.1 | select! proc-macro rewrite | `chan/select` — 5 CSP-derived bug fixes | 5 | ✅ |
 | v0.11.0 | crypto + encoding + hash | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | 49 | ✅ |
 | v0.12.0 | sort + container + math + unicode | `sort`, `math`, `math/rand`, `unicode`, `unicode/utf8`, `container/{heap,list,ring}` + new `container/ring` impl | 65 | ✅ |
+| v0.13.0 | generics-era helpers | `cmp`, `slices`, `maps`, `iter` (all new impls + tests) | 48 | ✅ |
 | v0.11.0 | crypto + encoding | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | – | ⏳ planned |
 | v0.12.0 | sort + container + math + unicode | `sort`, `container/*`, `math`, `math/rand`, `unicode`, `unicode/utf8` | – | ⏳ planned |
 | v0.13.0 | generics-era helpers | `slices`, `maps`, `cmp`, `iter` | – | 📋 |

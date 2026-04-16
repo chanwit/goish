@@ -50,7 +50,8 @@ extern crate self as goish;
 
 pub mod bufio;
 pub mod bytes;
-pub mod container;        // container/{list,heap}
+pub mod cmp;
+pub mod container;        // container/{list,heap,ring}
 pub mod context;
 pub mod crypto;           // crypto/{md5,sha1,sha256}
 pub mod encoding;         // encoding/{base64,binary,csv,hex,json}
@@ -59,7 +60,9 @@ pub mod flag;
 pub mod fmt;
 pub mod hash;             // hash/{crc32,fnv}
 pub mod io;
+pub mod iter;
 pub mod log;
+pub mod maps;
 pub mod math;             // math + math/rand
 pub mod mime;
 pub mod net;              // net/url (net/http in v0.5)
@@ -67,6 +70,7 @@ pub mod os;               // os + os/exec
 pub mod path;             // path + path/filepath
 pub mod regexp;
 pub mod runtime;
+pub mod slices;
 pub mod sort;
 pub mod strconv;
 pub mod strings;
@@ -134,6 +138,7 @@ pub mod prelude {
     pub use crate::bufio;
     pub use crate::bytes;
     pub use crate::chan::Chan;
+    pub use crate::cmp;
     pub use crate::container;
     pub use crate::context;
     pub use crate::crypto;
@@ -146,7 +151,9 @@ pub mod prelude {
     pub use crate::io::{Reader as _GoishIoReader, Writer as _GoishIoWriter,
                         Closer as _GoishIoCloser, Seeker as _GoishIoSeeker,
                         ReaderAt as _GoishIoReaderAt, WriterAt as _GoishIoWriterAt};
+    pub use crate::iter;
     pub use crate::log;
+    pub use crate::maps;
     pub use crate::math;
     pub use crate::mime;
     pub use crate::net;
@@ -154,6 +161,7 @@ pub mod prelude {
     pub use crate::path;
     pub use crate::regexp;
     pub use crate::runtime;
+    pub use crate::slices;
     pub use crate::sort;
     pub use crate::strconv;
     pub use crate::strings;
