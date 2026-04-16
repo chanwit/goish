@@ -69,6 +69,22 @@ macro_rules! __goish_struct_parse {
             [$($ord)* ($f ($h $(:: $s)+))]);
     };
 
+    // Slice type: `name []T ;` or trailing.
+    // `[]` is two tokens (bracket group + inner), so this arm has to run
+    // before the single-tt arm. The emitted type is paren-wrapped
+    // `( slice<T> )` so it remains a single tt for ctor-macro dispatch.
+    (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident [ ] $inner:tt ; $($rest:tt)*) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* ($f : ( $crate::types::slice<$crate::__goish_type!($inner)> ) ,)]
+            [$($ord)* ($f ( $crate::types::slice<$crate::__goish_type!($inner)> ))]
+            $($rest)*);
+    };
+    (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident [ ] $inner:tt) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* ($f : ( $crate::types::slice<$crate::__goish_type!($inner)> ) ,)]
+            [$($ord)* ($f ( $crate::types::slice<$crate::__goish_type!($inner)> ))]);
+    };
+
     // Single field: `name TYPE ;` or `name TYPE` at end (TYPE = single tt)
     (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident $ty:tt ; $($rest:tt)*) => {
         $crate::__goish_struct_parse!(@start [$name]
@@ -97,6 +113,23 @@ macro_rules! __goish_struct_parse {
         $crate::__goish_struct_parse!(@start [$name]
             [$($fd)* $( ($names : ($h $(:: $s)+) ,) )+ ($last : ($h $(:: $s)+) ,)]
             [$($ord)* $( ($names ($h $(:: $s)+)) )+ ($last ($h $(:: $s)+))]);
+    };
+
+    // Multi-name group ending with slice type: `a, b []T ;`
+    (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident [ ] $inner:tt ; $($rest:tt)*) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* $( ($names : ( $crate::types::slice<$crate::__goish_type!($inner)> ) ,) )+
+                      ($last : ( $crate::types::slice<$crate::__goish_type!($inner)> ) ,)]
+            [$($ord)* $( ($names ( $crate::types::slice<$crate::__goish_type!($inner)> )) )+
+                      ($last ( $crate::types::slice<$crate::__goish_type!($inner)> ))]
+            $($rest)*);
+    };
+    (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident [ ] $inner:tt) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* $( ($names : ( $crate::types::slice<$crate::__goish_type!($inner)> ) ,) )+
+                      ($last : ( $crate::types::slice<$crate::__goish_type!($inner)> ) ,)]
+            [$($ord)* $( ($names ( $crate::types::slice<$crate::__goish_type!($inner)> )) )+
+                      ($last ( $crate::types::slice<$crate::__goish_type!($inner)> ))]);
     };
     // Last ident in group + single-tt type + optional ; + more
     (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident $ty:tt ; $($rest:tt)*) => {
@@ -301,6 +334,29 @@ mod tests {
         ver2 semver::Version;
         expected int
     } }
+
+    Struct!{ type Bag struct { name string; items []string } }
+
+    #[test]
+    fn slice_field_types() {
+        let b = Bag!(
+            "basket",
+            vec![crate::gostring::GoString::from("a"), "b".into()].into()
+        );
+        assert_eq!(b.name, "basket");
+        assert_eq!(b.items.len(), 2);
+        assert_eq!(b.items[0i64], "a");
+    }
+
+    Struct!{ type Parts struct { head, tail []int } }
+
+    #[test]
+    fn multi_name_slice_fields() {
+        let empty: crate::types::slice<i64> = crate::types::slice::new();
+        let p = Parts!(empty.clone(), empty);
+        assert_eq!(p.head.len(), 0);
+        assert_eq!(p.tail.len(), 0);
+    }
 
     #[test]
     fn qualified_path_field_types() {
