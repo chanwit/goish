@@ -65,9 +65,7 @@ impl Header {
 }
 
 pub(crate) fn canonicalize(k: &str) -> string {
-    // Go's MIME canonical form: first char upper, after every `-` upper,
-    // rest lower. `content-type` → `Content-Type`.
-    let mut out = String::with_capacity(k.len());
+    let mut out = std::string::String::with_capacity(k.len());
     let mut upper_next = true;
     for c in k.chars() {
         if c == '-' {
@@ -80,7 +78,7 @@ pub(crate) fn canonicalize(k: &str) -> string {
             out.extend(c.to_lowercase());
         }
     }
-    out
+    out.into()
 }
 
 /// `http.Request` — represents an incoming server request or an outgoing
@@ -238,7 +236,7 @@ pub(crate) fn parse_basic_auth(auth: &str) -> (string, string, bool) {
         Err(_) => return ("".into(), "".into(), false),
     };
     match s.find(':') {
-        Some(i) => (s[..i].to_string(), s[i+1..].to_string(), true),
+        Some(i) => (s[..i].into(), s[i+1..].into(), true),
         None => ("".into(), "".into(), false),
     }
 }

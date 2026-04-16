@@ -179,7 +179,7 @@ fn parse_duration(s: &str) -> Result<crate::time::Duration, String> {
         let unit_end = after_num.chars().take_while(|c| c.is_alphabetic()).count();
         if unit_end == 0 { return Err(format!("missing unit in {:?}", s)); }
         let (unit, after_unit) = after_num.split_at(unit_end);
-        let n: f64 = num_s.parse().map_err(|e: std::num::ParseFloatError| e.into())?;
+        let n: f64 = num_s.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?;
         let unit_dur = match unit {
             "ns" => Nanosecond,
             "us" | "µs" => Microsecond,

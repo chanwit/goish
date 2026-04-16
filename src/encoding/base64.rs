@@ -66,7 +66,7 @@ impl Encoding {
                 out.push(p as char);
             }
         }
-        out
+        out.into()
     }
 
     #[allow(non_snake_case)]

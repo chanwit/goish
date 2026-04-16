@@ -24,7 +24,7 @@ pub struct Response {
 impl Response {
     pub(crate) fn empty(code: int) -> Response {
         Response {
-            Status: format!("{} {}", code, crate::net::http::StatusText(code)),
+            Status: format!("{} {}", code, crate::net::http::StatusText(code)).into(),
             StatusCode: code,
             Proto: "HTTP/1.1".into(),
             Header: Header::new(),

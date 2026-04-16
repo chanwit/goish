@@ -217,7 +217,7 @@ fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usi
         if upper { format!("{:.*}", prec, f).to_uppercase() } else { format!("{:.*}", prec, f) }
     }
 
-    let mut value = match verb {
+    let mut value: std::string::String = match verb {
         'q' => format!("\"{}\"", raw),
         'f' | 'F' => {
             let p = precision.unwrap_or(6);
@@ -226,13 +226,13 @@ fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usi
         'e' | 'E' => {
             let p = precision.unwrap_or(6);
             raw.parse::<f64>()
-                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p as i64, 64))
+                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p as i64, 64).as_str().to_string())
                 .unwrap_or_else(|_| raw.into())
         },
         'g' | 'G' => {
             let p = precision.map(|p| p as i64).unwrap_or(-1);
             raw.parse::<f64>()
-                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p, 64))
+                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p, 64).as_str().to_string())
                 .unwrap_or_else(|_| raw.into())
         },
         'x' => raw.parse::<i128>().map(|n| format!("{:x}", n)).unwrap_or_else(|_| raw.into()),

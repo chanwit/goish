@@ -146,7 +146,7 @@ impl URL {
         let h = &self.Host;
         if h.starts_with('[') {
             if let Some(end) = h.find(']') {
-                if h.len() > end + 1 && &h[end + 1..end + 2] == ":" {
+                if h.as_str().len() > end + 1 && &h[end + 1..end + 2] == ":" {
                     return h[end + 2..].into();
                 }
                 return "".into();

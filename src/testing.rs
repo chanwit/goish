@@ -61,7 +61,7 @@ impl T {
     /// t.Name() — the test's name path.
     #[allow(non_snake_case)]
     pub fn Name(&self) -> string {
-        self.name.clone()
+        self.name.clone().into()
     }
 
     /// t.Failed() — whether this test (or any of its subtests) has failed.
@@ -207,6 +207,11 @@ impl T {
 
     #[doc(hidden)]
     pub fn log_contents(&self) -> string {
+        self.logbuf.lock().unwrap().clone().into()
+    }
+
+    #[doc(hidden)]
+    pub fn log_contents_raw(&self) -> std::string::String {
         self.logbuf.lock().unwrap().clone()
     }
 
@@ -242,10 +247,10 @@ impl T {
                 }
             }
             Outcome::Paniced(msg) => {
-                let mut log = self.log_contents();
+                let mut log = self.log_contents_raw();
                 if !log.is_empty() && !log.ends_with('\n') { log.push('\n'); }
                 log.push_str(&format!("panic: {}", msg));
-                Err(log)
+                Err(log.into())
             }
         }
     }
