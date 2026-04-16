@@ -329,14 +329,12 @@ fn parse_v6(s: &str) -> Result<(u64, u64), String> {
                 // embedded IPv4 found in this group — actually no colon before the dot
                 let v4 = parse_v4(rest)?;
                 embedded4 = Some(v4);
-                rest = "";
                 break;
             }
             (None, Some(_)) => {
                 // only dots remain — embedded IPv4
                 let v4 = parse_v4(rest)?;
                 embedded4 = Some(v4);
-                rest = "";
                 break;
             }
             (Some(ci), _) => {
@@ -369,7 +367,6 @@ fn parse_v6(s: &str) -> Result<(u64, u64), String> {
                     Some(t) => t.push(v),
                     None => groups.push(v),
                 }
-                rest = "";
                 break;
             }
         }

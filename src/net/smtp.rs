@@ -242,7 +242,7 @@ impl<C: Read + Write> Client<C> {
     /// Read an SMTP response. Handles multiline "250-foo\r\n250 bar\r\n".
     fn read_response(&mut self, expect: i64) -> (i64, string, error) {
         let mut acc_msg = String::new();
-        let mut code: i64 = 0;
+        let mut code: i64;
         loop {
             let mut line = String::new();
             match self.r.read_line(&mut line) {
