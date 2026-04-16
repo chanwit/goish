@@ -221,6 +221,16 @@ impl<C: Read + Write> Client<C> {
         err
     }
 
+    /// Extension reports whether the server supports an SMTP extension
+    /// (e.g. "AUTH", "STARTTLS", "8BITMIME") and returns its parameters.
+    pub fn Extension(&self, ext: &str) -> (bool, string) {
+        let up = ext.to_ascii_uppercase();
+        match self.Ext.get(&up) {
+            Some(v) => (true, v.clone()),
+            None => (false, String::new()),
+        }
+    }
+
     pub fn Verify(&mut self, addr: &str) -> error {
         if let Some(e) = validate_line(addr) { return e; }
         let (_, _, err) = self.cmd(250, &format!("VRFY {}", addr));

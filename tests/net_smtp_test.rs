@@ -124,6 +124,68 @@ test!{ fn TestDialAndBasicFlow(t) {
     }
 }}
 
+// ── TestExtensions: EHLO multi-line advertises extensions ─────────
+
+test!{ fn TestExtensions(t) {
+    // First line is "HELLO", next lines advertise extensions.
+    let script = [
+        "250-mock.test Hello\n250-AUTH LOGIN PLAIN\n250-8BITMIME\n250 SIZE 1048576",
+        "221 bye",
+    ];
+    let server = start_mock(&script);
+    let (mut c, err) = smtp::Dial(&server.addr);
+    if err != nil { t.Fatal(&Sprintf!("Dial: %s", err)); }
+
+    // Hello triggers EHLO → collects extension list.
+    let err = c.Hello("localhost");
+    if err != nil { t.Fatal(&Sprintf!("Hello: %s", err)); }
+
+    let (has_auth, auth_params) = c.Extension("AUTH");
+    if !has_auth {
+        t.Errorf(Sprintf!("Extension(AUTH) = false, want true"));
+    }
+    if auth_params != "LOGIN PLAIN" {
+        t.Errorf(Sprintf!("Extension(AUTH) params = %s, want LOGIN PLAIN", auth_params));
+    }
+
+    let (has_bit, _) = c.Extension("8BITMIME");
+    if !has_bit {
+        t.Errorf(Sprintf!("Extension(8BITMIME) = false"));
+    }
+
+    let (has_dsn, _) = c.Extension("DSN");
+    if has_dsn {
+        t.Errorf(Sprintf!("Extension(DSN) = true, want false"));
+    }
+
+    let _ = c.Quit();
+}}
+
+// ── TestNoopReset ───────────────────────────────────────────────────
+
+test!{ fn TestNoopReset(t) {
+    let script = [
+        "250 mock.test Hello",  // EHLO
+        "250 OK",                // NOOP
+        "250 OK",                // RSET
+        "221 bye",               // QUIT
+    ];
+    let server = start_mock(&script);
+    let (mut c, err) = smtp::Dial(&server.addr);
+    if err != nil { t.Fatal(&Sprintf!("Dial: %s", err)); }
+
+    let err = c.Hello("localhost");
+    if err != nil { t.Fatal(&Sprintf!("Hello: %s", err)); }
+
+    let err = c.Noop();
+    if err != nil { t.Errorf(Sprintf!("Noop: %s", err)); }
+
+    let err = c.Reset();
+    if err != nil { t.Errorf(Sprintf!("Reset: %s", err)); }
+
+    let _ = c.Quit();
+}}
+
 // ── TestValidateLine (message injection guard) ─────────────────────
 
 test!{ fn TestValidateLine(t) {
