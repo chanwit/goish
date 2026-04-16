@@ -67,11 +67,11 @@ pub fn Dial(addr: &str) -> (Client<TcpStream>, error) {
         Ok(c) => c,
         Err(e) => return (Client::dummy(), New(&e.to_string())),
     };
-    let host = addr.split(':').next().unwrap_or(addr).to_string();
+    let host: string = addr.split(':').next().unwrap_or(addr).into();
     let boxed = BoxedConn { inner: stream, writer: Some(Box::new(writer_clone)) };
     let mut c = Client {
         r: BufReader::new(boxed),
-        localName: "localhost".to_string(),
+        localName: "localhost".into(),
         didHello: false,
         Ext: HashMap::new(),
     };
@@ -98,7 +98,7 @@ impl Client<TcpStream> {
         let boxed = BoxedConn { inner: stream, writer: None };
         Client {
             r: BufReader::new(boxed),
-            localName: String::new(),
+            localName: "".into(),
             didHello: false,
             Ext: HashMap::new(),
         }
@@ -115,7 +115,7 @@ impl<C: Read + Write + Send + 'static> Client<C> {
         let boxed = BoxedConn { inner: NullConn::with_reader(Box::new(r)), writer: Some(w) };
         let mut c = Client::<NullConn> {
             r: BufReader::new(boxed),
-            localName: "localhost".to_string(),
+            localName: "localhost".into(),
             didHello: false,
             Ext: HashMap::new(),
         };
@@ -148,7 +148,7 @@ impl<C: Read + Write> Client<C> {
         if self.didHello {
             return New("smtp: Hello called after other methods");
         }
-        self.localName = localName.to_string();
+        self.localName = localName.into();
         self.hello()
     }
 
@@ -179,7 +179,7 @@ impl<C: Read + Write> Client<C> {
                     Some(i) => (&line[..i], &line[i + 1..]),
                     None => (&line[..], ""),
                 };
-                ext.insert(k.to_string(), v.to_string());
+                ext.insert(k.into(), v.into());
             }
         }
         self.Ext = ext;
@@ -224,10 +224,10 @@ impl<C: Read + Write> Client<C> {
     /// Extension reports whether the server supports an SMTP extension
     /// (e.g. "AUTH", "STARTTLS", "8BITMIME") and returns its parameters.
     pub fn Extension(&self, ext: &str) -> (bool, string) {
-        let up = ext.to_ascii_uppercase();
+        let up: string = ext.to_ascii_uppercase().into();
         match self.Ext.get(&up) {
             Some(v) => (true, v.clone()),
-            None => (false, String::new()),
+            None => (false, "".into()),
         }
     }
 
@@ -241,28 +241,28 @@ impl<C: Read + Write> Client<C> {
 
     fn cmd(&mut self, expect: i64, line: &str) -> (i64, string, error) {
         // Write line + CRLF.
-        let mut payload = line.to_string();
+        let mut payload: std::string::String = line.into();
         payload.push_str("\r\n");
         if let Err(e) = self.r.get_mut().write_all(payload.as_bytes()) {
-            return (0, String::new(), New(&e.to_string()));
+            return (0, "".into(), New(&e.to_string()));
         }
         self.read_response(expect)
     }
 
     /// Read an SMTP response. Handles multiline "250-foo\r\n250 bar\r\n".
     fn read_response(&mut self, expect: i64) -> (i64, string, error) {
-        let mut acc_msg = String::new();
+        let mut acc_msg = std::string::String::new();
         let mut code: i64;
         loop {
-            let mut line = String::new();
+            let mut line = std::string::String::new();
             match self.r.read_line(&mut line) {
-                Ok(0) => return (0, acc_msg, New("EOF")),
+                Ok(0) => return (0, acc_msg.into(), New("EOF")),
                 Ok(_) => {}
-                Err(e) => return (0, acc_msg, New(&e.to_string())),
+                Err(e) => return (0, acc_msg.into(), New(&e.to_string())),
             }
             while line.ends_with('\n') || line.ends_with('\r') { line.pop(); }
             if line.len() < 4 {
-                return (0, acc_msg, New(&format!("smtp: short response: {}", line)));
+                return (0, acc_msg.into(), New(&format!("smtp: short response: {}", line)));
             }
             let c: i64 = line[..3].parse().unwrap_or(0);
             code = c;
@@ -272,7 +272,7 @@ impl<C: Read + Write> Client<C> {
             acc_msg.push_str(msg);
             if sep == b' ' { break; } // final line
             if sep != b'-' {
-                return (code, acc_msg, New(&format!("smtp: bad response line: {}", line)));
+                return (code, acc_msg.into(), New(&format!("smtp: bad response line: {}", line)));
             }
         }
         let err = if expect != 0 && !expects_match(code, expect) {
@@ -280,7 +280,7 @@ impl<C: Read + Write> Client<C> {
         } else {
             nil
         };
-        (code, acc_msg, err)
+        (code, acc_msg.into(), err)
     }
 }
 
