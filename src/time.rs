@@ -1989,6 +1989,15 @@ mod tests {
     }
 
     #[test]
+    fn duration_div_duration_is_int64() {
+        // Go: time.Millisecond / time.Nanosecond == int64(1_000_000)
+        let n: i64 = Millisecond / Nanosecond;
+        assert_eq!(n, 1_000_000);
+        let n: i64 = Second / Millisecond;
+        assert_eq!(n, 1_000);
+    }
+
+    #[test]
     fn date_and_format_basic() {
         let t = Date(2026, April, 15, 10, 30, 45, 0, UTC);
         assert_eq!(t.Format("2006-01-02 15:04:05"), "2026-04-15 10:30:45");

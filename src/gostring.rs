@@ -251,6 +251,17 @@ impl std::ops::Add<&str> for GoString {
     fn add(self, rhs: &str) -> GoString { self.cat(rhs) }
 }
 
+// Go-shape `"/" + p` — orphan rule allows this because GoString (local)
+// appears in the trait's type params (`Add<GoString>`).
+impl std::ops::Add<GoString> for &str {
+    type Output = GoString;
+    fn add(self, rhs: GoString) -> GoString { GoString::from(self).cat(&rhs) }
+}
+impl std::ops::Add<&GoString> for &str {
+    type Output = GoString;
+    fn add(self, rhs: &GoString) -> GoString { GoString::from(self).cat(rhs) }
+}
+
 // `+=` for Go's `s += "..."` / `s += t`.
 impl std::ops::AddAssign<&str> for GoString {
     fn add_assign(&mut self, rhs: &str) { *self = self.cat(rhs); }
@@ -390,6 +401,16 @@ mod tests {
     fn index_negative_panics() {
         let p: GoString = "ab".into();
         let _ = p[-1];
+    }
+
+    #[test]
+    fn str_plus_gostring() {
+        let p: GoString = "foo".into();
+        // Go: "/" + p
+        let r: GoString = "/" + p.clone();
+        assert_eq!(r, "/foo");
+        let r: GoString = "/" + &p;
+        assert_eq!(r, "/foo");
     }
 
     #[test]
