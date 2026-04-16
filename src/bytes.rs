@@ -158,9 +158,12 @@ impl std::fmt::Display for Buffer {
 }
 
 /// bytes.NewBuffer(b) — take ownership of b as the initial contents.
+/// Accepts anything convertible to `Vec<byte>`, including goish's
+/// `slice<byte>` (so `bytes::NewBuffer(make!([]byte, n))` works without
+/// `.into_vec()` at the call site).
 #[allow(non_snake_case)]
-pub fn NewBuffer(b: Vec<byte>) -> Buffer {
-    Buffer { inner: b, read_pos: 0 }
+pub fn NewBuffer(b: impl Into<Vec<byte>>) -> Buffer {
+    Buffer { inner: b.into(), read_pos: 0 }
 }
 
 /// bytes.NewBufferString(s) — start a buffer from a string.
@@ -525,6 +528,17 @@ pub fn EqualFold(a: &[byte], b: &[byte]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_buffer_accepts_vec_or_slice() {
+        // Vec<u8> — Rust-native path.
+        let b = NewBuffer(vec![b'a', b'b']);
+        assert_eq!(b.Bytes(), &[b'a', b'b']);
+        // slice<byte> — what `make!([]byte, n)` returns.
+        let s: crate::types::slice<byte> = crate::make!([]byte, 3);
+        let b = NewBuffer(s);
+        assert_eq!(b.Len(), 3);
+    }
 
     #[test]
     fn write_string_appends() {
