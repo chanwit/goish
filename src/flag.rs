@@ -325,7 +325,8 @@ mod tests {
         assert_eq!(host.Get(), "db.local");
         assert_eq!(port.Get(), 9090);
         assert_eq!(verbose.Get(), true);
-        assert_eq!(Args(), vec!["remaining".into()]);
+        let want: Vec<string> = vec!["remaining".into()];
+        assert_eq!(Args(), want);
         assert_eq!(NArg(), 1);
         assert_eq!(Arg(0), "remaining");
     }

@@ -361,7 +361,9 @@ macro_rules! Printf {
 #[macro_export]
 macro_rules! Sprintf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
-        $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ])
+        let _s: $crate::types::string =
+            $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ]).into();
+        _s
     }};
 }
 

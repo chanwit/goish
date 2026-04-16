@@ -302,14 +302,14 @@ mod tests {
     #[test]
     fn round_trip() {
         let mut w = NewWriter();
-        let records: Vec<Vec<String>> = vec![
+        let records: Vec<Vec<string>> = vec![
             vec!["name".into(), "age".into()],
             vec!["Alice, CEO".into(), "30".into()],
             vec!["Bob".into(), "25".into()],
         ];
         w.WriteAll(&records);
         let s = w.Flush();
-        let mut r = NewReader(&s);
+        let mut r = NewReader(s.as_str());
         let (all, err) = r.ReadAll();
         assert_eq!(err, nil);
         assert_eq!(all, records);

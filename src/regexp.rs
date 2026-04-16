@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn replace_with_func() {
         let re = MustCompile(r"\d+");
-        let out = re.ReplaceAllStringFunc("a1 b22", |m| format!("[{}]", m));
+        let out = re.ReplaceAllStringFunc("a1 b22", |m| format!("[{}]", m).into());
         assert_eq!(out, "a[1] b[22]");
     }
 
