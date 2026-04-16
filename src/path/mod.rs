@@ -69,8 +69,9 @@ pub fn Ext(p: impl AsRef<str>) -> string {
 }
 
 #[allow(non_snake_case)]
-pub fn Clean(p: impl Into<String>) -> string {
-    let s: String = p.into();
+pub fn Clean(p: impl AsRef<str>) -> string {
+    let s: &str = p.as_ref();
+    let s: String = s.to_string();
     if s.is_empty() {
         return ".".into();
     }

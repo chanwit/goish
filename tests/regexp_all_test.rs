@@ -146,7 +146,7 @@ test!{ fn TestReplaceAllFunc(t) {
     ];
     for (pat, input, want) in cases {
         let re = regexp::MustCompile(pat);
-        let got = re.ReplaceAllStringFunc(input, |s| format!("x{}y", s));
+        let got = re.ReplaceAllStringFunc(input, |s| format!("x{}y", s).into());
         if got != want {
             t.Errorf(Sprintf!("ReplaceAllStringFunc(%q, %q) = %q want %q",
                 pat, input, got, want));

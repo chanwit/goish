@@ -186,7 +186,7 @@ test!{ fn TestURLHostnameAndPort(t) {
         ("[1::6]", "1::6", ""),
     ];
     for (host, hn, port) in cases {
-        let u = url::URL { Host: host.to_string(), ..Default::default() };
+        let u = url::URL { Host: host.into(), ..Default::default() };
         if u.Hostname() != hn {
             t.Errorf(Sprintf!("Hostname(%q) = %q, want %q", host, u.Hostname(), hn));
         }

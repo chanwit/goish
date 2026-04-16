@@ -32,7 +32,7 @@ fn start_mock(responses: &[&str]) -> MockServer {
         let (stream, _) = listener.accept().expect("accept");
         let mut writer = stream.try_clone().expect("clone");
         let mut reader = BufReader::new(stream);
-        let mut collected = make!([]string, 0);
+        let mut collected: Vec<String> = Vec::new();
 
         let _ = writer.write_all(b"220 mock.test SMTP ready\r\n");
 

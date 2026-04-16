@@ -295,12 +295,12 @@ macro_rules! test {
                     __t.finish($crate::testing::__priv::Outcome::Aborted)
                 }
                 Err(e) => {
-                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.into()
+                    let msg: std::string::String = if let Some(s) = e.downcast_ref::<&str>() {
+                        (*s).to_string()
                     } else if let Some(s) = e.downcast_ref::<String>() {
                         s.clone()
                     } else {
-                        "unknown panic".into()
+                        "unknown panic".to_string()
                     };
                     __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
                 }
@@ -344,12 +344,12 @@ macro_rules! test_h {
                     __t.finish($crate::testing::__priv::Outcome::Aborted)
                 }
                 Err(e) => {
-                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.into()
+                    let msg: std::string::String = if let Some(s) = e.downcast_ref::<&str>() {
+                        (*s).to_string()
                     } else if let Some(s) = e.downcast_ref::<String>() {
                         s.clone()
                     } else {
-                        "unknown panic".into()
+                        "unknown panic".to_string()
                     };
                     __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
                 }

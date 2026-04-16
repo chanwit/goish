@@ -31,7 +31,7 @@ fn capital_letters() -> strings::Replacer {
     strings::NewReplacer(&["a", "A", "b", "B"])
 }
 
-struct Case { r: strings::Replacer, r#in: String, out: String }
+struct Case { r: strings::Replacer, r#in: string, out: string }
 
 test!{ fn TestReplacer(t) {
     let cases: Vec<Case> = vec![

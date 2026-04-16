@@ -383,8 +383,8 @@ impl std::io::Read for Reader {
 
 /// strings.NewReader(s) — construct a Reader over the string.
 #[allow(non_snake_case)]
-pub fn NewReader(s: impl Into<String>) -> Reader {
-    Reader { data: s.into(), pos: 0 }
+pub fn NewReader(s: impl AsRef<str>) -> Reader {
+    Reader { data: s.as_ref().to_string(), pos: 0 }
 }
 
 // ── strings.Replacer ───────────────────────────────────────────────────

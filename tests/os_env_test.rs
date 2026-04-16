@@ -20,7 +20,7 @@ fn test_getenv(s: &str) -> string {
         "H" => "(Value of H)".into(),
         "home_1" => "/usr/foo".into(),
         "_" => "underscore".into(),
-        _ => String::new(),
+        _ => "".into(),
     }
 }
 

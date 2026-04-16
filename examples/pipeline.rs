@@ -72,7 +72,7 @@ fn main() {
     });
 
     // Write a summary under a temp path built with filepath::Join.
-    let out_path = filepath::Join(&[os::TempDir(), "goish_pipeline_summary.txt".to_string()]);
+    let out_path = filepath::Join(&[os::TempDir(), "goish_pipeline_summary.txt".into()]);
     let mut buf = bytes::Buffer::new();
     fmt::Fprintf!(&mut buf, "pipeline summary — %d metrics\n", len!(collected));
     range!(&collected, |_i, m| {
