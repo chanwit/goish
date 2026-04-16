@@ -379,7 +379,7 @@ test!{ fn TestPrefixOverlaps(t) {
         Case { a: pfx("5::1/128"),              b: pfx("5::0/8"),             want: true },
         Case { a: pfx("1::1/128"),              b: pfx("2::2/128"),           want: false },
     ];
-    r#for!{ i, c := range (cases[..]) {
+    for (i, c) in range!(cases) {
         let got = c.a.Overlaps(&c.b);
         if got != c.want {
             t.Errorf(Sprintf!("case %d: %s.Overlaps(%s) = %s, want %s",
@@ -387,7 +387,7 @@ test!{ fn TestPrefixOverlaps(t) {
                 if got {"true"} else {"false"},
                 if c.want {"true"} else {"false"}));
         }
-    }}
+    }
 }}
 
 // ── TestAddrZone ────────────────────────────────────────────────────

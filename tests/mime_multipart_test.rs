@@ -80,7 +80,7 @@ test!{ fn TestWriterSetBoundary(t) {
         Case { b: "badspace ".into(),           ok: false },
         Case { b: "(boundary)".into(),          ok: true },
     ];
-    r#for!{ i, c := range (cases[..]) {
+    for (i, c) in range!(cases) {
         let mut buf = bytes::Buffer::new();
         let mut w = multipart::NewWriter(&mut buf);
         let err = w.SetBoundary(&c.b);
@@ -101,7 +101,7 @@ test!{ fn TestWriterSetBoundary(t) {
                 t.Errorf(Sprintf!("%d. ContentType = %s, want %s", i as i64, ct, want_ct));
             }
         }
-    }}
+    }
 }}
 
 // ── TestNameAccessors: FormName/FileName parse Content-Disposition ──
@@ -123,7 +123,7 @@ test!{ fn TestNameAccessors(t) {
         Case { disposition: r#" not-form-data ; filename="bar.txt"; name=foo; baz=quux"#,
                want_name: "", want_filename: "bar.txt" },
     ];
-    r#for!{ i, c := range (cases[..]) {
+    for (i, c) in range!(cases) {
         let mut h = textproto::MIMEHeader::new();
         h.Set("Content-Disposition", c.disposition);
         let p = multipart::ReaderPart::new_for_header(h);
@@ -135,7 +135,7 @@ test!{ fn TestNameAccessors(t) {
             t.Errorf(Sprintf!("case %d: FileName() = %s; want %s",
                 i as i64, p.FileName(), c.want_filename));
         }
-    }}
+    }
 }}
 
 // ── TestFormDataContentType ─────────────────────────────────────────

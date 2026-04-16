@@ -24,6 +24,15 @@ impl<'a, T> RangeIter for &'a [T] {
     }
 }
 
+// Fixed-size arrays — Go's `[N]T` or inline `[...]T{...}`.
+impl<'a, T, const N: usize> RangeIter for &'a [T; N] {
+    type Item = (usize, &'a T);
+    type Iter = std::iter::Enumerate<std::slice::Iter<'a, T>>;
+    fn range(self) -> Self::Iter {
+        self.iter().enumerate()
+    }
+}
+
 impl<'a, T> RangeIter for &'a Vec<T> {
     type Item = (usize, &'a T);
     type Iter = std::iter::Enumerate<std::slice::Iter<'a, T>>;

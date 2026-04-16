@@ -84,35 +84,26 @@ macro_rules! slice {
 /// `.chars().enumerate()` for string slices — whichever the expression's
 /// inherent method resolution picks first.
 ///
-/// Preferred Go-shape forms (v0.15.1+):
+/// Preferred Go-shape form — use native Rust `for`/`in` and let `range!`
+/// produce the iterator:
 ///
-///   range!{ i, v := xs; body_stmts }       // Go: for i, v := range xs
-///   range!{ v := xs; body_stmts }          // Go: for _, v := range xs
-///   range!{ i := xs; body_stmts }          // Go: for i := range xs  (index only)
+///   // Go:    for i, v := range xs { body }
+///   // goish: for (i, v) in range!(xs) { body }
 ///
-/// Or use the shorter Go-literal `for!` macro:
+/// For a single-arg range over integers (Go 1.22+):
 ///
-///   for!{ i, v := range xs { body } }      // Go: for i, v := range xs { body }
-///   for!{ _, v := range xs { body } }      // Go: for _, v := range xs { body }
-///   for!{ v := range xs { body } }         // value only
+///   // Go:    for i := range n { body }
+///   // goish: for i in range!(n) { body }   // where n is int
 ///
 /// The legacy closure form `range!(xs, |i, v| { ... })` is kept for
 /// backward compatibility.
 #[macro_export]
 macro_rules! range {
-    // Go:    for i, v := range xs { body }
-    // goish: range!{ i, v := xs; body }
-    ($i:ident, $v:ident : = $iter:expr ; $($body:tt)*) => {
-        for ($i, $v) in $crate::range::RangeIter::range(&$iter) {
-            $($body)*
-        }
-    };
-    // Go:    for _, v := range xs { body }
-    // goish: range!{ v := xs; body }
-    ($v:ident : = $iter:expr ; $($body:tt)*) => {
-        for (_, $v) in $crate::range::RangeIter::range(&$iter) {
-            $($body)*
-        }
+    // range!(xs) — returns a goish RangeIter over xs.
+    //   for (i, v) in range!(xs) { body }      // slices, arrays, maps
+    //   for v      in range!(xs).vals() { body }  // (future) values only
+    ($iter:expr) => {
+        $crate::range::RangeIter::range(&$iter)
     };
     // Legacy closure forms — retained for backward compatibility.
     ($iter:expr, |$i:pat_param, $v:pat_param| $body:block) => {
@@ -124,34 +115,6 @@ macro_rules! range {
         for $v in ($iter).into_iter() {
             $body
         }
-    };
-}
-
-/// Go-literal `for!{ i, v := range xs { body } }` — mirrors
-/// `for i, v := range xs { body }` token-for-token (apart from the
-/// `!` and outer braces that macro invocations need).
-///
-/// The range expression `xs` must be a single token tree — either a
-/// bare identifier (`xs`) or parenthesised (`(&cases[..])`). This
-/// restriction is a macro-rules follow-set limitation; passing a
-/// complex path or indexing expression requires parens.
-#[macro_export]
-macro_rules! r#for {
-    // for i, v := range xs { body }
-    ($i:ident , $v:ident : = range $iter:tt $body:block) => {
-        for ($i, $v) in $crate::range::RangeIter::range(&$iter) $body
-    };
-    // for _, v := range xs { body }
-    (_ , $v:ident : = range $iter:tt $body:block) => {
-        for (_, $v) in $crate::range::RangeIter::range(&$iter) $body
-    };
-    // for i, _ := range xs { body }
-    ($i:ident , _ : = range $iter:tt $body:block) => {
-        for ($i, _) in $crate::range::RangeIter::range(&$iter) $body
-    };
-    // for v := range xs { body }  — value only (Go: for _, v := range xs)
-    ($v:ident : = range $iter:tt $body:block) => {
-        for (_, $v) in $crate::range::RangeIter::range(&$iter) $body
     };
 }
 

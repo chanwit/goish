@@ -107,11 +107,11 @@ test!{ fn TestReadDotLines(t) {
     if len!(s) != len!(want) {
         t.Fatal(&Sprintf!("ReadDotLines len = %d, want %d", len!(s), len!(want)));
     }
-    r#for!{ i, v := range (s[..]) {
+    for (i, v) in range!(s) {
         if *v != want[i] {
             t.Errorf(Sprintf!("ReadDotLines[%d] = %s, want %s", i as i64, v, want[i]));
         }
-    }}
+    }
 }}
 
 // ── TestReadDotBytes ────────────────────────────────────────────────
