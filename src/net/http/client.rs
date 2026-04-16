@@ -175,7 +175,7 @@ async fn do_request(req: &mut Request) -> (Response, error) {
     }
 
     let host = match uri.host() {
-        Some(h) => h.to_owned(),
+        Some(h) => h.into(),
         None => return (Response::empty(0), New("http: missing host in URL")),
     };
     let port = uri.port_u16().unwrap_or(80);
@@ -267,7 +267,7 @@ fn build_uri(u: &URL) -> string {
 }
 
 fn path_and_query(u: &URL) -> string {
-    let mut s = if u.Path.is_empty() { "/".to_owned() } else { u.Path.clone() };
+    let mut s = if u.Path.is_empty() { "/".into() } else { u.Path.clone() };
     if !u.RawQuery.is_empty() {
         s.push('?');
         s.push_str(&u.RawQuery);

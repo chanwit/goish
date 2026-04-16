@@ -58,7 +58,7 @@ fn table() -> &'static RwLock<Vec<(string, string)>> {
             (".woff", "font/woff"),
             (".woff2","font/woff2"),
         ];
-        RwLock::new(base.iter().map(|(e, t)| (e.to_string(), t.to_string())).collect())
+        RwLock::new(base.iter().map(|(e, t)| (e.into(), t.into())).collect())
     })
 }
 
@@ -98,9 +98,9 @@ pub fn AddExtensionType(ext: impl AsRef<str>, typ: impl AsRef<str>) -> error {
     }
     let mut tab = table().write().unwrap();
     if let Some(entry) = tab.iter_mut().find(|(e, _)| e == ext) {
-        entry.1 = typ.as_ref().to_string();
+        entry.1 = typ.as_ref().into();
     } else {
-        tab.push((ext.to_ascii_lowercase(), typ.as_ref().to_string()));
+        tab.push((ext.to_ascii_lowercase(), typ.as_ref().into()));
     }
     nil
 }
@@ -131,8 +131,8 @@ mod tests {
     fn extensions_by_type_reverse_lookup() {
         let (exts, err) = ExtensionsByType("image/jpeg");
         assert_eq!(err, nil);
-        assert!(exts.contains(&".jpg".to_string()));
-        assert!(exts.contains(&".jpeg".to_string()));
+        assert!(exts.contains(&".jpg".into()));
+        assert!(exts.contains(&".jpeg".into()));
     }
 
     #[test]

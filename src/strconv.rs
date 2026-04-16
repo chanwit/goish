@@ -619,7 +619,8 @@ fn canonical_exponent(s: &str, _prec: usize, _use_e: bool, upper: bool) -> strin
             digits_trimmed = all_digits[idx..].trim_end_matches('0').into();
         }
     }
-    let (lead, tail) = if digits_trimmed.is_empty() { ("0".into(), String::new()) }
+    let (lead, tail): (std::string::String, std::string::String) =
+        if digits_trimmed.is_empty() { ("0".into(), std::string::String::new()) }
         else { (digits_trimmed[..1].into(), digits_trimmed[1..].into()) };
     let sign = if exp_val >= 0 { '+' } else { '-' };
     let sign_prefix = if neg { "-" } else { "" };

@@ -49,7 +49,7 @@ impl<W: Write> Writer<W> {
         if !valid_boundary(boundary) {
             return New(&format!("mime: invalid boundary character"));
         }
-        self.boundary = boundary.to_string();
+        self.boundary = boundary.into();
         nil
     }
 
@@ -185,7 +185,7 @@ impl Reader {
     pub fn NewReader<R: Read>(mut r: R, boundary: &str) -> Reader {
         let mut buf = Vec::new();
         let _ = r.read_to_end(&mut buf);
-        Reader { buf, pos: 0, boundary: boundary.to_string(), eof: false, first_part: true }
+        Reader { buf, pos: 0, boundary: boundary.into(), eof: false, first_part: true }
     }
 
     pub fn NextPart(&mut self) -> (ReaderPart, error) {
@@ -330,10 +330,10 @@ fn parse_param(cd: &str, name: &str) -> Option<string> {
         let v = s[eq + 1..].trim();
         if let Some(stripped) = v.strip_prefix('"') {
             if let Some(end) = stripped.find('"') {
-                return Some(stripped[..end].to_string());
+                return Some(stripped[..end].into());
             }
         }
-        return Some(v.to_string());
+        return Some(v.into());
     }
     None
 }

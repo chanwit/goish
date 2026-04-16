@@ -313,7 +313,7 @@ pub fn ReadLines<R: Read>(r: R) -> (crate::types::slice<string>, error) {
     let mut sc = NewScanner(r);
     let mut lines = crate::types::slice::<string>::new();
     while sc.Scan() {
-        lines.push(sc.Text().to_string());
+        lines.push(sc.Text().into());
     }
     let err = sc.Err().clone();
     (lines, err)
@@ -493,7 +493,7 @@ mod tests {
         let mut sc = NewScanner(Cursor::new(input));
         let mut seen: Vec<String> = Vec::new();
         while sc.Scan() {
-            seen.push(sc.Text().to_string());
+            seen.push(sc.Text().into());
         }
         assert_eq!(seen, vec!["alpha", "beta", "gamma"]);
         assert!(sc.Err() == &nil);

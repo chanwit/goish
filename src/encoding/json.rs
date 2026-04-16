@@ -112,7 +112,7 @@ impl Value {
             for (k, v) in m.iter_mut() {
                 if k == key.as_ref() { *v = value; return; }
             }
-            m.push((key.as_ref().to_string(), value));
+            m.push((key.as_ref().into(), value));
         }
     }
 }

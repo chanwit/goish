@@ -57,14 +57,14 @@ fn cli() -> &'static FlagSet {
 }
 
 fn register(name: &str, usage: &str, spec: Spec) {
-    cli().specs.lock().unwrap().push((name.to_string(), usage.to_string(), spec));
+    cli().specs.lock().unwrap().push((name.into(), usage.into(), spec));
 }
 
 // ── Definers ───────────────────────────────────────────────────────────
 
 #[allow(non_snake_case)]
 pub fn String(name: &str, default: &str, usage: &str) -> Flag<string> {
-    let f = Flag { value: Arc::new(RwLock::new(default.to_string())) };
+    let f = Flag { value: Arc::new(RwLock::new(default.into())) };
     register(name, usage, Spec::String(f.clone()));
     f
 }
@@ -123,7 +123,7 @@ fn find_spec(name: &str) -> Option<Spec> {
 
 fn apply(spec: Spec, val: &str) -> error {
     match spec {
-        Spec::String(f) => { f.Set(val.to_string()); nil }
+        Spec::String(f) => { f.Set(val.into()); nil }
         Spec::Int(f) => {
             let (n, err) = crate::strconv::Atoi(val);
             if err != nil { return err; }
@@ -179,7 +179,7 @@ fn parse_duration(s: &str) -> Result<crate::time::Duration, String> {
         let unit_end = after_num.chars().take_while(|c| c.is_alphabetic()).count();
         if unit_end == 0 { return Err(format!("missing unit in {:?}", s)); }
         let (unit, after_unit) = after_num.split_at(unit_end);
-        let n: f64 = num_s.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?;
+        let n: f64 = num_s.parse().map_err(|e: std::num::ParseFloatError| e.into())?;
         let unit_dur = match unit {
             "ns" => Nanosecond,
             "us" | "µs" => Microsecond,
@@ -243,7 +243,7 @@ pub fn ParseArgs(args: &[string]) {
                     }
                     Some(Spec::Duration(f)) => {
                         let v = match inline_val {
-                            Some(v) => v.to_string(),
+                            Some(v) => v.into(),
                             None => {
                                 let v = args.get(i + 1).cloned().unwrap_or_default();
                                 i += 1;
@@ -258,7 +258,7 @@ pub fn ParseArgs(args: &[string]) {
                     }
                     Some(spec) => {
                         let v = match inline_val {
-                            Some(v) => v.to_string(),
+                            Some(v) => v.into(),
                             None => {
                                 let v = args.get(i + 1).cloned().unwrap_or_default();
                                 i += 1;
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(host.Get(), "db.local");
         assert_eq!(port.Get(), 9090);
         assert_eq!(verbose.Get(), true);
-        assert_eq!(Args(), vec!["remaining".to_string()]);
+        assert_eq!(Args(), vec!["remaining".into()]);
         assert_eq!(NArg(), 1);
         assert_eq!(Arg(0), "remaining");
     }

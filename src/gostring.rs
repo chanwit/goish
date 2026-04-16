@@ -117,9 +117,8 @@ impl GoString {
         self.as_str().ends_with(s.as_ref())
     }
 
-    pub fn contains(&self, sub: impl AsRef<str>) -> bool {
-        self.as_str().contains(sub.as_ref())
-    }
+    // .contains() is inherited from str via Deref — supports &str, char,
+    // char-closures, etc. Not overridden here.
 
     /// Go's Stringer — returns self.
     pub fn String(&self) -> GoString { self.clone() }

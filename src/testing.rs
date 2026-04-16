@@ -291,11 +291,11 @@ macro_rules! test {
                 }
                 Err(e) => {
                     let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.to_string()
+                        s.into()
                     } else if let Some(s) = e.downcast_ref::<String>() {
                         s.clone()
                     } else {
-                        "unknown panic".to_string()
+                        "unknown panic".into()
                     };
                     __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
                 }
@@ -340,11 +340,11 @@ macro_rules! test_h {
                 }
                 Err(e) => {
                     let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.to_string()
+                        s.into()
                     } else if let Some(s) = e.downcast_ref::<String>() {
                         s.clone()
                     } else {
-                        "unknown panic".to_string()
+                        "unknown panic".into()
                     };
                     __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
                 }
@@ -577,7 +577,7 @@ impl M {
             filter: std::env::args().find_map(|a| {
                 a.strip_prefix("-run=")
                     .or_else(|| a.strip_prefix("-test.run="))
-                    .map(|s| s.to_owned())
+                    .map(|s| s.into())
             }),
             verbose: std::env::args().any(|a| {
                 matches!(a.as_str(), "-v" | "--verbose" | "-test.v")
