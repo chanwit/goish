@@ -25,7 +25,7 @@ const SEP: char = '/';
 pub fn Join(parts: &[impl AsRef<str>]) -> string {
     let joined: Vec<&str> = parts.iter().map(|p| p.as_ref()).filter(|s| !s.is_empty()).collect();
     if joined.is_empty() {
-        return String::new();
+        return "".into();
     }
     Clean(joined.join(&SEP.to_string()))
 }
@@ -34,15 +34,15 @@ pub fn Join(parts: &[impl AsRef<str>]) -> string {
 pub fn Base(p: impl AsRef<str>) -> string {
     let s = p.as_ref();
     if s.is_empty() {
-        return ".".to_string();
+        return ".".into();
     }
     let trimmed = s.trim_end_matches(SEP);
     if trimmed.is_empty() {
-        return SEP.to_string();
+        return SEP.to_string().into();
     }
     match trimmed.rsplit_once(SEP) {
-        Some((_, tail)) => tail.to_string(),
-        None => trimmed.to_string(),
+        Some((_, tail)) => tail.into(),
+        None => trimmed.into(),
     }
 }
 
@@ -50,7 +50,7 @@ pub fn Base(p: impl AsRef<str>) -> string {
 pub fn Dir(p: impl AsRef<str>) -> string {
     // Mirror Go's path.Dir: dir, _ := Split(p); return Clean(dir)
     let (dir, _) = Split(p);
-    Clean(dir)
+    Clean(dir.as_str().to_string())
 }
 
 #[allow(non_snake_case)]
@@ -62,17 +62,18 @@ pub fn Ext(p: impl AsRef<str>) -> string {
     while i > 0 {
         i -= 1;
         let c = bytes[i];
-        if c == b'/' { return String::new(); }
-        if c == b'.' { return s[i..].to_string(); }
+        if c == b'/' { return "".into(); }
+        if c == b'.' { return s[i..].into(); }
     }
-    String::new()
+    "".into()
 }
 
 #[allow(non_snake_case)]
-pub fn Clean(p: impl Into<String>) -> string {
-    let s: String = p.into();
+pub fn Clean(p: impl AsRef<str>) -> string {
+    let s: &str = p.as_ref();
+    let s: String = s.to_string();
     if s.is_empty() {
-        return ".".to_string();
+        return ".".into();
     }
     let absolute = s.starts_with(SEP);
     let mut stack: Vec<&str> = Vec::new();
@@ -91,11 +92,11 @@ pub fn Clean(p: impl Into<String>) -> string {
     }
     let joined = stack.join(&SEP.to_string());
     if absolute {
-        if joined.is_empty() { SEP.to_string() } else { format!("{}{}", SEP, joined) }
+        if joined.is_empty() { SEP.to_string().into() } else { format!("{}{}", SEP, joined).into() }
     } else if joined.is_empty() {
-        ".".to_string()
+        ".".into()
     } else {
-        joined
+        joined.into()
     }
 }
 
@@ -109,8 +110,8 @@ pub fn IsAbs(p: impl AsRef<str>) -> bool {
 pub fn Split(p: impl AsRef<str>) -> (string, string) {
     let s = p.as_ref();
     match s.rfind(SEP) {
-        Some(i) => (s[..=i].to_string(), s[i + 1..].to_string()),
-        None => (String::new(), s.to_string()),
+        Some(i) => (s[..=i].into(), s[i + 1..].into()),
+        None => ("".into(), s.into()),
     }
 }
 

@@ -23,22 +23,22 @@ impl MIMEHeader {
         let k = CanonicalMIMEHeaderKey(key);
         for (ek, ev) in self.entries.iter_mut() {
             if *ek == k {
-                ev.push(value.to_string());
+                ev.push(value.into());
                 return;
             }
         }
-        self.entries.push((k, vec![value.to_string()]));
+        self.entries.push((k, vec![value.into()]));
     }
 
     pub fn Set(&mut self, key: &str, value: &str) {
         let k = CanonicalMIMEHeaderKey(key);
         for (ek, ev) in self.entries.iter_mut() {
             if *ek == k {
-                *ev = vec![value.to_string()];
+                *ev = vec![value.into()];
                 return;
             }
         }
-        self.entries.push((k, vec![value.to_string()]));
+        self.entries.push((k, vec![value.into()]));
     }
 
     pub fn Get(&self, key: &str) -> string {
@@ -48,7 +48,7 @@ impl MIMEHeader {
                 return ev.first().cloned().unwrap_or_default();
             }
         }
-        String::new()
+        "".into()
     }
 
     pub fn Values(&self, key: &str) -> Vec<string> {
@@ -78,16 +78,16 @@ impl MIMEHeader {
 
 pub fn CanonicalMIMEHeaderKey(key: &str) -> string {
     if !is_valid_header_key(key) {
-        return key.to_string();
+        return key.into();
     }
-    let mut out = String::with_capacity(key.len());
+    let mut out = std::string::String::with_capacity(key.len());
     let mut upper = true;
     for c in key.chars() {
         if upper { out.push(c.to_ascii_uppercase()); }
         else     { out.push(c.to_ascii_lowercase()); }
         upper = c == '-';
     }
-    out
+    out.into()
 }
 
 fn is_valid_header_key(key: &str) -> bool {
@@ -135,15 +135,15 @@ impl<R: Read> Reader<R> {
     /// ReadLine reads a single line stripping the trailing \r\n or \n.
     /// Returns empty string + EOF error at the end.
     pub fn ReadLine(&mut self) -> (string, error) {
-        let mut buf = String::new();
+        let mut buf = std::string::String::new();
         match self.r.read_line(&mut buf) {
-            Ok(0) => (String::new(), New("EOF")),
+            Ok(0) => ("".into(), New("EOF")),
             Ok(_) => {
                 if buf.ends_with('\n') { buf.pop(); }
                 if buf.ends_with('\r') { buf.pop(); }
-                (buf, nil)
+                (buf.into(), nil)
             }
-            Err(e) => (String::new(), New(&e.to_string())),
+            Err(e) => ("".into(), New(&e.to_string())),
         }
     }
 
@@ -153,23 +153,22 @@ impl<R: Read> Reader<R> {
         let (first, err) = self.ReadLine();
         if err != nil { return (first, err); }
         if first.is_empty() { return (first, nil); }
-        let mut out = first;
+        let mut out: std::string::String = first.as_str().into();
         loop {
             // peek next byte
             let buf = match self.r.fill_buf() {
                 Ok(b) if b.is_empty() => break,
                 Ok(b) => b,
-                Err(e) => return (out, New(&e.to_string())),
+                Err(e) => return (out.into(), New(&e.to_string())),
             };
             if !(buf[0] == b' ' || buf[0] == b'\t') { break; }
             let (cont, err) = self.ReadLine();
-            if err != nil { return (out, err); }
-            // Trim trailing whitespace on accumulator, leading on cont, join with single space.
+            if err != nil { return (out.into(), err); }
             while out.ends_with(' ') || out.ends_with('\t') { out.pop(); }
             out.push(' ');
             out.push_str(cont.trim_start_matches(|c: char| c == ' ' || c == '\t'));
         }
-        (out, nil)
+        (out.into(), nil)
     }
 
     /// ReadMIMEHeader reads a block of MIME headers. Terminated by a blank
@@ -187,7 +186,7 @@ impl<R: Read> Reader<R> {
                 Some(i) => i,
                 None => return (h, New(&format!("malformed MIME header line: {}", line))),
             };
-            let key = line[..colon].to_string();
+            let key: string = line[..colon].into();
             // Go accepts non-compliant keys (spaces before colon) and
             // preserves them verbatim. We only reject genuinely malformed
             // lines (empty key after leading whitespace check).
@@ -199,7 +198,7 @@ impl<R: Read> Reader<R> {
                     return (h, New(&format!("malformed MIME header line: {}", line)));
                 }
             }
-            let value = line[colon + 1..].trim_matches(|c: char| c == ' ' || c == '\t').to_string();
+            let value: string = line[colon + 1..].trim_matches(|c: char| c == ' ' || c == '\t').into();
             h.Add(&key, &value);
         }
     }
@@ -213,7 +212,7 @@ impl<R: Read> Reader<R> {
     /// Returns (code, message, err).
     pub fn ReadCodeLine(&mut self, expect: i64) -> (i64, string, error) {
         let (line, err) = self.ReadLine();
-        if err != nil { return (0, String::new(), err); }
+        if err != nil { return (0, "".into(), err); }
         if line.len() < 4 {
             return (0, line.clone(), New(&format!("short response: {}", line)));
         }
@@ -223,10 +222,10 @@ impl<R: Read> Reader<R> {
         };
         let sep = line.as_bytes()[3];
         if sep != b' ' && sep != b'-' {
-            return (code, line[4..].to_string(),
+            return (code, line[4..].into(),
                     New(&format!("invalid response separator: {}", line)));
         }
-        let msg = line[4..].to_string();
+        let msg: string = line[4..].into();
         if expect != 0 {
             let ok = if expect >= 100 {
                 code == expect
@@ -250,7 +249,7 @@ impl<R: Read> Reader<R> {
             let (line, err) = self.ReadLine();
             if err != nil { return (lines, err); }
             if line == "." { return (lines, nil); }
-            let unstuffed = if let Some(r) = line.strip_prefix('.') { r.to_string() } else { line };
+            let unstuffed = if let Some(r) = line.strip_prefix('.') { r.into() } else { line };
             lines.push(unstuffed);
         }
     }
@@ -279,7 +278,7 @@ impl<W: Write> Writer<W> {
     pub fn NewWriter(w: W) -> Writer<W> { Writer { w } }
 
     pub fn PrintfLine(&mut self, format: &str, args: &[&dyn std::fmt::Display]) -> error {
-        let mut s = format.to_string();
+        let mut s: std::string::String = format.into();
         for a in args {
             let needle = "%s";
             if let Some(i) = s.find(needle) {
@@ -345,7 +344,7 @@ impl<'a, W: Write> Drop for DotWriter<'a, W> {
 
 pub fn TrimString(s: &str) -> string {
     // Go: trim ASCII space + horizontal tab.
-    s.trim_matches(|c: char| c == ' ' || c == '\t').to_string()
+    s.trim_matches(|c: char| c == ' ' || c == '\t').into()
 }
 
 pub fn TrimBytes(b: &[u8]) -> Vec<u8> {

@@ -49,12 +49,12 @@ impl<W: Write> Writer<W> {
         if !valid_boundary(boundary) {
             return New(&format!("mime: invalid boundary character"));
         }
-        self.boundary = boundary.to_string();
+        self.boundary = boundary.into();
         nil
     }
 
     pub fn FormDataContentType(&self) -> string {
-        format!("multipart/form-data; boundary={}", self.boundary)
+        format!("multipart/form-data; boundary={}", self.boundary).into()
     }
 
     pub fn CreatePart(&mut self, header: MIMEHeader) -> (Part<'_, W>, error) {
@@ -122,7 +122,7 @@ impl<W: Write> Writer<W> {
     }
 }
 
-fn escape_quotes(s: &str) -> string {
+fn escape_quotes(s: &str) -> std::string::String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
@@ -147,8 +147,7 @@ fn random_boundary() -> string {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    // 60 hex chars — well within 70-char boundary limit.
-    format!("{:016x}{:016x}goishboundary", t ^ 0x9E3779B97F4A7C15_u64, n)
+    format!("{:016x}{:016x}goishboundary", t ^ 0x9E3779B97F4A7C15_u64, n).into()
 }
 
 // ── Part (writer side) ──────────────────────────────────────────────
@@ -185,7 +184,7 @@ impl Reader {
     pub fn NewReader<R: Read>(mut r: R, boundary: &str) -> Reader {
         let mut buf = Vec::new();
         let _ = r.read_to_end(&mut buf);
-        Reader { buf, pos: 0, boundary: boundary.to_string(), eof: false, first_part: true }
+        Reader { buf, pos: 0, boundary: boundary.into(), eof: false, first_part: true }
     }
 
     pub fn NextPart(&mut self) -> (ReaderPart, error) {
@@ -290,14 +289,13 @@ impl ReaderPart {
 
     pub fn FormName(&self) -> string {
         let cd = self.Header.Get("Content-Disposition");
-        // Go: FormName returns "" unless disposition is "form-data".
-        if !is_form_data(&cd) { return String::new(); }
-        parse_param(&cd, "name").unwrap_or_default()
+        if !is_form_data(&cd) { return "".into(); }
+        parse_param(&cd, "name").map(string::from).unwrap_or_default()
     }
 
     pub fn FileName(&self) -> string {
         let cd = self.Header.Get("Content-Disposition");
-        parse_param(&cd, "filename").unwrap_or_default()
+        parse_param(&cd, "filename").map(string::from).unwrap_or_default()
     }
 
     pub fn Body(&self) -> &[u8] { &self.body }
@@ -330,10 +328,10 @@ fn parse_param(cd: &str, name: &str) -> Option<string> {
         let v = s[eq + 1..].trim();
         if let Some(stripped) = v.strip_prefix('"') {
             if let Some(end) = stripped.find('"') {
-                return Some(stripped[..end].to_string());
+                return Some(stripped[..end].into());
             }
         }
-        return Some(v.to_string());
+        return Some(v.into());
     }
     None
 }

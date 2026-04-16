@@ -22,7 +22,7 @@ pub struct Address {
 }
 
 /// Go-shape `mail.Address{Name: "…", Address: "…"}` literal.
-/// Accepts string literals without `.to_string()` noise.
+/// Accepts string literals without `.into()` noise.
 #[macro_export]
 macro_rules! MailAddress {
     ( $($field:ident : $value:expr),* $(,)? ) => {{
@@ -35,26 +35,23 @@ macro_rules! MailAddress {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __mail_addr_set {
-    ($a:ident, Name,    $v:expr) => { $a.Name    = $v.to_string(); };
-    ($a:ident, Address, $v:expr) => { $a.Address = $v.to_string(); };
+    ($a:ident, Name,    $v:expr) => { $a.Name    = $v.into(); };
+    ($a:ident, Address, $v:expr) => { $a.Address = $v.into(); };
 }
 
 impl Address {
     pub fn String(&self) -> string {
         // If there's a display name, quote if it has non-atom chars.
         let addr = format!("<{}>", self.Address);
-        if self.Name.is_empty() { return addr.trim_matches(|c| c == '<' || c == '>').to_string(); }
+        if self.Name.is_empty() { return addr.trim_matches(|c| c == '<' || c == '>').into(); }
         let needs_quote = self.Name.chars().any(|c| !is_atext(c) && c != ' ');
-        let name = if needs_quote {
+        let name: std::string::String = if needs_quote {
             let escaped = self.Name.replace('\\', "\\\\").replace('"', "\\\"");
             format!("\"{}\"", escaped)
-        } else if self.Name.chars().any(|c| c == ' ') {
-            // Display with spaces is fine as phrase; keep unquoted.
-            self.Name.clone()
         } else {
-            self.Name.clone()
+            self.Name.as_str().into()
         };
-        format!("{} {}", name, addr)
+        format!("{} {}", name, addr).into()
     }
 }
 
@@ -158,10 +155,8 @@ impl<'a> Parser<'a> {
 
     fn parse_address(&mut self) -> Result<Address, String> {
         self.skip_cfws();
-        // If we can see a '<' anywhere before the next ',' (outside quotes
-        // and comments), the input is in display-name <addr> form.
         if self.lookahead_has_angle() {
-            let mut name = String::new();
+            let mut name = std::string::String::new();
             loop {
                 self.skip_cfws();
                 if self.peek() == Some('<') { break; }
@@ -174,11 +169,10 @@ impl<'a> Parser<'a> {
             if !self.consume('>') {
                 return Err(format!("expected > got {:?}", self.peek_str()));
             }
-            return Ok(Address { Name: name, Address: addr });
+            return Ok(Address { Name: name.into(), Address: addr });
         }
-        // Plain addr-spec.
         let addr = self.parse_addr_spec()?;
-        Ok(Address { Name: String::new(), Address: addr })
+        Ok(Address { Name: "".into(), Address: addr })
     }
 
     /// Scan ahead for '<' outside quoted strings and comments, stopping at
@@ -207,7 +201,7 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn parse_word(&mut self) -> Result<string, String> {
+    fn parse_word(&mut self) -> Result<std::string::String, String> {
         self.skip_cfws();
         if self.peek() == Some('"') {
             return self.parse_quoted_string();
@@ -215,7 +209,7 @@ impl<'a> Parser<'a> {
         self.parse_atom(true)
     }
 
-    fn parse_atom(&mut self, dot_allowed: bool) -> Result<string, String> {
+    fn parse_atom(&mut self, dot_allowed: bool) -> Result<std::string::String, String> {
         let start = self.pos;
         while let Some(c) = self.peek() {
             if is_atext(c) || (dot_allowed && c == '.') {
@@ -225,13 +219,13 @@ impl<'a> Parser<'a> {
         if self.pos == start {
             return Err(format!("expected atom, got {:?}", self.peek_str()));
         }
-        Ok(self.s[start..self.pos].to_string())
+        Ok(self.s[start..self.pos].into())
     }
 
-    fn parse_quoted_string(&mut self) -> Result<string, String> {
+    fn parse_quoted_string(&mut self) -> Result<std::string::String, String> {
         // assumes peek == '"'
         self.pos += 1;
-        let mut out = String::new();
+        let mut out = std::string::String::new();
         loop {
             match self.peek() {
                 None => return Err("unterminated quoted string".into()),
@@ -264,7 +258,6 @@ impl<'a> Parser<'a> {
         }
         self.skip_cfws();
         let domain = if self.peek() == Some('[') {
-            // domain literal
             self.pos += 1;
             let start = self.pos;
             while self.peek().is_some() && self.peek() != Some(']') {
@@ -276,6 +269,6 @@ impl<'a> Parser<'a> {
         } else {
             self.parse_atom(true)?
         };
-        Ok(format!("{}@{}", local, domain))
+        Ok(format!("{}@{}", local, domain).into())
     }
 }

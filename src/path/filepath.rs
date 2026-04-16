@@ -17,7 +17,7 @@ const SEP: char = std::path::MAIN_SEPARATOR;
 pub fn Join(parts: &[impl AsRef<str>]) -> string {
     let joined: Vec<&str> = parts.iter().map(|p| p.as_ref()).filter(|s| !s.is_empty()).collect();
     if joined.is_empty() {
-        return String::new();
+        return "".into();
     }
     let combined = joined.join(&SEP.to_string());
     Clean(combined)
@@ -28,15 +28,15 @@ pub fn Join(parts: &[impl AsRef<str>]) -> string {
 pub fn Base(path: impl AsRef<str>) -> string {
     let s = path.as_ref();
     if s.is_empty() {
-        return ".".to_string();
+        return ".".into();
     }
     let trimmed = s.trim_end_matches(SEP);
     if trimmed.is_empty() {
-        return SEP.to_string();
+        return SEP.to_string().into();
     }
     match trimmed.rsplit_once(SEP) {
-        Some((_, tail)) => tail.to_string(),
-        None => trimmed.to_string(),
+        Some((_, tail)) => tail.into(),
+        None => trimmed.into(),
     }
 }
 
@@ -48,12 +48,12 @@ pub fn Dir(path: impl AsRef<str>) -> string {
     match trimmed.rsplit_once(SEP) {
         Some((head, _)) => {
             if head.is_empty() {
-                SEP.to_string()
+                SEP.to_string().into()
             } else {
                 Clean(head.to_string())
             }
         }
-        None => ".".to_string(),
+        None => ".".into(),
     }
 }
 
@@ -63,8 +63,8 @@ pub fn Ext(path: impl AsRef<str>) -> string {
     let s = path.as_ref();
     let base = Base(s);
     match base.rfind('.') {
-        Some(i) if i > 0 => base[i..].to_string(),
-        _ => String::new(),
+        Some(i) if i > 0 => base[i..].into(),
+        _ => "".into(),
     }
 }
 
@@ -73,7 +73,7 @@ pub fn Ext(path: impl AsRef<str>) -> string {
 pub fn Clean(path: impl Into<String>) -> string {
     let s: String = path.into();
     if s.is_empty() {
-        return ".".to_string();
+        return ".".into();
     }
     let absolute = s.starts_with(SEP);
     let mut stack: Vec<&str> = Vec::new();
@@ -92,11 +92,11 @@ pub fn Clean(path: impl Into<String>) -> string {
     }
     let joined = stack.join(&SEP.to_string());
     if absolute {
-        format!("{}{}", SEP, joined)
+        format!("{}{}", SEP, joined).into()
     } else if joined.is_empty() {
-        ".".to_string()
+        ".".into()
     } else {
-        joined
+        joined.into()
     }
 }
 
@@ -106,8 +106,8 @@ pub fn Clean(path: impl Into<String>) -> string {
 pub fn Split(path: impl AsRef<str>) -> (string, string) {
     let s = path.as_ref();
     match s.rfind(SEP) {
-        Some(i) => (s[..=i].to_string(), s[i+1..].to_string()),
-        None => (String::new(), s.to_string()),
+        Some(i) => (s[..=i].into(), s[i+1..].into()),
+        None => ("".into(), s.into()),
     }
 }
 
@@ -118,7 +118,7 @@ pub fn SplitList(path: impl AsRef<str>) -> crate::types::slice<string> {
     let s = path.as_ref();
     if s.is_empty() { return Vec::new(); }
     let list_sep = if cfg!(windows) { ';' } else { ':' };
-    s.split(list_sep).map(|s| s.to_string()).collect()
+    s.split(list_sep).map(|s| s.into()).collect()
 }
 
 /// filepath.IsAbs — reports whether path is absolute.
@@ -130,15 +130,15 @@ pub fn IsAbs(path: impl AsRef<str>) -> bool {
 /// filepath.FromSlash — replaces each '/' with the OS separator.
 #[allow(non_snake_case)]
 pub fn FromSlash(path: impl AsRef<str>) -> string {
-    if SEP == '/' { path.as_ref().to_string() }
-    else { path.as_ref().replace('/', &SEP.to_string()) }
+    if SEP == '/' { path.as_ref().into() }
+    else { path.as_ref().replace('/', &SEP.to_string()).into() }
 }
 
 /// filepath.ToSlash — replaces each OS separator with '/'.
 #[allow(non_snake_case)]
 pub fn ToSlash(path: impl AsRef<str>) -> string {
-    if SEP == '/' { path.as_ref().to_string() }
-    else { path.as_ref().replace(SEP, "/") }
+    if SEP == '/' { path.as_ref().into() }
+    else { path.as_ref().replace(SEP, "/").into() }
 }
 
 /// filepath.IsLocal — reports whether path is relative, does not start with an

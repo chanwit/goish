@@ -45,7 +45,7 @@ fn intern_zone(s: &str) -> u32 {
     if let Some(idx) = guard.iter().position(|x| x == s) {
         return idx as u32;
     }
-    guard.push(s.to_string());
+    guard.push(s.into());
     (guard.len() - 1) as u32
 }
 
@@ -123,7 +123,7 @@ impl Addr {
         if self.is4 { 32 } else { 128 }
     }
 
-    pub fn Zone(&self) -> string { zone_str(self.zone_idx) }
+    pub fn Zone(&self) -> string { zone_str(self.zone_idx).into() }
 
     pub fn WithZone(&self, zone: impl AsRef<str>) -> Addr {
         if self.is4 { return *self; } // Go drops zones on IPv4.
@@ -176,17 +176,17 @@ impl Addr {
     }
 
     pub fn String(&self) -> string {
-        if !self.valid { return "invalid IP".to_string(); }
+        if !self.valid { return "invalid IP".into(); }
         if self.is4 {
             let b = self.As4();
-            return format!("{}.{}.{}.{}", b[0], b[1], b[2], b[3]);
+            return format!("{}.{}.{}.{}", b[0], b[1], b[2], b[3]).into();
         }
         let mut out = v6_string(self.hi, self.lo);
         if self.zone_idx != 0 {
             out.push('%');
             out.push_str(&zone_str(self.zone_idx));
         }
-        out
+        out.into()
     }
 
     pub fn Compare(&self, other: &Addr) -> i64 {
@@ -236,7 +236,7 @@ impl Addr {
 
     pub fn MarshalText(&self) -> (Vec<u8>, error) {
         if !self.valid { return (Vec::new(), nil); }
-        (self.String().into_bytes(), nil)
+        (self.String().as_bytes().to_vec(), nil)
     }
 }
 
@@ -274,7 +274,7 @@ pub fn AddrFromSlice(b: &[u8]) -> (Addr, bool) {
 pub fn ParseAddr(s: &str) -> (Addr, error) {
     // Split off zone
     let (addr_part, zone) = match s.find('%') {
-        Some(i) => (&s[..i], s[i + 1..].to_string()),
+        Some(i) => (&s[..i], s[i + 1..].into()),
         None => (s, String::new()),
     };
 
@@ -448,7 +448,7 @@ fn parse_v6_field(s: &str) -> Result<u16, String> {
     Ok(v as u16)
 }
 
-fn v6_string(hi: u64, lo: u64) -> string {
+fn v6_string(hi: u64, lo: u64) -> std::string::String {
     let groups = [
         ((hi >> 48) & 0xffff) as u16,
         ((hi >> 32) & 0xffff) as u16,
@@ -512,9 +512,9 @@ impl AddrPort {
     pub fn IsValid(&self) -> bool { self.ip.IsValid() }
     pub fn String(&self) -> string {
         if self.ip.Is6() || self.ip.Is4In6() {
-            format!("[{}]:{}", self.ip.String(), self.port)
+            format!("[{}]:{}", self.ip.String(), self.port).into()
         } else {
-            format!("{}:{}", self.ip.String(), self.port)
+            format!("{}:{}", self.ip.String(), self.port).into()
         }
     }
 }
@@ -582,8 +582,8 @@ impl Prefix {
     pub fn IsValid(&self) -> bool { self.valid }
 
     pub fn String(&self) -> string {
-        if !self.valid { return "invalid Prefix".to_string(); }
-        format!("{}/{}", self.ip.String(), self.bits)
+        if !self.valid { return "invalid Prefix".into(); }
+        format!("{}/{}", self.ip.String(), self.bits).into()
     }
 
     pub fn Contains(&self, a: Addr) -> bool {

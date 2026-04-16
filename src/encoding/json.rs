@@ -53,7 +53,7 @@ impl Value {
     pub fn String(&self) -> string {
         match self {
             Value::String(s) => s.clone(),
-            _ => String::new(),
+            _ => "".into(),
         }
     }
 
@@ -112,7 +112,7 @@ impl Value {
             for (k, v) in m.iter_mut() {
                 if k == key.as_ref() { *v = value; return; }
             }
-            m.push((key.as_ref().to_string(), value));
+            m.push((key.as_ref().into(), value));
         }
     }
 }
@@ -135,12 +135,12 @@ fn to_raw(v: &Value) -> RawValue {
                     .unwrap_or(RawValue::Null)
             }
         }
-        Value::String(s) => RawValue::String(s.clone()),
+        Value::String(s) => RawValue::String(s.as_str().into()),
         Value::Array(a) => RawValue::Array(a.iter().map(to_raw).collect()),
         Value::Object(m) => {
             let mut map = serde_json::Map::new();
             for (k, v) in m {
-                map.insert(k.clone(), to_raw(v));
+                map.insert(k.as_str().into(), to_raw(v));
             }
             RawValue::Object(map)
         }
@@ -152,10 +152,10 @@ fn from_raw(v: &RawValue) -> Value {
         RawValue::Null => Value::Null,
         RawValue::Bool(b) => Value::Bool(*b),
         RawValue::Number(n) => Value::Number(n.as_f64().unwrap_or(0.0)),
-        RawValue::String(s) => Value::String(s.clone()),
+        RawValue::String(s) => Value::String(s.as_str().into()),
         RawValue::Array(a) => Value::Array(a.iter().map(from_raw).collect()),
         RawValue::Object(m) => Value::Object(
-            m.iter().map(|(k, v)| (k.clone(), from_raw(v))).collect()
+            m.iter().map(|(k, v)| (string::from(k.as_str()), from_raw(v))).collect()
         ),
     }
 }

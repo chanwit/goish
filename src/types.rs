@@ -36,7 +36,7 @@ pub type float64 = f64;
 pub type byte = u8;
 pub type rune = i32;
 
-pub type string = std::string::String;
+pub type string = crate::gostring::GoString;
 
 // Go: []T  →  goish: slice<T>
 pub type slice<T> = Vec<T>;
@@ -301,13 +301,13 @@ mod tests {
     #[test]
     fn map_go_shaped_string_to_string() {
         let m = crate::map!([string]string{"host" => "db", "port" => "5432"});
-        assert_eq!(m.get("host"), Some(&"db".to_string()));
+        assert_eq!(m.get("host"), Some(&string::from("db")));
     }
 
     #[test]
     fn map_inferred_no_conversion() {
-        let m = crate::map!{1i64 => "a".to_string(), 2i64 => "b".to_string()};
-        assert_eq!(m.get(&1), Some(&"a".to_string()));
+        let m = crate::map!{1i64 => string::from("a"), 2i64 => string::from("b")};
+        assert_eq!(m.get(&1), Some(&string::from("a")));
     }
 
     #[test]
@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn len_polymorphic() {
-        let s: string = "hello".to_string();
+        let s: string = "hello".into();
         assert_eq!(crate::len!(s), 5);
         assert_eq!(crate::len!("world"), 5);
 
@@ -359,7 +359,8 @@ mod tests {
     fn append_widens_via_into() {
         let s = crate::slice!([]string{"a"});
         let s = crate::append!(s, "b", "c"); // &str → string
-        assert_eq!(s, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        let want: Vec<string> = vec!["a".into(), "b".into(), "c".into()];
+        assert_eq!(s, want);
 
         let s: slice<int> = crate::slice!([]int{1});
         let s = crate::append!(s, 2i32, 3i32); // i32 → i64
@@ -378,14 +379,13 @@ mod tests {
     #[test]
     fn delete_with_owned_string_via_ref() {
         let mut m: map<string, int> = crate::map!([string]int{"a" => 1});
-        let key = "a".to_string();
-        crate::delete!(m, &key);
+        crate::delete!(m, "a");
         assert_eq!(m.len(), 0);
     }
 
     #[test]
     fn delete_int_key_via_ref() {
-        let mut m: map<int, string> = crate::map!{1i64 => "a".to_string(), 2i64 => "b".to_string()};
+        let mut m: map<int, string> = crate::map!{1i64 => "a".into(), 2i64 => "b".into()};
         crate::delete!(m, &1);
         assert_eq!(m.len(), 1);
         assert!(m.contains_key(&2));

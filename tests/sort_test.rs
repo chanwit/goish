@@ -22,8 +22,8 @@ test!{ fn TestSortInts(t) {
 }}
 
 test!{ fn TestSortStrings(t) {
-    let mut data: Vec<String> = vec!["Banana", "apple", "cherry", "BANANA", ""]
-        .into_iter().map(String::from).collect();
+    let mut data: Vec<string> = vec!["Banana", "apple", "cherry", "BANANA", ""]
+        .into_iter().map(string::from).collect();
     sort::Strings(&mut data);
     for i in 1..data.len() {
         if data[i] < data[i-1] {
@@ -93,8 +93,8 @@ test!{ fn TestSearchInts(t) {
 }}
 
 test!{ fn TestSearchStrings(t) {
-    let data: Vec<String> = vec!["alice", "bob", "carol", "dave"]
-        .into_iter().map(String::from).collect();
+    let data: Vec<string> = vec!["alice", "bob", "carol", "dave"]
+        .into_iter().map(string::from).collect();
     let got = sort::SearchStrings(&data, "carol");
     if got != 2 {
         t.Errorf(Sprintf!("SearchStrings(carol) = %d, want 2", got));

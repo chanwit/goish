@@ -212,39 +212,39 @@ pub fn go_format(fmt_str: &str, args: &[&dyn Display]) -> String {
 
 fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usize>, flags: &str) -> String {
     fn fmt_float_go(f: f64, prec: usize, upper: bool) -> String {
-        if f.is_nan()       { return "NaN".to_string(); }
-        if f.is_infinite()  { return if f < 0.0 { "-Inf".to_string() } else { "+Inf".to_string() }; }
+        if f.is_nan()       { return "NaN".into(); }
+        if f.is_infinite()  { return if f < 0.0 { "-Inf".into() } else { "+Inf".into() }; }
         if upper { format!("{:.*}", prec, f).to_uppercase() } else { format!("{:.*}", prec, f) }
     }
 
-    let mut value = match verb {
+    let mut value: std::string::String = match verb {
         'q' => format!("\"{}\"", raw),
         'f' | 'F' => {
             let p = precision.unwrap_or(6);
-            raw.parse::<f64>().map(|f| fmt_float_go(f, p, verb == 'F')).unwrap_or_else(|_| raw.to_string())
+            raw.parse::<f64>().map(|f| fmt_float_go(f, p, verb == 'F')).unwrap_or_else(|_| raw.into())
         },
         'e' | 'E' => {
             let p = precision.unwrap_or(6);
             raw.parse::<f64>()
-                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p as i64, 64))
-                .unwrap_or_else(|_| raw.to_string())
+                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p as i64, 64).as_str().to_string())
+                .unwrap_or_else(|_| raw.into())
         },
         'g' | 'G' => {
             let p = precision.map(|p| p as i64).unwrap_or(-1);
             raw.parse::<f64>()
-                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p, 64))
-                .unwrap_or_else(|_| raw.to_string())
+                .map(|f| crate::strconv::FormatFloat(f, verb as u8, p, 64).as_str().to_string())
+                .unwrap_or_else(|_| raw.into())
         },
-        'x' => raw.parse::<i128>().map(|n| format!("{:x}", n)).unwrap_or_else(|_| raw.to_string()),
-        'X' => raw.parse::<i128>().map(|n| format!("{:X}", n)).unwrap_or_else(|_| raw.to_string()),
-        'o' => raw.parse::<i128>().map(|n| format!("{:o}", n)).unwrap_or_else(|_| raw.to_string()),
-        'b' => raw.parse::<i128>().map(|n| format!("{:b}", n)).unwrap_or_else(|_| raw.to_string()),
+        'x' => raw.parse::<i128>().map(|n| format!("{:x}", n)).unwrap_or_else(|_| raw.into()),
+        'X' => raw.parse::<i128>().map(|n| format!("{:X}", n)).unwrap_or_else(|_| raw.into()),
+        'o' => raw.parse::<i128>().map(|n| format!("{:o}", n)).unwrap_or_else(|_| raw.into()),
+        'b' => raw.parse::<i128>().map(|n| format!("{:b}", n)).unwrap_or_else(|_| raw.into()),
         's' => match precision {
-            Some(p) if raw.len() > p => raw[..p].to_string(),
-            _ => raw.to_string(),
+            Some(p) if raw.len() > p => raw[..p].into(),
+            _ => raw.into(),
         },
         // %d, %v, %t, %p — Display already does the right thing
-        _ => raw.to_string(),
+        _ => raw.into(),
     };
 
     // Sign flag: `%+d` / `%+f` / etc — prepend '+' for non-negative
@@ -361,7 +361,9 @@ macro_rules! Printf {
 #[macro_export]
 macro_rules! Sprintf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
-        $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ])
+        let _s: $crate::types::string =
+            $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ]).into();
+        _s
     }};
 }
 

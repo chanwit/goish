@@ -106,7 +106,7 @@ pub fn SearchInts(s: &[int], v: int) -> int {
 #[allow(non_snake_case)]
 pub fn SearchStrings(s: &[string], v: impl AsRef<str>) -> int {
     let v = v.as_ref();
-    Search(s.len() as int, |i| s[i as usize].as_str() >= v)
+    Search(s.len() as int, |i| &*s[i as usize] >= v)
 }
 
 #[allow(non_snake_case)]
@@ -202,9 +202,9 @@ mod tests {
 
     #[test]
     fn strings_sorted() {
-        let mut v: Vec<String> = vec!["banana".into(), "apple".into(), "cherry".into()];
+        let mut v: Vec<string> = vec!["banana".into(), "apple".into(), "cherry".into()];
         Strings(&mut v);
-        assert_eq!(v, vec!["apple", "banana", "cherry"]);
+        assert_eq!(v, vec![string::from("apple"), "banana".into(), "cherry".into()]);
         assert!(StringsAreSorted(&v));
     }
 
@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(SearchInts(&s, 4), 2);
         assert_eq!(SearchInts(&s, 0), 0);
         assert_eq!(SearchInts(&s, 10), 5);
-        let strs: Vec<String> = vec!["apple".into(), "banana".into(), "cherry".into()];
+        let strs: Vec<string> = vec!["apple".into(), "banana".into(), "cherry".into()];
         assert_eq!(SearchStrings(&strs, "banana"), 1);
         assert_eq!(SearchStrings(&strs, "blueberry"), 2);
     }
@@ -261,9 +261,9 @@ mod tests {
         let mut v = vec![3i64, 1, 4, 1, 5];
         ReverseInts(&mut v);
         assert_eq!(v, vec![5, 4, 3, 1, 1]);
-        let mut v = vec!["b".to_string(), "a".into(), "c".into()];
+        let mut v: Vec<string> = vec!["b".into(), "a".into(), "c".into()];
         ReverseStrings(&mut v);
-        assert_eq!(v, vec!["c", "b", "a"]);
+        assert_eq!(v, vec![string::from("c"), "b".into(), "a".into()]);
     }
 
     #[test]

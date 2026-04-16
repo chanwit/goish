@@ -55,7 +55,7 @@ impl ServeMux {
         self.routes
             .lock()
             .unwrap()
-            .push((pattern.to_owned(), Arc::new(f)));
+            .push((pattern.into(), Arc::new(f)));
     }
 
     /// `mux.Handle(pattern, handler)` — register a struct impl.
@@ -70,9 +70,9 @@ impl ServeMux {
         let mut best: Option<(usize, HandlerFunc)> = None;
         for (pat, h) in g.iter() {
             if path.starts_with(pat.as_str())
-                && pat.len() >= best.as_ref().map(|(l, _)| *l).unwrap_or(0)
+                && pat.as_str().len() >= best.as_ref().map(|(l, _)| *l).unwrap_or(0)
             {
-                best = Some((pat.len(), h.clone()));
+                best = Some((pat.as_str().len(), h.clone()));
             }
         }
         best.map(|(_, h)| h)
@@ -162,7 +162,7 @@ impl Clone for Server {
 impl Server {
     pub fn new(addr: &str, handler: ServeMux) -> Self {
         Server {
-            Addr: addr.to_owned(),
+            Addr: addr.into(),
             Handler: handler,
             shutdown: Arc::new(tokio::sync::Notify::new()),
         }
@@ -216,7 +216,7 @@ fn parse_addr(addr: &str) -> Result<SocketAddr, error> {
     let a = if let Some(rest) = addr.strip_prefix(':') {
         format!("0.0.0.0:{}", rest)
     } else {
-        addr.to_owned()
+        addr.into()
     };
     a.parse::<SocketAddr>()
         .map_err(|e| New(&format!("http: parse addr {:?}: {}", addr, e)))
@@ -261,15 +261,15 @@ async fn serve_one(
 ) -> hyper::Response<http_body_util::Full<bytes::Bytes>> {
     use http_body_util::BodyExt;
 
-    let method = req.method().as_str().to_owned();
+    let method: string = req.method().as_str().into();
     let uri = req.uri().clone();
-    let version = format!("{:?}", req.version());
-    let host_hdr = req
+    let version: string = format!("{:?}", req.version()).into();
+    let host_hdr: string = req
         .headers()
         .get(hyper::header::HOST)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
-        .to_owned();
+        .into();
 
     // Collect headers into goish Header.
     let mut header = Header::new();
@@ -290,8 +290,8 @@ async fn serve_one(
 
     // Build the URL struct. hyper gives us path + optional query.
     let mut url = URL::default();
-    url.Path = uri.path().to_owned();
-    if let Some(q) = uri.query() { url.RawQuery = q.to_owned(); }
+    url.Path = uri.path().into();
+    if let Some(q) = uri.query() { url.RawQuery = q.into(); }
     url.Host = host_hdr.clone();
 
     let mut request = Request::from_parts(
@@ -301,7 +301,7 @@ async fn serve_one(
         header,
         crate::net::http::body::Body::from_bytes(body_bytes.to_vec()),
         host_hdr,
-        remote.to_string(),
+        remote.to_string().into(),
         content_length,
     );
 
@@ -339,7 +339,7 @@ async fn serve_one(
         .status(u16::try_from(w.status).unwrap_or(200));
     for (k, vs) in w.header.iter() {
         for v in vs {
-            builder = builder.header(k.as_str(), v);
+            builder = builder.header(k.as_str(), v.as_str());
         }
     }
     // Default Content-Type if handler didn't set one.

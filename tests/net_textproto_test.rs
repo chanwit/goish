@@ -135,13 +135,13 @@ test!{ fn TestReadMIMEHeader(t) {
     let mk = h.Values("My-Key");
     if len!(mk) != 2 || mk[0] != "Value 1" || mk[1] != "Value 2" {
         // Go trims trailing whitespace from values ("Value 1  " → "Value 1").
-        let first  = if len!(mk) > 0 { mk[0].clone() } else { String::new() };
-        let second = if len!(mk) > 1 { mk[1].clone() } else { String::new() };
+        let first  = if len!(mk) > 0 { mk[0].clone() } else { string::from("") };
+        let second = if len!(mk) > 1 { mk[1].clone() } else { string::from("") };
         t.Errorf(Sprintf!("My-Key values = [%s, %s]", first, second));
     }
     let lk = h.Values("Long-Key");
     if len!(lk) != 1 || lk[0] != "Even Longer Value" {
-        let first = if len!(lk) > 0 { lk[0].clone() } else { String::new() };
+        let first = if len!(lk) > 0 { lk[0].clone() } else { string::from("") };
         t.Errorf(Sprintf!("Long-Key value = %s", first));
     }
 }}

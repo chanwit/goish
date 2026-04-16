@@ -17,7 +17,7 @@ use crate::types::{slice, string};
 use std::sync::{OnceLock, RwLock};
 
 fn table() -> &'static RwLock<Vec<(string, string)>> {
-    static T: OnceLock<RwLock<Vec<(String, String)>>> = OnceLock::new();
+    static T: OnceLock<RwLock<Vec<(string, string)>>> = OnceLock::new();
     T.get_or_init(|| {
         let base: &[(&str, &str)] = &[
             (".html", "text/html; charset=utf-8"),
@@ -58,7 +58,7 @@ fn table() -> &'static RwLock<Vec<(string, string)>> {
             (".woff", "font/woff"),
             (".woff2","font/woff2"),
         ];
-        RwLock::new(base.iter().map(|(e, t)| (e.to_string(), t.to_string())).collect())
+        RwLock::new(base.iter().map(|(e, t)| (string::from(*e), string::from(*t))).collect())
     })
 }
 
@@ -68,9 +68,9 @@ pub fn TypeByExtension(ext: impl AsRef<str>) -> string {
     let ext = if ext.starts_with('.') { ext } else { format!(".{}", ext) };
     let tab = table().read().unwrap();
     for (e, t) in tab.iter() {
-        if e == &ext { return t.clone(); }
+        if e.as_str() == ext.as_str() { return t.clone(); }
     }
-    String::new()
+    "".into()
 }
 
 #[allow(non_snake_case)]
@@ -97,10 +97,10 @@ pub fn AddExtensionType(ext: impl AsRef<str>, typ: impl AsRef<str>) -> error {
         return New(&format!("mime: extension {:?} must start with a dot", ext));
     }
     let mut tab = table().write().unwrap();
-    if let Some(entry) = tab.iter_mut().find(|(e, _)| e == ext) {
-        entry.1 = typ.as_ref().to_string();
+    if let Some(entry) = tab.iter_mut().find(|(e, _)| e.as_str() == ext) {
+        entry.1 = typ.as_ref().into();
     } else {
-        tab.push((ext.to_ascii_lowercase(), typ.as_ref().to_string()));
+        tab.push((ext.to_ascii_lowercase().into(), typ.as_ref().into()));
     }
     nil
 }
@@ -131,8 +131,8 @@ mod tests {
     fn extensions_by_type_reverse_lookup() {
         let (exts, err) = ExtensionsByType("image/jpeg");
         assert_eq!(err, nil);
-        assert!(exts.contains(&".jpg".to_string()));
-        assert!(exts.contains(&".jpeg".to_string()));
+        assert!(exts.contains(&".jpg".into()));
+        assert!(exts.contains(&".jpeg".into()));
     }
 
     #[test]

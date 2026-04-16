@@ -128,7 +128,7 @@ impl Reader {
                     self.pos += 1;
                 }
             }
-            fields.push(std::mem::take(&mut field));
+            fields.push(std::mem::take(&mut field).into());
             if self.pos >= self.data.len() { return (fields, nil); }
             let b = self.data[self.pos];
             if b == comma { self.pos += 1; continue; }
@@ -204,7 +204,7 @@ impl Writer {
 
     /// Returns the buffered output, clears the internal buffer, and returns nil error.
     pub fn Flush(&mut self) -> string {
-        std::mem::take(&mut self.buf)
+        std::mem::take(&mut self.buf).into()
     }
 
     pub fn Bytes(&self) -> &[u8] {
@@ -212,7 +212,7 @@ impl Writer {
     }
 
     pub fn String(&self) -> string {
-        self.buf.clone()
+        self.buf.clone().into()
     }
 
     pub fn Error(&self) -> error { nil }
@@ -302,14 +302,14 @@ mod tests {
     #[test]
     fn round_trip() {
         let mut w = NewWriter();
-        let records: Vec<Vec<String>> = vec![
+        let records: Vec<Vec<string>> = vec![
             vec!["name".into(), "age".into()],
             vec!["Alice, CEO".into(), "30".into()],
             vec!["Bob".into(), "25".into()],
         ];
         w.WriteAll(&records);
         let s = w.Flush();
-        let mut r = NewReader(&s);
+        let mut r = NewReader(s.as_str());
         let (all, err) = r.ReadAll();
         assert_eq!(err, nil);
         assert_eq!(all, records);

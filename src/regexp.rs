@@ -44,7 +44,7 @@ impl Regexp {
 
     /// re.FindString(s) — first match or "" if none.
     pub fn FindString(&self, s: impl AsRef<str>) -> string {
-        self.inner.find(s.as_ref()).map(|m| m.as_str().to_string()).unwrap_or_default()
+        self.inner.find(s.as_ref()).map(|m| m.as_str().into()).unwrap_or_default()
     }
 
     /// re.FindStringIndex(s) — returns [start, end] byte indices, or empty slice.
@@ -58,7 +58,7 @@ impl Regexp {
     /// re.FindAllString(s, n) — up to n matches (n<0 = all).
     pub fn FindAllString(&self, s: impl AsRef<str>, n: int) -> slice<string> {
         let s_ref = s.as_ref();
-        let iter = self.inner.find_iter(s_ref).map(|m| m.as_str().to_string());
+        let iter = self.inner.find_iter(s_ref).map(|m| m.as_str().into());
         if n < 0 {
             iter.collect()
         } else {
@@ -71,7 +71,7 @@ impl Regexp {
     pub fn FindStringSubmatch(&self, s: impl AsRef<str>) -> slice<string> {
         match self.inner.captures(s.as_ref()) {
             Some(caps) => (0..caps.len())
-                .map(|i| caps.get(i).map(|m| m.as_str().to_string()).unwrap_or_default())
+                .map(|i| caps.get(i).map(|m| m.as_str().into()).unwrap_or_default())
                 .collect(),
             None => Vec::new(),
         }
@@ -80,7 +80,7 @@ impl Regexp {
     pub fn FindAllStringSubmatch(&self, s: impl AsRef<str>, n: int) -> Vec<slice<string>> {
         let iter = self.inner.captures_iter(s.as_ref()).map(|caps| {
             (0..caps.len())
-                .map(|i| caps.get(i).map(|m| m.as_str().to_string()).unwrap_or_default())
+                .map(|i| caps.get(i).map(|m| m.as_str().into()).unwrap_or_default())
                 .collect::<Vec<_>>()
         });
         if n < 0 { iter.collect() } else { iter.take(n as usize).collect() }
@@ -88,22 +88,21 @@ impl Regexp {
 
     /// re.ReplaceAllString(s, repl) — Go-style `$1` / `$name` refs.
     pub fn ReplaceAllString(&self, s: impl AsRef<str>, repl: impl AsRef<str>) -> string {
-        self.inner.replace_all(s.as_ref(), repl.as_ref()).into_owned()
+        self.inner.replace_all(s.as_ref(), repl.as_ref()).into_owned().into()
     }
 
     pub fn ReplaceAllLiteralString(&self, s: impl AsRef<str>, repl: impl AsRef<str>) -> string {
         let replacer = regex::NoExpand(repl.as_ref());
-        self.inner.replace_all(s.as_ref(), replacer).into_owned()
+        self.inner.replace_all(s.as_ref(), replacer).into_owned().into()
     }
 
-    /// re.ReplaceAllStringFunc(s, |m| ...)
     pub fn ReplaceAllStringFunc<F>(&self, s: impl AsRef<str>, mut f: F) -> string
     where
         F: FnMut(string) -> string,
     {
         self.inner.replace_all(s.as_ref(), |caps: &regex::Captures| {
-            f(caps.get(0).map(|m| m.as_str().to_string()).unwrap_or_default())
-        }).into_owned()
+            f(caps.get(0).map(|m| m.as_str().into()).unwrap_or_default()).as_str().to_string()
+        }).into_owned().into()
     }
 
     /// re.Split(s, n) — split s around matches. n<0 = all.
@@ -115,11 +114,11 @@ impl Regexp {
         let mut count = 0i64;
         for m in self.inner.find_iter(s_ref) {
             if n > 0 && count >= n - 1 { break; }
-            out.push(s_ref[last..m.start()].to_string());
+            out.push(s_ref[last..m.start()].into());
             last = m.end();
             count += 1;
         }
-        out.push(s_ref[last..].to_string());
+        out.push(s_ref[last..].into());
         out
     }
 
@@ -127,13 +126,13 @@ impl Regexp {
         self.inner.captures_len() as int - 1
     }
 
-    pub fn String(&self) -> string { self.src.clone() }
+    pub fn String(&self) -> string { self.src.clone().into() }
 }
 
 #[allow(non_snake_case)]
 pub fn Compile(pat: impl AsRef<str>) -> (Regexp, error) {
     match regex::Regex::new(pat.as_ref()) {
-        Ok(r) => (Regexp { inner: r, src: pat.as_ref().to_string() }, nil),
+        Ok(r) => (Regexp { inner: r, src: pat.as_ref().into() }, nil),
         Err(e) => (dummy_regexp(), New(&e.to_string())),
     }
 }
@@ -154,7 +153,7 @@ pub fn MatchString(pat: impl AsRef<str>, s: impl AsRef<str>) -> (bool, error) {
 
 #[allow(non_snake_case)]
 pub fn QuoteMeta(s: impl AsRef<str>) -> string {
-    regex::escape(s.as_ref())
+    regex::escape(s.as_ref()).into()
 }
 
 // Internal: a never-used "empty" regex returned as a placeholder when
@@ -222,7 +221,7 @@ mod tests {
     #[test]
     fn replace_with_func() {
         let re = MustCompile(r"\d+");
-        let out = re.ReplaceAllStringFunc("a1 b22", |m| format!("[{}]", m));
+        let out = re.ReplaceAllStringFunc("a1 b22", |m| format!("[{}]", m).into());
         assert_eq!(out, "a[1] b[22]");
     }
 

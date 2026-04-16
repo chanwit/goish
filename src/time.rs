@@ -78,7 +78,7 @@ impl Duration {
     }
 
     pub fn String(&self) -> crate::types::string {
-        if self.nanos == 0 { return "0s".to_string(); }
+        if self.nanos == 0 { return "0s".into(); }
         let mut n = self.nanos;
         let neg = n < 0;
         if neg { n = -n; }
@@ -86,9 +86,9 @@ impl Duration {
         if n < 1_000_000_000 {
             let mut prefix = String::new();
             if neg { prefix.push('-'); }
-            if n < 1_000 { return format!("{}{}ns", prefix, n); }
-            if n < 1_000_000 { return format!("{}{}µs", prefix, n as f64 / 1_000.0); }
-            return format!("{}{}ms", prefix, n as f64 / 1_000_000.0);
+            if n < 1_000 { return format!("{}{}ns", prefix, n).into(); }
+            if n < 1_000_000 { return format!("{}{}µs", prefix, n as f64 / 1_000.0).into(); }
+            return format!("{}{}ms", prefix, n as f64 / 1_000_000.0).into();
         }
 
         let mut s = String::new();
@@ -107,7 +107,7 @@ impl Duration {
             let f = secs as f64 + rem_nanos as f64 / 1_000_000_000.0;
             s.push_str(&format!("{}s", f));
         }
-        s
+        s.into()
     }
 }
 
@@ -207,9 +207,9 @@ impl Month {
     pub fn String(&self) -> crate::types::string {
         let m = self.0;
         if m >= 1 && m <= 12 {
-            LONG_MONTH_NAMES[(m - 1) as usize].to_string()
+            LONG_MONTH_NAMES[(m - 1) as usize].into()
         } else {
-            format!("%!Month({})", m)
+            format!("%!Month({})", m).into()
         }
     }
 }
@@ -239,9 +239,9 @@ impl Weekday {
     pub fn String(&self) -> crate::types::string {
         let d = self.0;
         if d >= 0 && d <= 6 {
-            LONG_DAY_NAMES[d as usize].to_string()
+            LONG_DAY_NAMES[d as usize].into()
         } else {
-            format!("%!Weekday({})", d)
+            format!("%!Weekday({})", d).into()
         }
     }
 }
@@ -267,7 +267,7 @@ impl PartialEq for Location {
 impl Eq for Location {}
 
 impl Location {
-    pub fn String(&self) -> crate::types::string { self.0.name.clone() }
+    pub fn String(&self) -> crate::types::string { self.0.name.clone().into() }
     pub fn name(&self) -> &str { &self.0.name }
     pub fn offset_sec(&self) -> i32 { self.0.offset }
 }
@@ -283,10 +283,10 @@ static UTC_LOC: OnceLock<Location> = OnceLock::new();
 static LOCAL_LOC: OnceLock<Location> = OnceLock::new();
 
 fn utc_loc() -> &'static Location {
-    UTC_LOC.get_or_init(|| Location(Arc::new(LocInner { name: "UTC".to_string(), offset: 0 })))
+    UTC_LOC.get_or_init(|| Location(Arc::new(LocInner { name: "UTC".into(), offset: 0 })))
 }
 fn local_loc() -> &'static Location {
-    LOCAL_LOC.get_or_init(|| Location(Arc::new(LocInner { name: "Local".to_string(), offset: 0 })))
+    LOCAL_LOC.get_or_init(|| Location(Arc::new(LocInner { name: "Local".into(), offset: 0 })))
 }
 
 #[allow(non_upper_case_globals)]
@@ -477,7 +477,7 @@ impl Time {
     }
 
     pub fn Zone(&self) -> (crate::types::string, crate::types::int) {
-        (self.loc.0.name.clone(), self.loc.0.offset as crate::types::int)
+        (self.loc.0.name.clone().into(), self.loc.0.offset as crate::types::int)
     }
 
     pub fn Location(&self) -> Location { self.loc.clone() }
@@ -525,9 +525,9 @@ impl Time {
         let (y, mo, d) = self.Date();
         let (h, mi, s) = self.Clock();
         let ns = self.Nanosecond();
-        let loc_part = match self.loc.0.name.as_str() {
-            "UTC" => "time.UTC".to_string(),
-            "Local" => "time.Local".to_string(),
+        let loc_part: std::string::String = match self.loc.0.name.as_str() {
+            "UTC" => "time.UTC".into(),
+            "Local" => "time.Local".into(),
             other => format!("time.Location({})", quote_go(other)),
         };
         let month_part = if mo.0 >= 1 && mo.0 <= 12 {
@@ -536,13 +536,13 @@ impl Time {
             format!("{}", mo.0)
         };
         format!("time.Date({}, {}, {}, {}, {}, {}, {}, {})",
-            y, month_part, d, h, mi, s, ns, loc_part)
+            y, month_part, d, h, mi, s, ns, loc_part).into()
     }
 
     pub fn Format(&self, layout: impl AsRef<str>) -> crate::types::string {
         let mut buf = Vec::with_capacity(layout.as_ref().len() + 10);
         self.append_format(&mut buf, layout.as_ref());
-        String::from_utf8(buf).unwrap_or_default()
+        std::string::String::from_utf8(buf).unwrap_or_default().into()
     }
 
     pub fn AppendFormat(&self, mut b: Vec<u8>, layout: impl AsRef<str>) -> Vec<u8> {
@@ -1148,11 +1148,11 @@ impl ParseError {
 
 fn parse_err(layout: &str, value: &str, layout_elem: &str, value_elem: &str, message: &str) -> crate::errors::error {
     let pe = ParseError {
-        Layout: layout.to_string(),
-        Value: value.to_string(),
-        LayoutElem: layout_elem.to_string(),
-        ValueElem: value_elem.to_string(),
-        Message: message.to_string(),
+        Layout: layout.into(),
+        Value: value.into(),
+        LayoutElem: layout_elem.into(),
+        ValueElem: value_elem.into(),
+        Message: message.into(),
     };
     crate::errors::New(&pe.Error())
 }
@@ -1323,7 +1323,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
     let alayout = layout;
     let avalue = value;
     let mut layout_rest = layout;
-    let mut value_rest = value.to_string();
+    let mut value_rest: std::string::String = value.into();
     let mut range_err = String::new();
     let mut am_set = false;
     let mut pm_set = false;
@@ -1344,11 +1344,11 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
         let (prefix, std, suffix) = next_std_chunk(layout_rest);
         let std_str_len = layout_rest.len() - suffix.len();
         let stdstr = &layout_rest[prefix.len()..std_str_len];
-        let prefix_owned = prefix.to_string();
-        let stdstr_owned = stdstr.to_string();
+        let prefix_owned: std::string::String = prefix.into();
+        let stdstr_owned: std::string::String = stdstr.into();
         let v_before_skip = value_rest.clone();
         value_rest = match skip(&value_rest, &prefix_owned) {
-            Ok(s) => s.to_string(),
+            Ok(s) => s.into(),
             Err(_) => {
                 return (Time::default(), parse_err(alayout, avalue, &prefix_owned, &v_before_skip, ""));
             }
@@ -1372,7 +1372,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                     match p.parse::<i64>() {
                         Ok(n) => {
                             year = if n >= 69 { n + 1900 } else { n + 2000 };
-                            value_rest = rest.to_string();
+                            value_rest = rest.into();
                         }
                         Err(_) => err_mark = true,
                     }
@@ -1383,20 +1383,20 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                 else {
                     let (p, rest) = value_rest.split_at(4);
                     match p.parse::<i64>() {
-                        Ok(n) => { year = n; value_rest = rest.to_string(); }
+                        Ok(n) => { year = n; value_rest = rest.into(); }
                         Err(_) => err_mark = true,
                     }
                 }
             }
             STD_MONTH => {
                 match lookup_name(&SHORT_MONTH_NAMES, &value_rest) {
-                    Ok((i, rest)) => { month = (i + 1) as i64; value_rest = rest.to_string(); }
+                    Ok((i, rest)) => { month = (i + 1) as i64; value_rest = rest.into(); }
                     Err(_) => err_mark = true,
                 }
             }
             STD_LONG_MONTH => {
                 match lookup_name(&LONG_MONTH_NAMES, &value_rest) {
-                    Ok((i, rest)) => { month = (i + 1) as i64; value_rest = rest.to_string(); }
+                    Ok((i, rest)) => { month = (i + 1) as i64; value_rest = rest.into(); }
                     Err(_) => err_mark = true,
                 }
             }
@@ -1404,7 +1404,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                 match get_num(&value_rest, std & STD_MASK == STD_ZERO_MONTH) {
                     Ok((m, rest)) => {
                         month = m;
-                        value_rest = rest.to_string();
+                        value_rest = rest.into();
                         if month <= 0 || month > 12 { range_err = "month".into(); }
                     }
                     Err(_) => err_mark = true,
@@ -1412,39 +1412,39 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
             }
             STD_WEEK_DAY => {
                 match lookup_name(&SHORT_DAY_NAMES, &value_rest) {
-                    Ok((_, rest)) => { value_rest = rest.to_string(); }
+                    Ok((_, rest)) => { value_rest = rest.into(); }
                     Err(_) => err_mark = true,
                 }
             }
             STD_LONG_WEEK_DAY => {
                 match lookup_name(&LONG_DAY_NAMES, &value_rest) {
-                    Ok((_, rest)) => { value_rest = rest.to_string(); }
+                    Ok((_, rest)) => { value_rest = rest.into(); }
                     Err(_) => err_mark = true,
                 }
             }
             STD_DAY | STD_UNDER_DAY | STD_ZERO_DAY => {
                 if std & STD_MASK == STD_UNDER_DAY && !value_rest.is_empty() && value_rest.as_bytes()[0] == b' ' {
-                    value_rest = value_rest[1..].to_string();
+                    value_rest = value_rest[1..].into();
                 }
                 match get_num(&value_rest, std & STD_MASK == STD_ZERO_DAY) {
-                    Ok((d, rest)) => { day = d; value_rest = rest.to_string(); }
+                    Ok((d, rest)) => { day = d; value_rest = rest.into(); }
                     Err(_) => err_mark = true,
                 }
             }
             STD_UNDER_YEAR_DAY | STD_ZERO_YEAR_DAY => {
                 for _ in 0..2 {
                     if std & STD_MASK == STD_UNDER_YEAR_DAY && !value_rest.is_empty() && value_rest.as_bytes()[0] == b' ' {
-                        value_rest = value_rest[1..].to_string();
+                        value_rest = value_rest[1..].into();
                     }
                 }
                 match get_num3(&value_rest, std & STD_MASK == STD_ZERO_YEAR_DAY) {
-                    Ok((y, rest)) => { yday = y; value_rest = rest.to_string(); }
+                    Ok((y, rest)) => { yday = y; value_rest = rest.into(); }
                     Err(_) => err_mark = true,
                 }
             }
             STD_HOUR => {
                 match get_num(&value_rest, false) {
-                    Ok((h, rest)) => { hour = h; value_rest = rest.to_string();
+                    Ok((h, rest)) => { hour = h; value_rest = rest.into();
                         if hour < 0 || hour >= 24 { range_err = "hour".into(); }
                     }
                     Err(_) => err_mark = true,
@@ -1452,7 +1452,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
             }
             STD_HOUR_12 | STD_ZERO_HOUR_12 => {
                 match get_num(&value_rest, std & STD_MASK == STD_ZERO_HOUR_12) {
-                    Ok((h, rest)) => { hour = h; value_rest = rest.to_string();
+                    Ok((h, rest)) => { hour = h; value_rest = rest.into();
                         if hour < 0 || hour > 12 { range_err = "hour".into(); }
                     }
                     Err(_) => err_mark = true,
@@ -1460,7 +1460,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
             }
             STD_MINUTE | STD_ZERO_MINUTE => {
                 match get_num(&value_rest, std & STD_MASK == STD_ZERO_MINUTE) {
-                    Ok((m, rest)) => { min = m; value_rest = rest.to_string();
+                    Ok((m, rest)) => { min = m; value_rest = rest.into();
                         if min < 0 || min >= 60 { range_err = "minute".into(); }
                     }
                     Err(_) => err_mark = true,
@@ -1470,7 +1470,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                 match get_num(&value_rest, std & STD_MASK == STD_ZERO_SECOND) {
                     Ok((s, rest)) => {
                         sec = s;
-                        value_rest = rest.to_string();
+                        value_rest = rest.into();
                         if sec < 0 || sec >= 60 { range_err = "second".into(); }
                         else {
                             // Optional fractional second after this field if the layout doesn't contain one.
@@ -1487,7 +1487,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                                         Ok((ns, rng)) => {
                                             nsec = ns;
                                             if !rng.is_empty() { range_err = rng; }
-                                            value_rest = value_rest[n..].to_string();
+                                            value_rest = value_rest[n..].into();
                                         }
                                         Err(_) => err_mark = true,
                                     }
@@ -1503,8 +1503,8 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                 else {
                     let (p, rest) = value_rest.split_at(2);
                     match p {
-                        "PM" => { pm_set = true; value_rest = rest.to_string(); }
-                        "AM" => { am_set = true; value_rest = rest.to_string(); }
+                        "PM" => { pm_set = true; value_rest = rest.into(); }
+                        "AM" => { am_set = true; value_rest = rest.into(); }
                         _ => err_mark = true,
                     }
                 }
@@ -1514,8 +1514,8 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                 else {
                     let (p, rest) = value_rest.split_at(2);
                     match p {
-                        "pm" => { pm_set = true; value_rest = rest.to_string(); }
-                        "am" => { am_set = true; value_rest = rest.to_string(); }
+                        "pm" => { pm_set = true; value_rest = rest.into(); }
+                        "am" => { am_set = true; value_rest = rest.into(); }
                         _ => err_mark = true,
                     }
                 }
@@ -1527,7 +1527,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                 let iso_z = matches!(code, STD_ISO8601_TZ | STD_ISO8601_SHORT_TZ
                     | STD_ISO8601_COLON_TZ | STD_ISO8601_SECONDS_TZ | STD_ISO8601_COLON_SECONDS_TZ);
                 if iso_z && !value_rest.is_empty() && value_rest.as_bytes()[0] == b'Z' {
-                    value_rest = value_rest[1..].to_string();
+                    value_rest = value_rest[1..].into();
                     zone_loc = Some(utc_loc().clone());
                 } else {
                     let (sign, h, m, s, new_rest, ok) = parse_zone_fields(&value_rest, code);
@@ -1548,7 +1548,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                                     _ => err_mark = true,
                                 }
                                 zone_offset = off;
-                                value_rest = new_rest.to_string();
+                                value_rest = new_rest.into();
                             }
                         }
                     }
@@ -1557,13 +1557,13 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
             STD_TZ => {
                 if value_rest.len() >= 3 && &value_rest[..3] == "UTC" {
                     zone_loc = Some(utc_loc().clone());
-                    value_rest = value_rest[3..].to_string();
+                    value_rest = value_rest[3..].into();
                 } else {
                     let (n, ok) = ParseTimeZone(&value_rest);
                     if !ok { err_mark = true; }
                     else {
-                        zone_name = value_rest[..n as usize].to_string();
-                        value_rest = value_rest[n as usize..].to_string();
+                        zone_name = value_rest[..n as usize].into();
+                        value_rest = value_rest[n as usize..].into();
                     }
                 }
             }
@@ -1575,7 +1575,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                         Ok((ns, rng)) => {
                             nsec = ns;
                             if !rng.is_empty() { range_err = rng; }
-                            value_rest = value_rest[ndigit..].to_string();
+                            value_rest = value_rest[ndigit..].into();
                         }
                         Err(_) => err_mark = true,
                     }
@@ -1592,7 +1592,7 @@ fn parse_impl(layout: &str, value: &str, default_loc: Location, local: Location)
                         Ok((ns, rng)) => {
                             nsec = ns;
                             if !rng.is_empty() { range_err = rng; }
-                            value_rest = value_rest[1 + i..].to_string();
+                            value_rest = value_rest[1 + i..].into();
                         }
                         Err(_) => err_mark = true,
                     }
@@ -1755,7 +1755,7 @@ fn parse_zone_fields<'a>(value: &'a str, code: i32) -> (&'a str, &'a str, &'a st
 /// expectations.
 #[allow(non_snake_case)]
 pub fn Quote(s: impl AsRef<str>) -> crate::types::string {
-    quote_go(s.as_ref())
+    quote_go(s.as_ref()).into()
 }
 
 fn quote_go(s: &str) -> String {

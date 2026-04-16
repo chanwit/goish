@@ -61,7 +61,7 @@ impl T {
     /// t.Name() — the test's name path.
     #[allow(non_snake_case)]
     pub fn Name(&self) -> string {
-        self.name.clone()
+        self.name.clone().into()
     }
 
     /// t.Failed() — whether this test (or any of its subtests) has failed.
@@ -207,6 +207,11 @@ impl T {
 
     #[doc(hidden)]
     pub fn log_contents(&self) -> string {
+        self.logbuf.lock().unwrap().clone().into()
+    }
+
+    #[doc(hidden)]
+    pub fn log_contents_raw(&self) -> std::string::String {
         self.logbuf.lock().unwrap().clone()
     }
 
@@ -242,10 +247,10 @@ impl T {
                 }
             }
             Outcome::Paniced(msg) => {
-                let mut log = self.log_contents();
+                let mut log = self.log_contents_raw();
                 if !log.is_empty() && !log.ends_with('\n') { log.push('\n'); }
                 log.push_str(&format!("panic: {}", msg));
-                Err(log)
+                Err(log.into())
             }
         }
     }
@@ -290,8 +295,8 @@ macro_rules! test {
                     __t.finish($crate::testing::__priv::Outcome::Aborted)
                 }
                 Err(e) => {
-                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.to_string()
+                    let msg: std::string::String = if let Some(s) = e.downcast_ref::<&str>() {
+                        (*s).to_string()
                     } else if let Some(s) = e.downcast_ref::<String>() {
                         s.clone()
                     } else {
@@ -339,8 +344,8 @@ macro_rules! test_h {
                     __t.finish($crate::testing::__priv::Outcome::Aborted)
                 }
                 Err(e) => {
-                    let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                        s.to_string()
+                    let msg: std::string::String = if let Some(s) = e.downcast_ref::<&str>() {
+                        (*s).to_string()
                     } else if let Some(s) = e.downcast_ref::<String>() {
                         s.clone()
                     } else {
@@ -577,7 +582,7 @@ impl M {
             filter: std::env::args().find_map(|a| {
                 a.strip_prefix("-run=")
                     .or_else(|| a.strip_prefix("-test.run="))
-                    .map(|s| s.to_owned())
+                    .map(|s| s.into())
             }),
             verbose: std::env::args().any(|a| {
                 matches!(a.as_str(), "-v" | "--verbose" | "-test.v")

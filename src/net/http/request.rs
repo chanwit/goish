@@ -34,13 +34,13 @@ impl Header {
     #[allow(non_snake_case)]
     pub fn Set(&mut self, key: &str, value: &str) {
         let k = canonicalize(key);
-        self.inner.insert(k, vec![value.to_owned()]);
+        self.inner.insert(k, vec![value.into()]);
     }
 
     #[allow(non_snake_case)]
     pub fn Add(&mut self, key: &str, value: &str) {
         let k = canonicalize(key);
-        self.inner.entry(k).or_default().push(value.to_owned());
+        self.inner.entry(k).or_default().push(value.into());
     }
 
     #[allow(non_snake_case)]
@@ -65,9 +65,7 @@ impl Header {
 }
 
 pub(crate) fn canonicalize(k: &str) -> string {
-    // Go's MIME canonical form: first char upper, after every `-` upper,
-    // rest lower. `content-type` → `Content-Type`.
-    let mut out = String::with_capacity(k.len());
+    let mut out = std::string::String::with_capacity(k.len());
     let mut upper_next = true;
     for c in k.chars() {
         if c == '-' {
@@ -80,7 +78,7 @@ pub(crate) fn canonicalize(k: &str) -> string {
             out.extend(c.to_lowercase());
         }
     }
-    out
+    out.into()
 }
 
 /// `http.Request` — represents an incoming server request or an outgoing
@@ -122,13 +120,13 @@ impl Request {
         if err != crate::errors::nil {
             return (
                 Request {
-                    Method: method.to_owned(),
+                    Method: method.into(),
                     URL: URL::default(),
-                    Proto: "HTTP/1.1".to_owned(),
+                    Proto: "HTTP/1.1".into(),
                     Header: Header::new(),
                     Body: Body::empty(),
-                    Host: String::new(),
-                    RemoteAddr: String::new(),
+                    Host: "".into(),
+                    RemoteAddr: "".into(),
                     ContentLength: 0,
                     ctx: crate::context::Background(),
                 },
@@ -139,13 +137,13 @@ impl Request {
         let cl = body_bytes.len() as crate::types::int64;
         (
             Request {
-                Method: method.to_owned(),
+                Method: method.into(),
                 URL: u,
-                Proto: "HTTP/1.1".to_owned(),
+                Proto: "HTTP/1.1".into(),
                 Header: Header::new(),
                 Body: Body::from_bytes(body_bytes),
                 Host: host,
-                RemoteAddr: String::new(),
+                RemoteAddr: "".into(),
                 ContentLength: cl,
                 ctx: crate::context::Background(),
             },
@@ -220,7 +218,7 @@ impl Request {
     pub fn BasicAuth(&self) -> (string, string, bool) {
         let auth = self.Header.Get("Authorization");
         if !auth.starts_with("Basic ") {
-            return (String::new(), String::new(), false);
+            return ("".into(), "".into(), false);
         }
         let (user, pass, ok) = parse_basic_auth(&auth);
         (user, pass, ok)
@@ -229,17 +227,17 @@ impl Request {
 
 /// Shared parser for `Basic dXNlcjpwYXNz` header values.
 pub(crate) fn parse_basic_auth(auth: &str) -> (string, string, bool) {
-    if !auth.starts_with("Basic ") { return (String::new(), String::new(), false); }
+    if !auth.starts_with("Basic ") { return ("".into(), "".into(), false); }
     let token = &auth[6..];
     let (decoded, err) = crate::base64::StdEncoding.DecodeString(token);
-    if err != crate::errors::nil { return (String::new(), String::new(), false); }
+    if err != crate::errors::nil { return ("".into(), "".into(), false); }
     let s = match std::str::from_utf8(&decoded) {
         Ok(s) => s,
-        Err(_) => return (String::new(), String::new(), false),
+        Err(_) => return ("".into(), "".into(), false),
     };
     match s.find(':') {
-        Some(i) => (s[..i].to_string(), s[i+1..].to_string(), true),
-        None => (String::new(), String::new(), false),
+        Some(i) => (s[..i].into(), s[i+1..].into(), true),
+        None => ("".into(), "".into(), false),
     }
 }
 
