@@ -193,8 +193,12 @@ pub mod prelude {
     pub use crate::types::*;
     pub use crate::goroutine::Goroutine;
     pub use crate::{
-        Cookie, Errorf, Fprintf, MailAddress, Printf, Println, Sprintf,
+        Cookie, Errorf, Fprintf, IntNewtype, MailAddress, Printf, Println, Sprintf,
         append, benchmark, cat, chan, close, const_block, defer, delete, go, len, make, map,
         range, recover, select, slice, string, stringer, Struct, test, test_h, test_main,
     };
+
+    // Trait re-exports — required in scope for trait-method resolution like
+    // `x.Len()` when x impls sort::Interface.
+    pub use crate::sort::Interface as _SortInterface;
 }

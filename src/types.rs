@@ -161,6 +161,44 @@ macro_rules! delete {
     };
 }
 
+/// `IntNewtype!(ID = uint64)` — Go's `type ID uint64`.
+///
+/// Generates a tuple struct `pub struct ID(pub uint64)` with the derives
+/// you'd expect (Clone/Copy/Debug/Default/PartialEq/Eq/Hash/PartialOrd/Ord)
+/// plus `From<i32/i64/u32/u64/usize>` via `as` cast so `slice!([]ID{10, 20})`
+/// accepts bare literals the way Go does, and `From<ID>` for the
+/// underlying integer so `uint64::from(id)` works.
+///
+/// Does NOT generate `Display` / a `String()` method — wrap the result
+/// with `stringer!` to layer those on:
+///
+/// ```ignore
+/// IntNewtype!(ID = uint64);
+/// stringer! {
+///     impl ID {
+///         fn String(&self) -> string { strconv::FormatUint(self.0, 16) }
+///     }
+/// }
+/// ```
+///
+/// Only valid when the underlying type is a primitive integer — the
+/// generated `as` casts require it.
+#[macro_export]
+macro_rules! IntNewtype {
+    ($name:ident = $t:ty) => {
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        pub struct $name(pub $t);
+
+        impl ::std::convert::From<i32>   for $name { fn from(x: i32)   -> Self { $name(x as $t) } }
+        impl ::std::convert::From<i64>   for $name { fn from(x: i64)   -> Self { $name(x as $t) } }
+        impl ::std::convert::From<u32>   for $name { fn from(x: u32)   -> Self { $name(x as $t) } }
+        impl ::std::convert::From<u64>   for $name { fn from(x: u64)   -> Self { $name(x as $t) } }
+        impl ::std::convert::From<usize> for $name { fn from(x: usize) -> Self { $name(x as $t) } }
+        impl ::std::convert::From<$name> for $t    { fn from(x: $name) -> $t    { x.0 } }
+    };
+}
+
 /// `len!(x)` — Go's polymorphic `len()` builtin.
 ///
 /// Works on `string`, `&str`, `slice<T>`, `map<K,V>`, `Chan<T>`, and anything
@@ -466,6 +504,22 @@ mod tests {
         let v = crate::make!([]int, l, c);
         assert_eq!(v.len(), 2);
         assert!(v.capacity() >= 10);
+    }
+
+    #[test]
+    fn int_newtype_macro() {
+        use crate as goish;
+        goish::IntNewtype!(ID = u64);
+        // From<i32> via `as` — slice! with bare literals works.
+        let ids: crate::types::slice<ID> = crate::slice!([]ID{10i32, 20i32, 30i32});
+        assert_eq!(ids[0i64].0, 10u64);
+        assert_eq!(ids[2i64].0, 30u64);
+        // From<ID> for underlying.
+        let u: u64 = ID(42).into();
+        assert_eq!(u, 42);
+        // Derives are present.
+        assert_eq!(ID(1), ID(1));
+        assert!(ID(1) < ID(2));
     }
 
     #[test]
