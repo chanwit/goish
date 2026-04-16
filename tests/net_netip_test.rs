@@ -301,6 +301,62 @@ test!{ fn TestAddrFrom16(t) {
 
 // ── TestAddrZone ────────────────────────────────────────────────────
 
+// ── TestPrefix: CGNAT range + more Contains tables ─────────────────
+
+test!{ fn TestPrefix_CGNAT(t) {
+    let p = netip::MustParsePrefix("100.64.0.0/10");
+    let in_range = [
+        "100.64.0.0",
+        "100.64.0.1",
+        "100.81.251.94",
+        "100.100.100.100",
+        "100.127.255.254",
+        "100.127.255.255",
+    ];
+    for s in &in_range {
+        if !p.Contains(netip::MustParseAddr(s)) {
+            t.Errorf(Sprintf!("Contains(%s) = false, want true", s));
+        }
+    }
+    let out_of_range = [
+        "100.63.255.255",
+        "100.128.0.0",
+        "1.1.1.1",
+    ];
+    for s in &out_of_range {
+        if p.Contains(netip::MustParseAddr(s)) {
+            t.Errorf(Sprintf!("Contains(%s) = true, want false", s));
+        }
+    }
+}}
+
+// ── TestPrefixFromInvalidBits: bits > max → invalid ────────────────
+
+test!{ fn TestPrefixFromInvalidBits(t) {
+    let v4 = netip::MustParseAddr("1.2.3.4");
+    let p = netip::PrefixFrom(v4.clone(), 33);
+    if p.IsValid() { t.Errorf(Sprintf!("PrefixFrom(v4, 33) valid")); }
+    let v6 = netip::MustParseAddr("::1");
+    let p6 = netip::PrefixFrom(v6.clone(), 129);
+    if p6.IsValid() { t.Errorf(Sprintf!("PrefixFrom(v6, 129) valid")); }
+    let bad = netip::PrefixFrom(v4, -1);
+    if bad.IsValid() { t.Errorf(Sprintf!("PrefixFrom(v4, -1) valid")); }
+}}
+
+// ── TestAddrBitLen ──────────────────────────────────────────────────
+
+test!{ fn TestAddrBitLen(t) {
+    if netip::MustParseAddr("1.2.3.4").BitLen() != 32 {
+        t.Errorf(Sprintf!("v4 BitLen != 32"));
+    }
+    if netip::MustParseAddr("::1").BitLen() != 128 {
+        t.Errorf(Sprintf!("v6 BitLen != 128"));
+    }
+    if netip::Addr::default().BitLen() != 0 {
+        t.Errorf(Sprintf!("invalid BitLen != 0"));
+    }
+}}
+
 test!{ fn TestAddrZone(t) {
     let a = netip::MustParseAddr("fe80::1%eth0");
     if a.Zone() != "eth0" { t.Errorf(Sprintf!("Zone = %s, want eth0", a.Zone())); }

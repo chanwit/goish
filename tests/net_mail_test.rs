@@ -89,6 +89,40 @@ test!{ fn TestAddressParsingError(t) {
     }
 }}
 
+// ── TestAddressParsingDomainLiteral (RFC 5322 domain-literal) ───────
+
+test!{ fn TestAddressParsingDomainLiteral(t) {
+    // "foo@[127.0.0.1]" — domain is a literal in square brackets.
+    let (a, err) = mail::ParseAddress("foo@[127.0.0.1]");
+    if err != nil { t.Fatal(&Sprintf!("ParseAddress: %s", err)); }
+    if a.Address != "foo@[127.0.0.1]" {
+        t.Errorf(Sprintf!("Address = %s, want foo@[127.0.0.1]", a.Address));
+    }
+}}
+
+// ── TestAddressParsingQuotedLocal (quoted-string local part) ────────
+
+test!{ fn TestAddressParsingQuotedLocal(t) {
+    let (a, err) = mail::ParseAddress("\"very.unusual\"@example.com");
+    if err != nil { t.Fatal(&Sprintf!("ParseAddress: %s", err)); }
+    if a.Address != "very.unusual@example.com" {
+        t.Errorf(Sprintf!("Address = %s", a.Address));
+    }
+}}
+
+// ── TestAddressParsingAngleOnlyForm ────────────────────────────────
+
+test!{ fn TestAddressParsingAngleOnlyForm(t) {
+    let (a, err) = mail::ParseAddress("<boss@nil.test>");
+    if err != nil { t.Fatal(&Sprintf!("ParseAddress: %s", err)); }
+    if a.Address != "boss@nil.test" {
+        t.Errorf(Sprintf!("Address = %s", a.Address));
+    }
+    if !a.Name.is_empty() {
+        t.Errorf(Sprintf!("Name = %s, want empty", a.Name));
+    }
+}}
+
 // ── TestAddressString (format round-trip) ───────────────────────────
 
 test!{ fn TestAddressString(t) {

@@ -158,3 +158,53 @@ test!{ fn TestReadMIMEHeaderSingle(t) {
         t.Errorf(Sprintf!("Foo = %s, want bar", h.Get("Foo")));
     }
 }}
+
+// ── TestReadMIMEHeaderNoKey ─────────────────────────────────────────
+
+test!{ fn TestReadMIMEHeaderNoKey(t) {
+    let mut r = reader(": bar\ntest-1: 1\n\n");
+    let (_h, err) = r.ReadMIMEHeader();
+    if err == nil {
+        t.Fatal("ReadMIMEHeader: expected error for empty key");
+    }
+}}
+
+// ── TestLargeReadMIMEHeader: 16k-byte cookie ────────────────────────
+
+test!{ fn TestLargeReadMIMEHeader(t) {
+    let big = "x".repeat(16 * 1024);
+    let src = format!("Cookie: {}\r\n\n", big);
+    // Leak to get 'static borrow for Cursor.
+    let leaked: &'static [u8] = Box::leak(src.into_boxed_str().into_boxed_bytes());
+    let mut r = textproto::Reader::NewReader(std::io::Cursor::new(leaked));
+    let (h, err) = r.ReadMIMEHeader();
+    if err != nil { t.Fatal(&Sprintf!("ReadMIMEHeader: %s", err)); }
+    let cookie = h.Get("Cookie");
+    if cookie.len() != big.len() {
+        t.Fatal(&Sprintf!("ReadMIMEHeader: %d bytes, want %d bytes",
+            cookie.len() as i64, big.len() as i64));
+    }
+}}
+
+// ── TestReadMIMEHeaderMalformed: no-colon line, tab-only line ───────
+
+test!{ fn TestReadMIMEHeaderMalformed(t) {
+    let inputs = [
+        "No colon first line\r\nFoo: foo\r\n\r\n",
+        "Foo: foo\r\nNo colon second line\r\n\r\n",
+        ": empty key\r\n\r\n",
+    ];
+    for input in &inputs {
+        let mut r = reader_owned(input);
+        let (_h, err) = r.ReadMIMEHeader();
+        if err == nil {
+            t.Errorf(Sprintf!("ReadMIMEHeader(%s): expected error, got nil", input));
+        }
+    }
+}}
+
+// Helper: owned-input reader for malformed tests (no 'static lifetime
+// constraint on the input string).
+fn reader_owned(s: &str) -> textproto::Reader<std::io::Cursor<Vec<u8>>> {
+    textproto::Reader::NewReader(std::io::Cursor::new(s.as_bytes().to_vec()))
+}
