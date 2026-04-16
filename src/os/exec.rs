@@ -192,11 +192,11 @@ impl Cmd {
 /// varargs tail, which fits Rust macro ergonomics better.
 #[allow(non_snake_case)]
 pub fn Command(name: impl AsRef<str>, args: &[impl AsRef<str>]) -> Cmd {
-    let name = name.as_ref().to_string();
+    let name = name.as_ref().into();
     let mut all: slice<string> = Vec::with_capacity(args.len() + 1);
     all.push(name.clone());
     for a in args {
-        all.push(a.as_ref().to_string());
+        all.push(a.as_ref().into());
     }
     Cmd {
         Path: name,
@@ -215,7 +215,7 @@ pub fn LookPath(name: impl AsRef<str>) -> (string, error) {
     // If already absolute or relative, use as-is if it exists.
     if name.contains('/') || name.contains('\\') {
         if std::path::Path::new(name).exists() {
-            return (name.to_string(), nil);
+            return (name.into(), nil);
         }
         return (String::new(), New(&format!("exec: \"{}\": file does not exist", name)));
     }

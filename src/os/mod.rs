@@ -19,21 +19,21 @@ pub mod exec;
 /// os.Args — the command line, argv[0] is the program name (like Go).
 #[allow(non_snake_case)]
 pub fn Args() -> slice<string> {
-    std::env::args().collect()
+    std::env::args().map(string::from).collect()
 }
 
 /// os.Getenv(key) — returns "" if unset (matching Go).
 #[allow(non_snake_case)]
 pub fn Getenv(key: impl AsRef<str>) -> string {
-    std::env::var(key.as_ref()).unwrap_or_default()
+    std::env::var(key.as_ref()).map(string::from).unwrap_or_default()
 }
 
 /// os.LookupEnv(key) — like Getenv, but also reports whether the var was set.
 #[allow(non_snake_case)]
 pub fn LookupEnv(key: impl AsRef<str>) -> (string, bool) {
     match std::env::var(key.as_ref()) {
-        Ok(v) => (v, true),
-        Err(_) => (String::new(), false),
+        Ok(v) => (v.into(), true),
+        Err(_) => ("".into(), false),
     }
 }
 
@@ -66,7 +66,7 @@ pub fn Exit(code: int) -> ! {
 /// os.Environ() — the environment as a list of "key=value" strings.
 #[allow(non_snake_case)]
 pub fn Environ() -> slice<string> {
-    std::env::vars().map(|(k, v)| format!("{}={}", k, v)).collect()
+    std::env::vars().map(|(k, v)| string::from(format!("{}={}", k, v))).collect()
 }
 
 /// os.Clearenv() — removes all environment variables for the current process.
@@ -83,7 +83,7 @@ pub fn Clearenv() {
 pub fn Expand(s: impl AsRef<str>, mapping: impl Fn(&str) -> string) -> string {
     let s = s.as_ref();
     let bytes = s.as_bytes();
-    let mut out = String::with_capacity(s.len());
+    let mut out = std::string::String::with_capacity(s.len());
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'$' && i + 1 < bytes.len() {
@@ -103,7 +103,7 @@ pub fn Expand(s: impl AsRef<str>, mapping: impl Fn(&str) -> string) -> string {
         out.push(bytes[i] as char);
         i += 1;
     }
-    out
+    out.into()
 }
 
 /// os.ExpandEnv(s) — shorthand for Expand(s, os.Getenv).
@@ -130,15 +130,15 @@ fn get_shell_name(s: &[u8]) -> (String, usize) {
             // No closing brace: Go's implementation eats the characters.
             return (String::new(), s.len());
         }
-        let name = std::str::from_utf8(&s[1..i]).unwrap_or("").to_string();
+        let name = std::str::from_utf8(&s[1..i]).unwrap_or("").into();
         (name, i + 1)
     } else if is_shell_special_var(s[0]) {
-        let name = (s[0] as char).to_string();
+        let name = (s[0] as char).into();
         (name, 1)
     } else if is_alpha_num(s[0]) {
         let mut i = 0;
         while i < s.len() && is_alpha_num(s[i]) { i += 1; }
-        let name = std::str::from_utf8(&s[..i]).unwrap_or("").to_string();
+        let name = std::str::from_utf8(&s[..i]).unwrap_or("").into();
         (name, i)
     } else {
         (String::new(), 0)
@@ -159,12 +159,12 @@ pub fn Hostname() -> (string, error) {
     // std::env doesn't expose hostname; read from env or /etc/hostname.
     if let Ok(v) = std::env::var("HOSTNAME") {
         if !v.is_empty() {
-            return (v, nil);
+            return (v.into(), nil);
         }
     }
     match std::fs::read_to_string("/etc/hostname") {
-        Ok(s) => (s.trim().to_string(), nil),
-        Err(e) => (String::new(), New(&format!("os.Hostname: {}", e))),
+        Ok(s) => (s.trim().into(), nil),
+        Err(e) => ("".into(), New(&format!("os.Hostname: {}", e))),
     }
 }
 
@@ -172,8 +172,8 @@ pub fn Hostname() -> (string, error) {
 #[allow(non_snake_case)]
 pub fn Getwd() -> (string, error) {
     match std::env::current_dir() {
-        Ok(p) => (p.to_string_lossy().into_owned(), nil),
-        Err(e) => (String::new(), New(&format!("os.Getwd: {}", e))),
+        Ok(p) => (p.to_string_lossy().into_owned().into(), nil),
+        Err(e) => ("".into(), New(&format!("os.Getwd: {}", e))),
     }
 }
 
@@ -260,7 +260,7 @@ pub fn MkdirAll(path: impl AsRef<str>, _perm: u32) -> error {
 /// os.TempDir() — system temp directory.
 #[allow(non_snake_case)]
 pub fn TempDir() -> string {
-    std::env::temp_dir().to_string_lossy().into_owned()
+    std::env::temp_dir().to_string_lossy().into_owned().into()
 }
 
 // ── File handle ────────────────────────────────────────────────────────
@@ -384,9 +384,9 @@ impl std::io::Write for File {
 pub fn Open(path: impl AsRef<str>) -> (File, error) {
     let p = path.as_ref();
     match std::fs::File::open(p) {
-        Ok(f) => (File { inner: Some(f), name: p.to_string() }, nil),
+        Ok(f) => (File { inner: Some(f), name: p.into() }, nil),
         Err(e) => (
-            File { inner: None, name: p.to_string() },
+            File { inner: None, name: p.into() },
             New(&format!("os.Open: {}", e)),
         ),
     }
@@ -397,9 +397,9 @@ pub fn Open(path: impl AsRef<str>) -> (File, error) {
 pub fn Create(path: impl AsRef<str>) -> (File, error) {
     let p = path.as_ref();
     match std::fs::File::create(p) {
-        Ok(f) => (File { inner: Some(f), name: p.to_string() }, nil),
+        Ok(f) => (File { inner: Some(f), name: p.into() }, nil),
         Err(e) => (
-            File { inner: None, name: p.to_string() },
+            File { inner: None, name: p.into() },
             New(&format!("os.Create: {}", e)),
         ),
     }
