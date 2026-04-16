@@ -50,7 +50,7 @@ pub struct Cookie {
 /// ```
 ///
 /// Mirrors Go's `&http.Cookie{Name: "foo", Value: "bar"}` — accepts
-/// string literals without `.to_string()` / `.into()` noise.
+/// string literals without `.into()` / `.into()` noise.
 #[macro_export]
 macro_rules! Cookie {
     ( $($field:ident : $value:expr),* $(,)? ) => {{
@@ -63,13 +63,13 @@ macro_rules! Cookie {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __cookie_set {
-    ($c:ident, Name,        $v:expr) => { $c.Name        = $v.to_string(); };
-    ($c:ident, Value,       $v:expr) => { $c.Value       = $v.to_string(); };
-    ($c:ident, Path,        $v:expr) => { $c.Path        = $v.to_string(); };
-    ($c:ident, Domain,      $v:expr) => { $c.Domain      = $v.to_string(); };
-    ($c:ident, Expires,     $v:expr) => { $c.Expires     = $v.to_string(); };
-    ($c:ident, RawExpires,  $v:expr) => { $c.RawExpires  = $v.to_string(); };
-    ($c:ident, Raw,         $v:expr) => { $c.Raw         = $v.to_string(); };
+    ($c:ident, Name,        $v:expr) => { $c.Name        = $v.into(); };
+    ($c:ident, Value,       $v:expr) => { $c.Value       = $v.into(); };
+    ($c:ident, Path,        $v:expr) => { $c.Path        = $v.into(); };
+    ($c:ident, Domain,      $v:expr) => { $c.Domain      = $v.into(); };
+    ($c:ident, Expires,     $v:expr) => { $c.Expires     = $v.into(); };
+    ($c:ident, RawExpires,  $v:expr) => { $c.RawExpires  = $v.into(); };
+    ($c:ident, Raw,         $v:expr) => { $c.Raw         = $v.into(); };
     ($c:ident, Quoted,      $v:expr) => { $c.Quoted      = $v; };
     ($c:ident, MaxAge,      $v:expr) => { $c.MaxAge      = $v; };
     ($c:ident, Secure,      $v:expr) => { $c.Secure      = $v; };
@@ -80,8 +80,8 @@ macro_rules! __cookie_set {
 
 impl Cookie {
     pub fn String(&self) -> string {
-        if !is_token(&self.Name) { return String::new(); }
-        let mut b = String::new();
+        if !is_token(&self.Name) { return "".into(); }
+        let mut b = std::string::String::new();
         b.push_str(&self.Name);
         b.push('=');
         b.push_str(&sanitize_cookie_value(&self.Value, self.Quoted));
@@ -112,7 +112,7 @@ impl Cookie {
             SameSite::Default => {}
         }
         if self.Partitioned { b.push_str("; Partitioned"); }
-        b
+        b.into()
     }
 }
 
@@ -137,7 +137,7 @@ pub fn ParseCookie(line: &str) -> (Vec<Cookie>, error) {
         if !ok {
             return (Vec::new(), New("http: invalid cookie value"));
         }
-        out.push(Cookie { Name: name.to_string(), Value: val, Quoted: quoted, ..Cookie::default() });
+        out.push(Cookie { Name: name.into(), Value: val, Quoted: quoted, ..Cookie::default() });
     }
     (out, nil)
 }
@@ -154,7 +154,7 @@ pub fn ParseSetCookie(line: &str) -> (Cookie, error) {
         Some(i) => i,
         None => return (Cookie::default(), New("http: '=' not found in cookie")),
     };
-    let name = trim_string(&first[..eq]).to_string();
+    let name: string = trim_string(&first[..eq]).into();
     let value = &first[eq + 1..];
     if !is_token(&name) {
         return (Cookie::default(), New("http: invalid cookie name"));
@@ -167,7 +167,7 @@ pub fn ParseSetCookie(line: &str) -> (Cookie, error) {
         Name: name,
         Value: val,
         Quoted: quoted,
-        Raw: line.to_string(),
+        Raw: line.into(),
         ..Cookie::default()
     };
 
@@ -181,7 +181,7 @@ pub fn ParseSetCookie(line: &str) -> (Cookie, error) {
         let lower_attr = attr.to_ascii_lowercase();
         let (val, _, ok) = parse_cookie_value(val, false);
         if !ok {
-            c.Unparsed.push(part.to_string());
+            c.Unparsed.push(part.into());
             continue;
         }
         match lower_attr.as_str() {
@@ -200,13 +200,13 @@ pub fn ParseSetCookie(line: &str) -> (Cookie, error) {
                 match val.parse::<i64>() {
                     Ok(n) if n > 0 => c.MaxAge = n,
                     Ok(_)          => c.MaxAge = -1,
-                    Err(_)         => c.Unparsed.push(part.to_string()),
+                    Err(_)         => c.Unparsed.push(part.into()),
                 }
             }
             "expires"  => { c.RawExpires = val.clone(); c.Expires = val; }
             "path"     => c.Path = val,
             "partitioned" => c.Partitioned = true,
-            _          => c.Unparsed.push(part.to_string()),
+            _          => c.Unparsed.push(part.into()),
         }
     }
     (c, nil)
@@ -245,13 +245,13 @@ fn parse_cookie_value(raw: &str, allow_double_quote: bool) -> (string, bool, boo
         if quoted {
             // Inside quotes, spaces and commas are permitted.
             if !(valid_cookie_value_byte(b) || b == b' ' || b == b',') {
-                return (String::new(), false, false);
+                return ("".into(), false, false);
             }
         } else if !valid_cookie_value_byte(b) {
-            return (String::new(), false, false);
+            return ("".into(), false, false);
         }
     }
-    (inner.to_string(), quoted, true)
+    (inner.into(), quoted, true)
 }
 
 fn valid_cookie_value_byte(b: u8) -> bool {
@@ -283,9 +283,8 @@ fn valid_cookie_domain(v: &str) -> bool {
     true
 }
 
-fn sanitize_cookie_value(v: &str, quoted: bool) -> string {
-    // Drop anything that isn't a cookie-octet; optionally re-wrap in quotes.
-    let mut out = String::with_capacity(v.len());
+fn sanitize_cookie_value(v: &str, quoted: bool) -> std::string::String {
+    let mut out = std::string::String::with_capacity(v.len());
     for b in v.bytes() {
         if valid_cookie_value_byte(b) || b == b' ' || b == b',' { out.push(b as char); }
     }
@@ -296,8 +295,8 @@ fn sanitize_cookie_value(v: &str, quoted: bool) -> string {
     }
 }
 
-fn sanitize_cookie_path(v: &str) -> string {
-    let mut out = String::with_capacity(v.len());
+fn sanitize_cookie_path(v: &str) -> std::string::String {
+    let mut out = std::string::String::with_capacity(v.len());
     for b in v.bytes() {
         if (0x20 < b && b < 0x7f) && b != b';' { out.push(b as char); }
     }
