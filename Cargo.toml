@@ -3,11 +3,11 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.15.1"
+version = "0.15.2"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
-description = "Write Rust using Go idioms — a Go-flavored standard library for Rust"
+description = "Goish Rust — write Rust using Go idioms. Ports Go's standard library and syntax so Go programmers can write Rust code that reads and feels like Go."
 repository = "https://github.com/chanwit/goish"
 homepage = "https://github.com/chanwit/goish"
 documentation = "https://docs.rs/goish"

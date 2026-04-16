@@ -1,21 +1,21 @@
-# goish Port Progress
+# Goish Rust — Port Progress
 
 Tracks how much of the Go 1.25.5 standard library has been ported to
-goish, per package. Numbers combine **API coverage** (how much of Go's
-public surface is implemented) with **test-port coverage** (how many of
-Go's own `*_test.go` cases have been brought over and pass verbatim).
+Goish Rust, per package. Numbers combine **API coverage** (how much of
+Go's public surface is implemented) with **test-port coverage** (how many
+of Go's own `*_test.go` cases have been brought over and pass verbatim).
 
 Overall score = unweighted mean of per-package "Overall %". Packages
-that goish does not target (unsafe, reflect, go/*, image, plugin, …)
+that Goish Rust does not target (unsafe, reflect, go/*, image, plugin, …)
 are listed under **Out of scope** and excluded from the rollup.
 
 ## Overall: **66%**
 
-_Last updated: v0.15.0 — 914 tests green._
+_Last updated: v0.15.1 — 934 tests green._
 
 ## Ported packages (in rollup)
 
-| Package | Go source | goish src | Tests ported | Impl % | Test % | **Overall** |
+| Package | Go source | Goish src | Tests ported | Impl % | Test % | **Overall** |
 |---|---|---|---|---|---|---|
 | **Builtins** (chan / defer / go / range / select / close / len / make / append / delete / map / slice) | – | `src/{chan,defer,range,types,struct_macro}.rs` | 27 (chan + runtime + select semantics) | 85% | 65% | **75%** |
 | `cmp` | `src/cmp` | `src/cmp.rs` | 6 | 85% | 75% | **80%** |
@@ -108,32 +108,32 @@ issue if you need one.
 
 ## Excluded from scope — honest categorisation
 
-Earlier drafts lumped everything goish won't ship under a single
+Earlier drafts lumped everything Goish Rust won't ship under a single
 "out of scope" heading. That hid the fact that most of those packages
 are portable in principle; they're just deprioritised. This section
 splits the exclusion into four honest buckets.
 
-### A. Genuinely incompatible with goish's premise
+### A. Genuinely incompatible with Goish Rust's premise
 
-Goish's premise is *static Rust types with Go-shaped syntax*. These
+Goish Rust's premise is *static Rust types with Go-shaped syntax*. These
 three packages fight that premise and a port would be a leaky fake:
 
 - **`reflect`** — Go's reflection works because every value carries
-  runtime type metadata. Building that into goish means tagging every
+  runtime type metadata. Building that into Goish Rust means tagging every
   value and wrapping every API — the opposite of "idiomatic Rust
   under the hood". Crates like `bevy_reflect` prove it's possible,
-  but a goish version would contradict the project's design.
+  but a Goish Rust version would contradict the project's design.
 - **`unsafe`** — Rust already has the `unsafe` keyword with different
   semantics from `unsafe.Pointer`. Wrapping one as the other confuses
   both Go and Rust readers.
 - **`builtin`** — Not a package; documentation of `int`, `len`, `make`,
-  `append`, etc. Goish implements these via `types.rs` and the macro
+  `append`, etc. Goish Rust implements these via `types.rs` and the macro
   prelude, so the package itself has no porting target.
 
 ### B. Would require reimplementing large Go tooling
 
 Portable in principle but the effort budget is prohibitive and the
-goish audience (Rust devs writing Go-flavored code) doesn't need them:
+Goish Rust audience (Rust devs writing Go-flavored code) doesn't need them:
 
 - **`go/{ast,parser,types,token,scanner,format,printer,doc,build,constant,importer,version}`** —
   a Go parser + type checker in Rust is ~50k LoC. Won't do.
@@ -166,7 +166,7 @@ have, not scheduled" list:
 - **`structs`** — marker types only; a doc-only mapping is trivial.
 - **`testing/{quick,fstest,iotest,slogtest,synctest,cryptotest}`** —
   all portable. `testing/quick` (property-based testing) is the
-  most useful. Deprioritised because goish users write application
+  most useful. Deprioritised because Goish Rust users write application
   code, not test infrastructure.
 - **`expvar`** — exports `/debug/vars`; could wrap atomics + net/http.
 - **`log/slog`, `log/syslog`** — structured logging and syslog client.
@@ -215,7 +215,7 @@ Overall = round( (Impl% + Test%) / 2 )
 where:
 
 - **Impl %** — what fraction of the Go public functions, types, and
-  methods exist on goish's package. A best-effort estimate from code
+  methods exist on Goish Rust's package. A best-effort estimate from code
   review.
 - **Test %** — what fraction of Go's `*_test.go` test *functions* for
   that package have been ported to `tests/` and pass. Exact count
@@ -231,7 +231,7 @@ to keep the number reflective of what's shipped.
 Packages in the four **Excluded** buckets (genuinely incompatible,
 tooling-too-large, better-served-by-Rust, deprioritised) never enter
 the rollup. Including them would deflate the number to 20-something %
-and misrepresent how close goish is to covering the Go that's worth
+and misrepresent how close Goish Rust is to covering the Go that's worth
 covering.
 
 ## See also
