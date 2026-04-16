@@ -6,7 +6,6 @@
 #![allow(non_snake_case)]
 use goish::prelude::*;
 use goish::net::textproto;
-use std::io::Cursor;
 
 // ── TestCanonicalMIMEHeaderKey ──────────────────────────────────────
 
@@ -48,10 +47,10 @@ test!{ fn TestMIMEHeaderMultipleValues(t) {
     }
 }}
 
-// ── Reader helper — Go-shape textproto.NewReader(strings.NewReader(s)) ──
+// ── Reader helper — Go-shape `textproto.NewReader(strings.NewReader(s))` ──
 
-fn reader(s: &'static str) -> textproto::Reader<Cursor<&'static [u8]>> {
-    textproto::NewReader(Cursor::new(s.as_bytes()))
+fn reader(s: &str) -> textproto::Reader<strings::Reader> {
+    textproto::NewReader(strings::NewReader(s))
 }
 
 // ── TestReadLine ────────────────────────────────────────────────────
@@ -75,15 +74,14 @@ test!{ fn TestReadLine(t) {
 // ── TestReadLineLongLine ────────────────────────────────────────────
 
 test!{ fn TestReadLineLongLine(t) {
-    let line = "12345".repeat(10000);
-    let data = format!("{}\r\n", line);
-    // Need a 'static-like data source: box+leak the data for the Cursor.
-    let leaked: &'static [u8] = Box::leak(data.into_boxed_str().into_boxed_bytes());
-    let mut r = textproto::NewReader(Cursor::new(leaked));
+    let line = strings::Repeat("12345", 10000);
+    let data = Sprintf!("%s\r\n", line);
+    let mut r = textproto::NewReader(strings::NewReader(&data));
     let (s, err) = r.ReadLine();
     if err != nil { t.Fatal(&Sprintf!("Line 1: %s", err)); }
     if s != line {
-        t.Fatal(&Sprintf!("%d-byte line does not match expected %d-byte line", s.len() as i64, line.len() as i64));
+        t.Fatal(&Sprintf!("%d-byte line does not match expected %d-byte line",
+            len!(s) as i64, len!(line) as i64));
     }
 }}
 
@@ -172,17 +170,15 @@ test!{ fn TestReadMIMEHeaderNoKey(t) {
 // ── TestLargeReadMIMEHeader: 16k-byte cookie ────────────────────────
 
 test!{ fn TestLargeReadMIMEHeader(t) {
-    let big = "x".repeat(16 * 1024);
-    let src = format!("Cookie: {}\r\n\n", big);
-    // Leak to get 'static borrow for Cursor.
-    let leaked: &'static [u8] = Box::leak(src.into_boxed_str().into_boxed_bytes());
-    let mut r = textproto::Reader::NewReader(std::io::Cursor::new(leaked));
+    let big = strings::Repeat("x", 16 * 1024);
+    let src = Sprintf!("Cookie: %s\r\n\n", big);
+    let mut r = textproto::NewReader(strings::NewReader(&src));
     let (h, err) = r.ReadMIMEHeader();
     if err != nil { t.Fatal(&Sprintf!("ReadMIMEHeader: %s", err)); }
     let cookie = h.Get("Cookie");
-    if cookie.len() != big.len() {
+    if len!(cookie) != len!(big) {
         t.Fatal(&Sprintf!("ReadMIMEHeader: %d bytes, want %d bytes",
-            cookie.len() as i64, big.len() as i64));
+            len!(cookie) as i64, len!(big) as i64));
     }
 }}
 
@@ -195,7 +191,7 @@ test!{ fn TestReadMIMEHeaderMalformed(t) {
         ": empty key\r\n\r\n",
     ];
     for input in &inputs {
-        let mut r = reader_owned(input);
+        let mut r = reader(input);
         let (_h, err) = r.ReadMIMEHeader();
         if err == nil {
             t.Errorf(Sprintf!("ReadMIMEHeader(%s): expected error, got nil", input));
@@ -203,8 +199,3 @@ test!{ fn TestReadMIMEHeaderMalformed(t) {
     }
 }}
 
-// Helper: owned-input reader for malformed tests (no 'static lifetime
-// constraint on the input string).
-fn reader_owned(s: &str) -> textproto::Reader<std::io::Cursor<Vec<u8>>> {
-    textproto::NewReader(std::io::Cursor::new(s.as_bytes().to_vec()))
-}

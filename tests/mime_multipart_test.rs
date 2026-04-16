@@ -5,14 +5,13 @@
 #![allow(non_snake_case)]
 use goish::prelude::*;
 use goish::mime::multipart;
-use std::io::Cursor;
 
 // ── TestWriter ──────────────────────────────────────────────────────
 
 test!{ fn TestWriter(t) {
     let file_contents = b"my file contents";
 
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = bytes::Buffer::new();
     let boundary;
     {
         let mut w = multipart::NewWriter(&mut buf);
@@ -28,13 +27,14 @@ test!{ fn TestWriter(t) {
         let err = w.Close();
         if err != nil { t.Fatal(&Sprintf!("Close: %s", err)); }
 
-        if buf.is_empty() { t.Fatal("empty buffer"); }
-        if buf[0] == b'\r' || buf[0] == b'\n' {
+        let bytes = buf.Bytes();
+        if bytes.is_empty() { t.Fatal("empty buffer"); }
+        if bytes[0] == b'\r' || bytes[0] == b'\n' {
             t.Fatal("unexpected leading newline");
         }
     }
 
-    let mut r = multipart::NewReader(Cursor::new(&buf), &boundary);
+    let mut r = multipart::NewReader(&mut buf, &boundary);
 
     let (part1, err) = r.NextPart();
     if err != nil { t.Fatal(&Sprintf!("part 1: %s", err)); }
@@ -77,7 +77,7 @@ test!{ fn TestWriterSetBoundary(t) {
         Case { b: "badspace ",     ok: false },
     ];
     for c in &cases {
-        let mut buf: Vec<u8> = Vec::new();
+        let mut buf = bytes::Buffer::new();
         let mut w = multipart::NewWriter(&mut buf);
         let err = w.SetBoundary(c.b);
         let got = err == nil;
