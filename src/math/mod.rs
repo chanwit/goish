@@ -34,6 +34,15 @@ pub mod rand;
 #[allow(non_upper_case_globals)] pub const MinInt64: int64 = i64::MIN;
 #[allow(non_upper_case_globals)] pub const MaxInt32: i32 = i32::MAX;
 #[allow(non_upper_case_globals)] pub const MinInt32: i32 = i32::MIN;
+#[allow(non_upper_case_globals)] pub const MaxInt16: i16 = i16::MAX;
+#[allow(non_upper_case_globals)] pub const MinInt16: i16 = i16::MIN;
+#[allow(non_upper_case_globals)] pub const MaxInt8:  i8  = i8::MAX;
+#[allow(non_upper_case_globals)] pub const MinInt8:  i8  = i8::MIN;
+
+#[allow(non_upper_case_globals)] pub const MaxUint64: u64 = u64::MAX;
+#[allow(non_upper_case_globals)] pub const MaxUint32: u32 = u32::MAX;
+#[allow(non_upper_case_globals)] pub const MaxUint16: u16 = u16::MAX;
+#[allow(non_upper_case_globals)] pub const MaxUint8:  u8  = u8::MAX;
 
 // ── funcs ──────────────────────────────────────────────────────────────
 
@@ -81,6 +90,10 @@ mod tests {
     fn constants_are_sane() {
         assert!((Pi - 3.141_592_653_589_793).abs() < 1e-12);
         assert_eq!(MaxInt64, i64::MAX);
+        assert_eq!(MaxUint64, u64::MAX);
+        assert_eq!(MaxUint32, u32::MAX);
+        assert_eq!(MaxUint16, u16::MAX);
+        assert_eq!(MaxUint8,  u8::MAX);
     }
 
     #[test]

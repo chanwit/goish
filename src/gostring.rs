@@ -216,6 +216,17 @@ impl std::ops::Add<&str> for GoString {
     fn add(self, rhs: &str) -> GoString { self.cat(rhs) }
 }
 
+// `+=` for Go's `s += "..."` / `s += t`.
+impl std::ops::AddAssign<&str> for GoString {
+    fn add_assign(&mut self, rhs: &str) { *self = self.cat(rhs); }
+}
+impl std::ops::AddAssign<GoString> for GoString {
+    fn add_assign(&mut self, rhs: GoString) { *self = self.cat(&rhs); }
+}
+impl std::ops::AddAssign<&GoString> for GoString {
+    fn add_assign(&mut self, rhs: &GoString) { *self = self.cat(rhs); }
+}
+
 // ── Display / Debug ────────────────────────────────────────────────
 
 impl std::fmt::Display for GoString {
@@ -310,6 +321,23 @@ mod tests {
         assert!(s == "x");
         assert!("x" == s);
         assert!(s != "y");
+    }
+
+    #[test]
+    fn add_assign_str_literal() {
+        let mut p: GoString = "foo".into();
+        p += "/";
+        p += "bar";
+        assert_eq!(p, "foo/bar");
+    }
+
+    #[test]
+    fn add_assign_gostring() {
+        let mut p: GoString = "a".into();
+        let b: GoString = "b".into();
+        p += &b;
+        p += b;
+        assert_eq!(p, "abb");
     }
 
     #[test]
