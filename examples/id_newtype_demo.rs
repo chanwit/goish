@@ -11,14 +11,17 @@
 
 use goish::prelude::*;
 
-IntNewtype!(ID = uint64);
+// v0.17.7: `Type!(...)` — Go's `type` keyword, dispatches on RHS shape.
+//   Type!(ID = uint64)     → int newtype
+//   Type!(IDSlice = []ID)  → slice newtype
+Type!(ID = uint64);
 stringer! {
     impl ID {
         fn String(&self) -> string { strconv::FormatUint(self.0, 16) }
     }
 }
 
-pub struct IDSlice(pub slice<ID>);
+Type!(IDSlice = []ID);
 
 impl sort::Interface for IDSlice {
     fn Len(&self) -> int { self.0.len() as int }

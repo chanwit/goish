@@ -199,6 +199,101 @@ macro_rules! IntNewtype {
     };
 }
 
+/// `SliceNewtype!(IDSlice = ID)` — Go's `type IDSlice []ID`.
+///
+/// Generates `pub struct IDSlice(pub slice<ID>)` with Deref/DerefMut to
+/// slice<ID> (so all slice methods flow through), From<slice<ID>> /
+/// From<Vec<ID>> / From<IDSlice> for slice<ID>, IntoIterator, and the
+/// usual derives (Clone/Debug/Default; PartialEq/Eq when the element
+/// supports it — add `#[derive(...)]` manually if you need more).
+#[macro_export]
+macro_rules! SliceNewtype {
+    ($name:ident = $elem:ty) => {
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Debug, Default)]
+        pub struct $name(pub $crate::types::slice<$elem>);
+
+        impl ::std::ops::Deref for $name {
+            type Target = $crate::types::slice<$elem>;
+            fn deref(&self) -> &Self::Target { &self.0 }
+        }
+        impl ::std::ops::DerefMut for $name {
+            fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+        }
+
+        impl ::std::convert::From<$crate::types::slice<$elem>> for $name {
+            fn from(v: $crate::types::slice<$elem>) -> Self { $name(v) }
+        }
+        impl ::std::convert::From<::std::vec::Vec<$elem>> for $name {
+            fn from(v: ::std::vec::Vec<$elem>) -> Self { $name(v.into()) }
+        }
+        impl ::std::convert::From<$name> for $crate::types::slice<$elem> {
+            fn from(x: $name) -> $crate::types::slice<$elem> { x.0 }
+        }
+
+        impl ::std::iter::IntoIterator for $name {
+            type Item = $elem;
+            type IntoIter = ::std::vec::IntoIter<$elem>;
+            fn into_iter(self) -> Self::IntoIter { self.0.into_vec().into_iter() }
+        }
+        impl<'a> ::std::iter::IntoIterator for &'a $name {
+            type Item = &'a $elem;
+            type IntoIter = ::std::slice::Iter<'a, $elem>;
+            fn into_iter(self) -> Self::IntoIter { self.0.as_vec().iter() }
+        }
+        impl<'a> ::std::iter::IntoIterator for &'a mut $name {
+            type Item = &'a mut $elem;
+            type IntoIter = ::std::slice::IterMut<'a, $elem>;
+            fn into_iter(self) -> Self::IntoIter { self.0.as_vec_mut().iter_mut() }
+        }
+    };
+}
+
+/// `Type!(Name = <shape>)` — Go's `type Name <shape>` decl.
+///
+/// Dispatches on the shape of the RHS:
+///
+///   Type!(ID = uint64)         // int newtype  → IntNewtype!
+///   Type!(IDSlice = []ID)      // slice newtype → SliceNewtype!
+///   Type!(X = SomeStruct)      // generic newtype fallback
+///
+/// Compose with `stringer!` to layer on `String()` + `Display`. See
+/// examples/id_newtype_demo.rs for the full Go → goish port pattern.
+#[macro_export]
+macro_rules! Type {
+    // Slice: `type IDSlice []ID`
+    ($name:ident = [ ] $elem:ty) => { $crate::SliceNewtype!($name = $elem); };
+
+    // Integer primitive names — dispatch to IntNewtype.
+    ($name:ident = int)    => { $crate::IntNewtype!($name = $crate::types::int); };
+    ($name:ident = int8)   => { $crate::IntNewtype!($name = $crate::types::int8); };
+    ($name:ident = int16)  => { $crate::IntNewtype!($name = $crate::types::int16); };
+    ($name:ident = int32)  => { $crate::IntNewtype!($name = $crate::types::int32); };
+    ($name:ident = int64)  => { $crate::IntNewtype!($name = $crate::types::int64); };
+    ($name:ident = uint)   => { $crate::IntNewtype!($name = $crate::types::uint); };
+    ($name:ident = uint8)  => { $crate::IntNewtype!($name = $crate::types::uint8); };
+    ($name:ident = uint16) => { $crate::IntNewtype!($name = $crate::types::uint16); };
+    ($name:ident = uint32) => { $crate::IntNewtype!($name = $crate::types::uint32); };
+    ($name:ident = uint64) => { $crate::IntNewtype!($name = $crate::types::uint64); };
+    ($name:ident = byte)   => { $crate::IntNewtype!($name = $crate::types::byte); };
+    ($name:ident = rune)   => { $crate::IntNewtype!($name = $crate::types::rune); };
+
+    // Generic fallback: `type X SomeStruct` — plain tuple struct newtype
+    // with the minimum viable plumbing. Users derive more if they need it.
+    ($name:ident = $t:ty) => {
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Debug, Default)]
+        pub struct $name(pub $t);
+
+        impl ::std::convert::From<$t> for $name {
+            fn from(x: $t) -> Self { $name(x) }
+        }
+        impl ::std::convert::From<$name> for $t {
+            fn from(x: $name) -> $t { x.0 }
+        }
+    };
+}
+
 /// `len!(x)` — Go's polymorphic `len()` builtin.
 ///
 /// Works on `string`, `&str`, `slice<T>`, `map<K,V>`, `Chan<T>`, and anything
@@ -504,6 +599,25 @@ mod tests {
         let v = crate::make!([]int, l, c);
         assert_eq!(v.len(), 2);
         assert!(v.capacity() >= 10);
+    }
+
+    #[test]
+    fn type_macro_int_and_slice() {
+        use crate as goish;
+        goish::Type!(UserId = uint64);
+        goish::Type!(UserIds = []UserId);
+
+        // Int form: slice! with bare literals widens through IntNewtype's
+        // From<i32> impl that Type! forwarded to.
+        let _raw: crate::types::slice<UserId> = crate::slice!([]UserId{1i32, 2i32, 3i32});
+        // Slice form: From<Vec<T>> via SliceNewtype wraps the inner Vec.
+        let ids: UserIds = vec![UserId(10), UserId(20), UserId(30)].into();
+        assert_eq!(ids.0.len(), 3);
+        // Deref lets us reach slice<UserId> methods directly.
+        assert_eq!(ids.len(), 3);
+        // IntoIterator by reference.
+        let sum: u64 = (&ids).into_iter().map(|u| u.0).sum();
+        assert_eq!(sum, 60);
     }
 
     #[test]
