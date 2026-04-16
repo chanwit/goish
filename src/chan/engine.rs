@@ -82,13 +82,16 @@ impl<T> Inner<T> {
     }
 
     pub fn recv(&self) -> Option<T> {
+        // Polls with a short timeout so Close() wakes blocked receivers
+        // within a few ms (flume has no sender-side close broadcast of its
+        // own; we simulate it via the shared `closed` flag).
         loop {
             match self.rx.try_recv() {
                 Ok(v) => return Some(v),
                 Err(flume::TryRecvError::Disconnected) => return None,
                 Err(flume::TryRecvError::Empty) => {
                     if self.is_closed() { return None; }
-                    match self.rx.recv_timeout(std::time::Duration::from_millis(50)) {
+                    match self.rx.recv_timeout(std::time::Duration::from_millis(5)) {
                         Ok(v) => return Some(v),
                         Err(flume::RecvTimeoutError::Timeout) => continue,
                         Err(flume::RecvTimeoutError::Disconnected) => return None,
