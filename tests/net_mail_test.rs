@@ -123,6 +123,28 @@ test!{ fn TestAddressParsingAngleOnlyForm(t) {
     }
 }}
 
+// ── TestEmptyAddress ────────────────────────────────────────────────
+
+test!{ fn TestEmptyAddress(t) {
+    let (_a, err) = mail::ParseAddress("");
+    if err == nil { t.Errorf(Sprintf!("ParseAddress(\"\") expected error")); }
+
+    let (list, err) = mail::ParseAddressList("");
+    if len!(list) > 0 || err == nil {
+        t.Errorf(Sprintf!("ParseAddressList(\"\") = %d items, want error", len!(list)));
+    }
+
+    let (list, err) = mail::ParseAddressList(",");
+    if len!(list) > 0 || err == nil {
+        t.Errorf(Sprintf!("ParseAddressList(\",\") = %d items, want error", len!(list)));
+    }
+
+    let (list, err) = mail::ParseAddressList("a@b c@d");
+    if len!(list) > 0 || err == nil {
+        t.Errorf(Sprintf!("ParseAddressList(\"a@b c@d\") = %d items, want error", len!(list)));
+    }
+}}
+
 // ── TestAddressString (format round-trip) ───────────────────────────
 
 test!{ fn TestAddressString(t) {

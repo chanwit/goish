@@ -110,6 +110,70 @@ test!{ fn TestParseCookie(t) {
     }
 }}
 
+// ── TestParseSetCookie — tabular Go `readSetCookiesTests` port ──────
+
+test!{ fn TestParseSetCookieTable(t) {
+    struct Case {
+        input: &'static str,
+        name: &'static str,
+        value: &'static str,
+        path: &'static str,
+        domain: &'static str,
+        http_only: bool,
+        secure: bool,
+        same_site: goish::net::http::SameSite,
+    }
+    use goish::net::http::SameSite::*;
+    let cases = [
+        Case { input: "Cookie-1=v$1",
+               name: "Cookie-1", value: "v$1", path: "", domain: "",
+               http_only: false, secure: false, same_site: Default },
+        Case { input: "ASP.NET_SessionId=foo; path=/; HttpOnly",
+               name: "ASP.NET_SessionId", value: "foo", path: "/", domain: "",
+               http_only: true, secure: false, same_site: Default },
+        Case { input: "samesitedefault=foo; SameSite",
+               name: "samesitedefault", value: "foo", path: "", domain: "",
+               http_only: false, secure: false, same_site: Default },
+        Case { input: "samesitelax=foo; SameSite=Lax",
+               name: "samesitelax", value: "foo", path: "", domain: "",
+               http_only: false, secure: false, same_site: Lax },
+        Case { input: "samesitestrict=foo; SameSite=Strict",
+               name: "samesitestrict", value: "foo", path: "", domain: "",
+               http_only: false, secure: false, same_site: Strict },
+        Case { input: "samesitenone=foo; SameSite=None",
+               name: "samesitenone", value: "foo", path: "", domain: "",
+               http_only: false, secure: false, same_site: None },
+        Case { input: r#"special-2=" z""#,
+               name: "special-2", value: " z", path: "", domain: "",
+               http_only: false, secure: false, same_site: Default },
+    ];
+    range!(&cases[..], |i, c| {
+        let (got, err) = http::ParseSetCookie(c.input);
+        if err != nil { t.Fatal(&Sprintf!("case %d: ParseSetCookie: %s", i as i64, err)); }
+        if got.Name != c.name {
+            t.Errorf(Sprintf!("case %d: Name = %s, want %s", i as i64, got.Name, c.name));
+        }
+        if got.Value != c.value {
+            t.Errorf(Sprintf!("case %d: Value = %s, want %s", i as i64, got.Value, c.value));
+        }
+        if got.Path != c.path {
+            t.Errorf(Sprintf!("case %d: Path = %s, want %s", i as i64, got.Path, c.path));
+        }
+        if got.Domain != c.domain {
+            t.Errorf(Sprintf!("case %d: Domain = %s, want %s", i as i64, got.Domain, c.domain));
+        }
+        if got.HttpOnly != c.http_only {
+            t.Errorf(Sprintf!("case %d: HttpOnly mismatch", i as i64));
+        }
+        if got.Secure != c.secure {
+            t.Errorf(Sprintf!("case %d: Secure mismatch", i as i64));
+        }
+        if got.SameSite != c.same_site {
+            t.Errorf(Sprintf!("case %d: SameSite mismatch", i as i64));
+        }
+    });
+}}
+
 // ── TestParseSetCookie (Set-Cookie response header parsing) ─────────
 
 test!{ fn TestParseSetCookie(t) {
