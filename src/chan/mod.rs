@@ -145,6 +145,23 @@ impl<T> Chan<T> {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
+
+    // ── proc-macro-internal accessors ──────────────────────────────────
+    // The `select!` proc macro reaches through these to build a flume
+    // `Selector` that parks on every arm at once (see issue #119). Never
+    // call from user code.
+
+    #[doc(hidden)]
+    pub fn __flume_rx(&self) -> &flume::Receiver<T> { self.inner.__flume_rx() }
+
+    #[doc(hidden)]
+    pub fn __flume_tx(&self) -> &flume::Sender<T> { self.inner.__flume_tx() }
+
+    #[doc(hidden)]
+    pub fn __flume_close_rx(&self) -> &flume::Receiver<()> { self.inner.__flume_close_rx() }
+
+    #[doc(hidden)]
+    pub fn __is_closed(&self) -> bool { self.inner.is_closed() }
 }
 
 /// `chan!(T)`         → unbuffered channel (rendezvous)
@@ -167,123 +184,9 @@ macro_rules! close {
     };
 }
 
-/// `select!{ ... }` — Go's select statement.
-///
-/// Supported arm forms:
-///   - `recv(c)              => { body }`   — case fires, value discarded
-///   - `recv(c) |v|          => { body }`   — bind received value
-///   - `recv(c) |v, ok|      => { body }`   — bind value + close-flag
-///   - `send(c, expr)        => { body }`   — send expr; fires on success
-///   - `default              => { body }`   — fallback if no case ready
-///
-/// Semantics:
-///   - All case channels are tested non-blocking.
-///   - If multiple are ready, the first in source order wins (Go's spec
-///     says uniform-random; this is a known simplification to revisit).
-///   - If none ready and `default` is present, default fires.
-///   - If none ready and no `default`, this select *currently* spins
-///     with a short sleep between polls. (Proper cross-channel parking
-///     via `flume::Selector` lands in the next iteration.)
-#[macro_export]
-macro_rules! select {
-    ($($tt:tt)*) => {
-        $crate::__select_parse!(@arms [] $($tt)*)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __select_parse {
-    // recv(c) |v, ok| => { body }
-    (@arms [$($acc:tt)*] recv($ch:expr) |$v:ident, $ok:ident| => $body:block $(, $($rest:tt)*)?) => {
-        $crate::__select_parse!(@arms [$($acc)* (RecvBind2 ($ch) ($v) ($ok) ($body))] $($($rest)*)?)
-    };
-    // recv(c) |v| => { body }
-    (@arms [$($acc:tt)*] recv($ch:expr) |$v:ident| => $body:block $(, $($rest:tt)*)?) => {
-        $crate::__select_parse!(@arms [$($acc)* (RecvBind1 ($ch) ($v) ($body))] $($($rest)*)?)
-    };
-    // recv(c) => { body }
-    (@arms [$($acc:tt)*] recv($ch:expr) => $body:block $(, $($rest:tt)*)?) => {
-        $crate::__select_parse!(@arms [$($acc)* (RecvDrop ($ch) ($body))] $($($rest)*)?)
-    };
-    // send(c, v) => { body }
-    (@arms [$($acc:tt)*] send($ch:expr, $v:expr) => $body:block $(, $($rest:tt)*)?) => {
-        $crate::__select_parse!(@arms [$($acc)* (Send ($ch) ($v) ($body))] $($($rest)*)?)
-    };
-    // default => { body }
-    (@arms [$($acc:tt)*] default => $body:block $(,)?) => {
-        $crate::__select_parse!(@emit [$($acc)*] [$body])
-    };
-    // End of input, no default
-    (@arms [$($acc:tt)*]) => {
-        $crate::__select_parse!(@emit [$($acc)*] [])
-    };
-
-    // Emit: try each arm; if none fire and no default, spin-wait briefly.
-    (@emit [$($arms:tt)*] [$($def:tt)*]) => {{
-        #[allow(unused_mut, unused_assignments)]
-        let mut __goish_fired = false;
-        loop {
-            $crate::__select_parse!(@try __goish_fired $($arms)*);
-            if __goish_fired {
-                break;
-            }
-            $crate::__select_parse!(@default_or_spin __goish_fired [$($def)*]);
-            if __goish_fired {
-                break;
-            }
-        }
-    }};
-
-    // If default exists: fire it.
-    (@default_or_spin $fired:ident [$($def:tt)+]) => {{
-        { $($def)+ }
-        $fired = true;
-    }};
-    // No default: short sleep before retry.
-    (@default_or_spin $fired:ident []) => {{
-        std::thread::sleep(std::time::Duration::from_millis(1));
-    }};
-
-    // Try each arm:
-    (@try $fired:ident (RecvBind2 ($ch:expr) ($v:ident) ($ok:ident) ($body:block)) $($rest:tt)*) => {
-        if !$fired {
-            if let Some(($v, $ok)) = ($ch).__select_try_recv() {
-                $body
-                $fired = true;
-            }
-        }
-        $crate::__select_parse!(@try $fired $($rest)*);
-    };
-    (@try $fired:ident (RecvBind1 ($ch:expr) ($v:ident) ($body:block)) $($rest:tt)*) => {
-        if !$fired {
-            if let Some(($v, _)) = ($ch).__select_try_recv() {
-                $body
-                $fired = true;
-            }
-        }
-        $crate::__select_parse!(@try $fired $($rest)*);
-    };
-    (@try $fired:ident (RecvDrop ($ch:expr) ($body:block)) $($rest:tt)*) => {
-        if !$fired {
-            if ($ch).__select_try_recv().is_some() {
-                $body
-                $fired = true;
-            }
-        }
-        $crate::__select_parse!(@try $fired $($rest)*);
-    };
-    (@try $fired:ident (Send ($ch:expr) ($v:expr) ($body:block)) $($rest:tt)*) => {
-        if !$fired {
-            if ($ch).__select_try_send($v).is_ok() {
-                $body
-                $fired = true;
-            }
-        }
-        $crate::__select_parse!(@try $fired $($rest)*);
-    };
-    (@try $fired:ident) => {};
-}
+// `select!{ ... }` is re-exported at the crate root from goish_macros.
+// See src/lib.rs. Left here as a marker for the previous macro_rules!
+// definition removed in v0.10.1 (issue #119).
 
 #[cfg(test)]
 mod tests {

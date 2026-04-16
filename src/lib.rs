@@ -41,6 +41,11 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(rustdoc::invalid_html_tags)]
 
+// Make `::goish::…` resolve to `crate::…` inside our own lib, so paths the
+// `select!` proc macro emits (e.g. `::goish::__flume::Selector`) work both
+// in downstream crates and in goish's own integration tests.
+extern crate self as goish;
+
 // ── Top-level Go packages ──────────────────────────────────────────────
 
 pub mod bufio;
@@ -76,6 +81,18 @@ pub mod unicode;          // unicode + unicode/utf8
 pub mod __macros {
     pub use goish_macros::rewrite_go_body;
 }
+
+/// Re-export of the `flume` crate so `select!` (proc-macro) can reference
+/// `$crate::__flume::Selector` without forcing users to add flume to
+/// their own `Cargo.toml`. Not a public API.
+#[doc(hidden)]
+pub use flume as __flume;
+
+/// `select!{ ... }` — Go's `select` statement (proc-macro form).
+///
+/// See `src/chan/mod.rs` for the semantic contract; the macro is
+/// defined in the `goish-macros` proc-macro crate.
+pub use goish_macros::select;
 
 /// Re-export of the `inventory` crate so the `test!` macro in user crates
 /// can submit registrations without the user depending on `inventory`

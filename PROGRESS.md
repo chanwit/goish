@@ -11,13 +11,13 @@ are listed under **Out of scope** and excluded from the rollup.
 
 ## Overall: **53%**
 
-_Last updated: v0.10.0 — 666 tests green._
+_Last updated: v0.10.1 — 671 tests green._
 
 ## Ported packages (in rollup)
 
 | Package | Go source | goish src | Tests ported | Impl % | Test % | **Overall** |
 |---|---|---|---|---|---|---|
-| **Builtins** (chan / defer / go / range / select / close / len / make / append / delete / map / slice) | – | `src/{chan,defer,range,types,struct_macro}.rs` | 22 (chan + runtime) | 85% | 55% | **70%** |
+| **Builtins** (chan / defer / go / range / select / close / len / make / append / delete / map / slice) | – | `src/{chan,defer,range,types,struct_macro}.rs` | 27 (chan + runtime + select semantics) | 85% | 65% | **75%** |
 | `bufio` | `src/bufio` | `src/bufio.rs` | 17 | 70% | 40% | **55%** |
 | `bytes` | `src/bytes` | `src/bytes.rs` | 4 | 55% | 30% | **40%** |
 | `container/heap` + `container/list` | `src/container/*` | `src/container/*.rs` | 0 | 60% | 0% | **30%** |
@@ -181,6 +181,7 @@ into a milestone.
 | v0.8.0 | I/O + OS | `io`, `bufio`, `os`, `path/filepath` | 60 | ✅ |
 | v0.9.0 | networking + regexp | `net/url`, `regexp`, `net/http` | 52 | ✅ |
 | v0.10.0 | concurrency deep dive | `sync`, `sync/atomic`, `context`, `runtime/chan` | 41 | ✅ |
+| v0.10.1 | select! proc-macro rewrite | `chan/select` — 5 CSP-derived bug fixes | 5 | ✅ |
 | v0.11.0 | crypto + encoding | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | – | ⏳ planned |
 | v0.12.0 | sort + container + math + unicode | `sort`, `container/*`, `math`, `math/rand`, `unicode`, `unicode/utf8` | – | ⏳ planned |
 | v0.13.0 | generics-era helpers | `slices`, `maps`, `cmp`, `iter` | – | 📋 |

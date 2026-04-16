@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.10"     # latest
+goish = "0.10"     # latest (v0.10.1)
 ```
 
 Then in every file where you want Go-shaped code:
@@ -328,15 +328,6 @@ if r.is_none() { t.Fatal("expected panic"); }
 
 - **`string` is an alias for `String`** (owned, mutable). Go strings are
   immutable shared bytes; close enough for most code.
-- **`select!` with no `default` still spins** — the blocking `Chan.Recv()`
-  path now parks truly on `flume::Selector` + a shadow close channel, so
-  `ctx.Done().Recv()`, `<-ch`, and the sync engine wake within one
-  scheduler cycle of `Close()` with zero poll cost. The `select!` macro
-  with multiple arms and no `default`, however, still spin-sleeps 1 ms
-  between non-blocking attempts — a proper multi-arm park wants a
-  proc-macro rewrite to avoid FnMut-borrow conflicts on arm bodies
-  that share outer state. Works correctly; latency-sensitive select-
-  loops can add a `default` arm and back off externally for now.
 
 ## Examples
 
