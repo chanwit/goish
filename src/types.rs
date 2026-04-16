@@ -83,15 +83,37 @@ macro_rules! slice {
 /// Uses `.iter().enumerate()` for slices and arrays, `.iter()` for maps, and
 /// `.chars().enumerate()` for string slices — whichever the expression's
 /// inherent method resolution picks first.
+///
+/// Preferred Go-shape forms (v0.15.1+):
+///
+///   range!{ i, v := xs; body_stmts }       // Go: for i, v := range xs
+///   range!{ v := xs; body_stmts }          // Go: for _, v := range xs
+///   range!{ i := xs; body_stmts }          // Go: for i := range xs  (index only)
+///
+/// The legacy closure form `range!(xs, |i, v| { ... })` is kept for
+/// backward compatibility.
 #[macro_export]
 macro_rules! range {
-    // range!(slice, |i, v| body)  → index + value
+    // Go:    for i, v := range xs { body }
+    // goish: range!{ i, v := xs; body }
+    ($i:ident, $v:ident : = $iter:expr ; $($body:tt)*) => {
+        for ($i, $v) in $crate::range::RangeIter::range(&$iter) {
+            $($body)*
+        }
+    };
+    // Go:    for _, v := range xs { body }
+    // goish: range!{ v := xs; body }
+    ($v:ident : = $iter:expr ; $($body:tt)*) => {
+        for (_, $v) in $crate::range::RangeIter::range(&$iter) {
+            $($body)*
+        }
+    };
+    // Legacy closure forms — retained for backward compatibility.
     ($iter:expr, |$i:pat_param, $v:pat_param| $body:block) => {
         for ($i, $v) in $crate::range::RangeIter::range($iter) {
             $body
         }
     };
-    // range!(iter, |v| body)  → value only
     ($iter:expr, |$v:pat_param| $body:block) => {
         for $v in ($iter).into_iter() {
             $body
