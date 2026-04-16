@@ -5,6 +5,7 @@
 #![allow(non_snake_case)]
 use goish::prelude::*;
 use goish::mime::multipart;
+use goish::net::textproto;
 
 // ── TestWriter ──────────────────────────────────────────────────────
 
@@ -89,6 +90,40 @@ test!{ fn TestWriterSetBoundary(t) {
             t.Errorf(Sprintf!("Boundary() = %s, want %s", w.Boundary(), c.b));
         }
     }
+}}
+
+// ── TestNameAccessors: FormName/FileName parse Content-Disposition ──
+
+test!{ fn TestNameAccessors(t) {
+    struct Case {
+        disposition: &'static str,
+        want_name: &'static str,
+        want_filename: &'static str,
+    }
+    let cases = [
+        Case { disposition: r#"form-data; name="foo""#,                        want_name: "foo", want_filename: "" },
+        Case { disposition: " form-data ; name=foo",                            want_name: "foo", want_filename: "" },
+        Case { disposition: r#"FORM-DATA;name="foo""#,                         want_name: "foo", want_filename: "" },
+        Case { disposition: r#" FORM-DATA ; name="foo""#,                      want_name: "foo", want_filename: "" },
+        Case { disposition: r#" FORM-DATA ; filename="foo.txt"; name=foo; baz=quux"#,
+               want_name: "foo", want_filename: "foo.txt" },
+        // Non-form-data disposition — FormName returns "".
+        Case { disposition: r#" not-form-data ; filename="bar.txt"; name=foo; baz=quux"#,
+               want_name: "", want_filename: "bar.txt" },
+    ];
+    range!(&cases[..], |i, c| {
+        let mut h = textproto::MIMEHeader::new();
+        h.Set("Content-Disposition", c.disposition);
+        let p = multipart::ReaderPart::new_for_header(h);
+        if p.FormName() != c.want_name {
+            t.Errorf(Sprintf!("case %d: FormName() = %s; want %s",
+                i as i64, p.FormName(), c.want_name));
+        }
+        if p.FileName() != c.want_filename {
+            t.Errorf(Sprintf!("case %d: FileName() = %s; want %s",
+                i as i64, p.FileName(), c.want_filename));
+        }
+    });
 }}
 
 // ── TestFormDataContentType ─────────────────────────────────────────

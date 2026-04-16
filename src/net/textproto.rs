@@ -188,12 +188,58 @@ impl<R: Read> Reader<R> {
                 None => return (h, New(&format!("malformed MIME header line: {}", line))),
             };
             let key = line[..colon].to_string();
-            if !is_valid_header_key(&key) {
+            // Go accepts non-compliant keys (spaces before colon) and
+            // preserves them verbatim. We only reject genuinely malformed
+            // lines (empty key after leading whitespace check).
+            if key.is_empty() {
                 return (h, New(&format!("malformed MIME header line: {}", line)));
+            }
+            for b in key.bytes() {
+                if b == b'\r' || b == b'\n' {
+                    return (h, New(&format!("malformed MIME header line: {}", line)));
+                }
             }
             let value = line[colon + 1..].trim_matches(|c: char| c == ' ' || c == '\t').to_string();
             h.Add(&key, &value);
         }
+    }
+
+    /// ReadCodeLine reads an SMTP/NNTP/FTP-style response line —
+    /// "CODE message\r\n". The expectCode is a prefix match:
+    ///   - 0     — accept any code
+    ///   - 2     — accept any 2xx
+    ///   - 25    — accept any 25x
+    ///   - 250   — accept exactly 250
+    /// Returns (code, message, err).
+    pub fn ReadCodeLine(&mut self, expect: i64) -> (i64, string, error) {
+        let (line, err) = self.ReadLine();
+        if err != nil { return (0, String::new(), err); }
+        if line.len() < 4 {
+            return (0, line.clone(), New(&format!("short response: {}", line)));
+        }
+        let code: i64 = match line[..3].parse() {
+            Ok(c) => c,
+            Err(_) => return (0, line.clone(), New(&format!("invalid response code: {}", line))),
+        };
+        let sep = line.as_bytes()[3];
+        if sep != b' ' && sep != b'-' {
+            return (code, line[4..].to_string(),
+                    New(&format!("invalid response separator: {}", line)));
+        }
+        let msg = line[4..].to_string();
+        if expect != 0 {
+            let ok = if expect >= 100 {
+                code == expect
+            } else if expect >= 10 {
+                code / 10 == expect
+            } else {
+                code / 100 == expect
+            };
+            if !ok {
+                return (code, msg.clone(), New(&format!("{} {}", code, msg)));
+            }
+        }
+        (code, msg, nil)
     }
 
     /// ReadDotLines reads "dot-style" lines (SMTP/NNTP) terminated by a "."

@@ -245,7 +245,23 @@ impl Reader {
         };
         let body = self.buf[p..end].to_vec();
         self.pos = end;
-        (ReaderPart { header, body, read: 0 }, nil)
+        (ReaderPart { Header: header, body, read: 0 }, nil)
+    }
+}
+
+fn is_form_data(cd: &str) -> bool {
+    // Check `disposition-type` token, case-insensitive.
+    let bytes = cd.trim_start().as_bytes();
+    let needle = b"form-data";
+    if bytes.len() < needle.len() { return false; }
+    let prefix = &bytes[..needle.len()];
+    if !prefix.iter().zip(needle.iter()).all(|(a, b)| a.eq_ignore_ascii_case(b)) {
+        return false;
+    }
+    // Next char must be ';' or whitespace or end.
+    match bytes.get(needle.len()) {
+        None => true,
+        Some(c) => *c == b';' || *c == b' ' || *c == b'\t',
     }
 }
 
@@ -260,23 +276,29 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[derive(Default)]
 pub struct ReaderPart {
-    pub header: MIMEHeader,
+    pub Header: MIMEHeader,
     body: Vec<u8>,
     read: usize,
 }
 
 impl ReaderPart {
+    /// Construct a ReaderPart from just its headers — useful in tests
+    /// that want to exercise FormName/FileName without a full round-trip.
+    pub fn new_for_header(h: MIMEHeader) -> ReaderPart {
+        ReaderPart { Header: h, body: Vec::new(), read: 0 }
+    }
+
     pub fn FormName(&self) -> string {
-        let cd = self.header.Get("Content-Disposition");
+        let cd = self.Header.Get("Content-Disposition");
+        // Go: FormName returns "" unless disposition is "form-data".
+        if !is_form_data(&cd) { return String::new(); }
         parse_param(&cd, "name").unwrap_or_default()
     }
 
     pub fn FileName(&self) -> string {
-        let cd = self.header.Get("Content-Disposition");
+        let cd = self.Header.Get("Content-Disposition");
         parse_param(&cd, "filename").unwrap_or_default()
     }
-
-    pub fn Header(&self) -> &MIMEHeader { &self.header }
 
     pub fn Body(&self) -> &[u8] { &self.body }
 }
@@ -292,14 +314,26 @@ impl Read for ReaderPart {
 }
 
 fn parse_param(cd: &str, name: &str) -> Option<string> {
-    // Extract `name="value"` or `name=value` from a Content-Disposition.
-    let prefix = format!("{}=", name);
-    let idx = cd.find(&prefix)?;
-    let rest = &cd[idx + prefix.len()..];
-    if let Some(stripped) = rest.strip_prefix('"') {
-        let end = stripped.find('"')?;
-        return Some(stripped[..end].to_string());
+    // Split on ';' and find a parameter whose key (trimmed, lowercased)
+    // matches `name`. Handles quoted values and case-insensitive keys.
+    // Skips the first segment (disposition type).
+    let name_lower = name.to_ascii_lowercase();
+    let segments: Vec<&str> = cd.split(';').skip(1).collect();
+    for seg in segments {
+        let s = seg.trim_matches(|c: char| c == ' ' || c == '\t');
+        let eq = match s.find('=') {
+            Some(i) => i,
+            None => continue,
+        };
+        let k = s[..eq].trim().to_ascii_lowercase();
+        if k != name_lower { continue; }
+        let v = s[eq + 1..].trim();
+        if let Some(stripped) = v.strip_prefix('"') {
+            if let Some(end) = stripped.find('"') {
+                return Some(stripped[..end].to_string());
+            }
+        }
+        return Some(v.to_string());
     }
-    let end = rest.find(|c: char| c == ';' || c == ' ').unwrap_or(rest.len());
-    Some(rest[..end].to_string())
+    None
 }

@@ -601,6 +601,12 @@ impl Prefix {
         (a.hi & m_hi == self.ip.hi & m_hi) && (a.lo & m_lo == self.ip.lo & m_lo)
     }
 
+    pub fn IsSingleIP(&self) -> bool {
+        if !self.valid { return false; }
+        let max = if self.ip.is4 { 32 } else { 128 };
+        self.bits == max
+    }
+
     pub fn Masked(&self) -> Prefix {
         if !self.valid { return *self; }
         let bits = self.bits as u32;

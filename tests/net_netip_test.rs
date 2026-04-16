@@ -299,6 +299,69 @@ test!{ fn TestAddrFrom16(t) {
     }
 }}
 
+// ── TestPrefixIsSingleIP ────────────────────────────────────────────
+
+test!{ fn TestPrefixIsSingleIP(t) {
+    struct Case { input: &'static str, want: bool }
+    let cases = [
+        Case { input: "127.0.0.1/32", want: true },
+        Case { input: "127.0.0.1/31", want: false },
+        Case { input: "127.0.0.1/0",  want: false },
+        Case { input: "::1/128",       want: true },
+        Case { input: "::1/127",       want: false },
+        Case { input: "::1/0",         want: false },
+    ];
+    for c in &cases {
+        let p = netip::MustParsePrefix(c.input);
+        let got = p.IsSingleIP();
+        if got != c.want {
+            t.Errorf(Sprintf!("IsSingleIP(%s) = %s, want %s",
+                c.input,
+                if got {"true"} else {"false"},
+                if c.want {"true"} else {"false"}));
+        }
+    }
+    // Default (invalid) prefix.
+    let invalid = netip::Prefix::default();
+    if invalid.IsSingleIP() {
+        t.Errorf(Sprintf!("invalid prefix IsSingleIP = true"));
+    }
+}}
+
+// ── TestAs4 (panics on v6-non-mapped) ───────────────────────────────
+
+test!{ fn TestAs4(t) {
+    let a = netip::MustParseAddr("1.2.3.4");
+    if a.As4() != [1u8, 2, 3, 4] {
+        t.Errorf(Sprintf!("As4() round-trip broken"));
+    }
+    let mapped = netip::AddrFrom16(a.As16());
+    if mapped.As4() != [1u8, 2, 3, 4] {
+        t.Errorf(Sprintf!("4-in-6 mapped As4() broken"));
+    }
+    // v6-non-mapped → panic.
+    let r = recover!{ {
+        let _ = netip::MustParseAddr("::1").As4();
+    }};
+    if r.is_none() {
+        t.Errorf(Sprintf!("As4 on ::1 should have panicked"));
+    }
+}}
+
+// ── TestAsSlice ─────────────────────────────────────────────────────
+
+test!{ fn TestAsSlice(t) {
+    let v4 = netip::MustParseAddr("1.2.3.4");
+    let s = v4.AsSlice();
+    if len!(s) != 4 { t.Errorf(Sprintf!("v4 AsSlice len = %d, want 4", len!(s))); }
+    let v6 = netip::MustParseAddr("::1");
+    let s = v6.AsSlice();
+    if len!(s) != 16 { t.Errorf(Sprintf!("v6 AsSlice len = %d, want 16", len!(s))); }
+    let invalid = netip::Addr::default();
+    let s = invalid.AsSlice();
+    if len!(s) != 0 { t.Errorf(Sprintf!("invalid AsSlice len = %d, want 0", len!(s))); }
+}}
+
 // ── TestAddrZone ────────────────────────────────────────────────────
 
 // ── TestPrefix: CGNAT range + more Contains tables ─────────────────

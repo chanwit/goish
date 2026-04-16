@@ -146,6 +146,42 @@ test!{ fn TestReadMIMEHeader(t) {
     }
 }}
 
+// ── TestReadCodeLine ────────────────────────────────────────────────
+
+test!{ fn TestReadCodeLine(t) {
+    let mut r = reader("123 hi\n234 bye\n345 no way\n");
+    let (code, msg, err) = r.ReadCodeLine(0);
+    if code != 123 || msg != "hi" || err != nil {
+        t.Fatal(&Sprintf!("Line 1: %d, %s, %s", code, msg, err));
+    }
+    let (code, msg, err) = r.ReadCodeLine(23);
+    if code != 234 || msg != "bye" || err != nil {
+        t.Fatal(&Sprintf!("Line 2: %d, %s, %s", code, msg, err));
+    }
+    let (code, msg, err) = r.ReadCodeLine(346);
+    if code != 345 || msg != "no way" || err == nil {
+        t.Fatal(&Sprintf!("Line 3: %d, %s, %s (expected mismatch)", code, msg, err));
+    }
+}}
+
+// ── TestReadMIMEHeaderNonCompliant: spaces before colon preserved ───
+
+test!{ fn TestReadMIMEHeaderNonCompliant(t) {
+    let mut r = reader("Foo: bar\r\nContent-Language: en\r\nSID : 0\r\nAudio Mode : None\r\nPrivilege : 127\r\n\r\n");
+    let (h, err) = r.ReadMIMEHeader();
+    if err != nil { t.Fatal(&Sprintf!("ReadMIMEHeader: %s", err)); }
+    if h.Get("Foo") != "bar" {
+        t.Errorf(Sprintf!("Foo = %s, want bar", h.Get("Foo")));
+    }
+    if h.Get("Content-Language") != "en" {
+        t.Errorf(Sprintf!("Content-Language = %s, want en", h.Get("Content-Language")));
+    }
+    // Non-canonical key "SID " (with trailing space) — preserved verbatim.
+    if h.Get("SID ") != "0" {
+        t.Errorf(Sprintf!("SID  = %s, want 0", h.Get("SID ")));
+    }
+}}
+
 // ── TestReadMIMEHeaderSingle ────────────────────────────────────────
 
 test!{ fn TestReadMIMEHeaderSingle(t) {
