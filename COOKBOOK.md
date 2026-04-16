@@ -21,6 +21,11 @@ import `use goish::prelude::*` is assumed throughout.
 - [Encoding (JSON, base64, hex, CSV)](#encoding)
 - [Networking (HTTP, URL, netip, mail, smtp)](#networking)
 - [Multipart, cookies, MIME](#multipart-cookies-mime)
+- [Generics-era helpers (`cmp`, `slices`, `maps`, `iter`)](#generics-era-helpers)
+- [Text toolkit (`html`, `text/tabwriter`, `text/scanner`, `text/template`)](#text-toolkit)
+- [Crypto and hashing](#crypto-and-hashing)
+- [Container types (`heap`, `list`, `ring`)](#container-types)
+- [Regexp, flag, log, math/rand, unicode](#smaller-packages)
 - [Testing](#testing)
 
 ---
@@ -623,3 +628,332 @@ test_main!{ fn TestMain(m) {
     os::Exit(code);
 }}
 ```
+
+---
+
+## Generics-era helpers
+
+Go 1.21+ added generic standard library packages for slices, maps,
+iteration, and comparison. Goish Rust mirrors the same call sites.
+
+### `cmp`
+
+```go
+cmp.Compare(1, 2)       // -1
+cmp.Less(1.5, 2.5)      // true
+cmp.Or(0, 0, 42)        // 42  (first non-zero)
+```
+
+```rust
+cmp::Compare(1, 2);
+cmp::Less(1.5, 2.5);
+cmp::Or(&[0, 0, 42]);
+```
+
+### `slices`
+
+```go
+slices.Contains([]int{1,2,3}, 2)
+slices.Index([]string{"a","b"}, "b")
+slices.Sort(xs)
+slices.SortFunc(xs, func(a, b int) int { return a - b })
+slices.Reverse(xs)
+slices.Min(xs); slices.Max(xs)
+slices.BinarySearch(sorted, 42)
+slices.Insert(xs, 1, 99, 100)
+slices.Delete(xs, 1, 3)
+slices.Compact(xs)
+slices.Concat(a, b, c)
+slices.Repeat(xs, 3)
+slices.Clone(xs)
+```
+
+```rust
+slices::Contains(&slice!([]int{1,2,3}), &2);
+slices::Index(&slice!([]string{"a","b"}), &"b".to_string());
+slices::Sort(&mut xs);
+slices::SortFunc(&mut xs, |a, b| a - b);
+slices::Reverse(&mut xs);
+slices::Min(&xs); slices::Max(&xs);
+slices::BinarySearch(&sorted, &42);
+slices::Insert(&mut xs, 1, &[99, 100]);
+slices::Delete(&mut xs, 1, 3);
+slices::Compact(&mut xs);
+slices::Concat(&[&a, &b, &c]);
+slices::Repeat(&xs, 3);
+slices::Clone(&xs);
+```
+
+### `maps`
+
+```go
+keys := maps.Keys(m)
+values := maps.Values(m)
+maps.Equal(a, b)
+cloned := maps.Clone(m)
+maps.Copy(dst, src)
+maps.DeleteFunc(m, func(k, v) bool { return v < 0 })
+```
+
+```rust
+let keys = maps::Keys(&m);
+let values = maps::Values(&m);
+maps::Equal(&a, &b);
+let cloned = maps::Clone(&m);
+maps::Copy(&mut dst, &src);
+maps::DeleteFunc(&mut m, |_k, v| *v < 0);
+```
+
+### `iter`
+
+```go
+// Go: range-over-func iteration
+for v := range slices.Values(xs) { use(v) }
+```
+
+```rust
+// Goish Rust: the Seq/Seq2 traits bridge to Rust iterators.
+for v in iter::Values(&xs) { use_v(v); }
+```
+
+---
+
+## Text toolkit
+
+### `html`
+
+```go
+html.EscapeString("<a>&\"'")   // "&lt;a&gt;&amp;&#34;&#39;"
+html.UnescapeString("&lt;a&gt;")
+```
+
+```rust
+html::EscapeString("<a>&\"'");
+html::UnescapeString("&lt;a&gt;");
+```
+
+### `text/tabwriter`
+
+```go
+w := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', 0)
+fmt.Fprintln(w, "name\tage")
+fmt.Fprintln(w, "alice\t30")
+w.Flush()
+```
+
+```rust
+let mut w = tabwriter::NewWriter(&mut os::Stdout(), 0, 8, 1, b'\t', 0);
+Fprintf!(&mut w, "name\tage\n");
+Fprintf!(&mut w, "alice\t30\n");
+w.Flush();
+```
+
+### `text/scanner`
+
+```go
+var s scanner.Scanner
+s.Init(strings.NewReader("x + 3.14"))
+for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
+    fmt.Println(s.TokenText())
+}
+```
+
+```rust
+let mut s = scanner::Scanner::new();
+s.Init(strings::NewReader("x + 3.14"));
+loop {
+    let tok = s.Scan();
+    if tok == scanner::EOF { break; }
+    fmt::Println!(s.TokenText());
+}
+```
+
+### `text/template`
+
+```go
+t := template.Must(template.New("t").Parse("Hi {{.Name}}!"))
+t.Execute(os.Stdout, map[string]any{"Name": "alice"})
+```
+
+```rust
+let (t, _) = template::New("t").Parse("Hi {{.Name}}!");
+let mut out = String::new();
+t.Execute(&mut out, &serde_json::json!({"Name": "alice"}));
+```
+
+---
+
+## Crypto and hashing
+
+### `crypto/md5` / `sha1` / `sha256`
+
+```go
+h := sha256.New()
+h.Write([]byte("hello"))
+sum := h.Sum(nil)
+fmt.Printf("%x\n", sum)
+
+// one-shot
+sum = sha256.Sum256([]byte("hello"))
+```
+
+```rust
+let mut h = sha256::New();
+h.Write(b"hello");
+let sum = h.Sum(&[]);
+fmt::Printf!("%x\n", sum);
+
+let sum = sha256::Sum256(b"hello");
+```
+
+### `hash/crc32` / `hash/fnv`
+
+```go
+crc32.ChecksumIEEE([]byte("abc"))
+fnv.New32a().Sum32()
+```
+
+```rust
+crc32::ChecksumIEEE(b"abc");
+let mut h = fnv::New32a();
+h.Sum32();
+```
+
+---
+
+## Container types
+
+### `container/list`
+
+```go
+l := list.New()
+l.PushBack(1); l.PushBack(2); l.PushFront(0)
+for e := l.Front(); e != nil; e = e.Next() {
+    fmt.Println(e.Value)
+}
+```
+
+```rust
+let mut l = container::list::New::<int>();
+l.PushBack(1); l.PushBack(2); l.PushFront(0);
+let mut e = l.Front();
+while let Some(node) = e {
+    fmt::Println!(node.Value);
+    e = node.Next();
+}
+```
+
+### `container/heap`
+
+```go
+h := &IntHeap{2, 1, 5}
+heap.Init(h)
+heap.Push(h, 3)
+min := heap.Pop(h).(int)
+```
+
+```rust
+let mut h = container::heap::Heap::<int>::new();
+h.Push(2); h.Push(1); h.Push(5); h.Push(3);
+let min = h.Pop();
+```
+
+### `container/ring`
+
+```go
+r := ring.New(3)
+for i := 0; i < r.Len(); i++ {
+    r.Value = i
+    r = r.Next()
+}
+```
+
+```rust
+let r = container::ring::New::<int>(3);
+let mut cur = r;
+for i in 0..3 {
+    cur.SetValue(i);
+    cur = cur.Next();
+}
+```
+
+---
+
+## Smaller packages
+
+### `regexp`
+
+```go
+re := regexp.MustCompile(`^\d+$`)
+re.MatchString("123")
+re.FindString("abc 42 xyz")
+re.ReplaceAllString("abc 42", "*")
+```
+
+```rust
+let re = regexp::MustCompile(r"^\d+$");
+re.MatchString("123");
+re.FindString("abc 42 xyz");
+re.ReplaceAllString("abc 42", "*");
+```
+
+### `flag`
+
+```go
+port := flag.Int("port", 8080, "listen port")
+name := flag.String("name", "goish", "name")
+flag.Parse()
+```
+
+```rust
+let port = flag::Int("port", 8080, "listen port");
+let name = flag::String("name", "goish", "name");
+flag::Parse();
+```
+
+### `log`
+
+```go
+log.Println("server started")
+log.Printf("port %d\n", 8080)
+log.Fatalf("boom: %v", err)
+```
+
+```rust
+log::Println!("server started");
+log::Printf!("port %d\n", 8080);
+log::Fatalf!("boom: %s", err);
+```
+
+### `math/rand`
+
+```go
+rand.Seed(42)
+rand.Intn(100)
+rand.Float64()
+rand.Shuffle(len(xs), func(i, j int) { xs[i], xs[j] = xs[j], xs[i] })
+```
+
+```rust
+rand::Seed(42);
+rand::Intn(100);
+rand::Float64();
+rand::Shuffle(len!(xs), |i, j| xs.swap(i as usize, j as usize));
+```
+
+### `unicode` / `unicode/utf8`
+
+```go
+unicode.IsLetter('A')
+unicode.ToUpper('a')
+utf8.RuneCountInString("héllo")
+utf8.ValidString("...")
+```
+
+```rust
+unicode::IsLetter('A');
+unicode::ToUpper('a');
+utf8::RuneCountInString("héllo");
+utf8::ValidString("...");
+```
+
