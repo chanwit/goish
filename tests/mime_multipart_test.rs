@@ -15,7 +15,7 @@ test!{ fn TestWriter(t) {
     let mut buf: Vec<u8> = Vec::new();
     let boundary;
     {
-        let mut w = multipart::Writer::NewWriter(&mut buf);
+        let mut w = multipart::NewWriter(&mut buf);
         boundary = w.Boundary();
         {
             let (mut part, err) = w.CreateFormFile("myfile", "my-file.txt");
@@ -34,7 +34,7 @@ test!{ fn TestWriter(t) {
         }
     }
 
-    let mut r = multipart::Reader::NewReader(Cursor::new(&buf), &boundary);
+    let mut r = multipart::NewReader(Cursor::new(&buf), &boundary);
 
     let (part1, err) = r.NextPart();
     if err != nil { t.Fatal(&Sprintf!("part 1: %s", err)); }
@@ -78,7 +78,7 @@ test!{ fn TestWriterSetBoundary(t) {
     ];
     for c in &cases {
         let mut buf: Vec<u8> = Vec::new();
-        let mut w = multipart::Writer::NewWriter(&mut buf);
+        let mut w = multipart::NewWriter(&mut buf);
         let err = w.SetBoundary(c.b);
         let got = err == nil;
         if got != c.ok {

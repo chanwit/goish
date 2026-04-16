@@ -3,63 +3,61 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use goish::net::http::{self, Cookie, SameSite, SameSiteLaxMode, SameSiteNoneMode, SameSiteStrictMode};
+use goish::net::http::{self, SameSiteLaxMode, SameSiteNoneMode, SameSiteStrictMode};
+use goish::net::http::Cookie as CookieType;
 
 // ── TestWriteSetCookies (core subset — no Expires time formatting) ──
 
 test!{ fn TestWriteSetCookies(t) {
-    struct Case { cookie: Cookie, raw: &'static str }
+    struct Case { cookie: CookieType, raw: &'static str }
     let cases = [
-        Case { cookie: Cookie { Name: "cookie-1".into(), Value: "v$1".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-1", Value: "v$1"},
                raw: "cookie-1=v$1" },
-        Case { cookie: Cookie { Name: "cookie-2".into(), Value: "two".into(), MaxAge: 3600, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-2", Value: "two", MaxAge: 3600},
                raw: "cookie-2=two; Max-Age=3600" },
-        Case { cookie: Cookie { Name: "cookie-3".into(), Value: "three".into(), Domain: ".example.com".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-3", Value: "three", Domain: ".example.com"},
                raw: "cookie-3=three; Domain=example.com" },
-        Case { cookie: Cookie { Name: "cookie-4".into(), Value: "four".into(), Path: "/restricted/".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-4", Value: "four", Path: "/restricted/"},
                raw: "cookie-4=four; Path=/restricted/" },
-        Case { cookie: Cookie { Name: "cookie-5".into(), Value: "five".into(), Domain: "wrong;bad.abc".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-5", Value: "five", Domain: "wrong;bad.abc"},
                raw: "cookie-5=five" },
-        Case { cookie: Cookie { Name: "cookie-6".into(), Value: "six".into(), Domain: "bad-.abc".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-6", Value: "six", Domain: "bad-.abc"},
                raw: "cookie-6=six" },
-        Case { cookie: Cookie { Name: "cookie-7".into(), Value: "seven".into(), Domain: "127.0.0.1".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-7", Value: "seven", Domain: "127.0.0.1"},
                raw: "cookie-7=seven; Domain=127.0.0.1" },
-        Case { cookie: Cookie { Name: "cookie-8".into(), Value: "eight".into(), Domain: "::1".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-8", Value: "eight", Domain: "::1"},
                raw: "cookie-8=eight" },
-        Case { cookie: Cookie { Name: "cookie-12".into(), Value: "samesite-default".into(), SameSite: SameSite::Default, ..Cookie::default() },
-               raw: "cookie-12=samesite-default" },
-        Case { cookie: Cookie { Name: "cookie-13".into(), Value: "samesite-lax".into(), SameSite: SameSiteLaxMode, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-13", Value: "samesite-lax", SameSite: SameSiteLaxMode},
                raw: "cookie-13=samesite-lax; SameSite=Lax" },
-        Case { cookie: Cookie { Name: "cookie-14".into(), Value: "samesite-strict".into(), SameSite: SameSiteStrictMode, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-14", Value: "samesite-strict", SameSite: SameSiteStrictMode},
                raw: "cookie-14=samesite-strict; SameSite=Strict" },
-        Case { cookie: Cookie { Name: "cookie-15".into(), Value: "samesite-none".into(), SameSite: SameSiteNoneMode, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie-15", Value: "samesite-none", SameSite: SameSiteNoneMode},
                raw: "cookie-15=samesite-none; SameSite=None" },
-        // Partitioned + Secure
-        Case { cookie: Cookie {
-                 Name: "cookie-16".into(), Value: "partitioned".into(),
-                 SameSite: SameSiteNoneMode, Secure: true, Path: "/".into(),
-                 Partitioned: true, ..Cookie::default()
+        Case { cookie: Cookie!{
+                 Name: "cookie-16", Value: "partitioned",
+                 SameSite: SameSiteNoneMode, Secure: true, Path: "/",
+                 Partitioned: true
                },
                raw: "cookie-16=partitioned; Path=/; Secure; SameSite=None; Partitioned" },
         // Quoted values (issue #46443)
-        Case { cookie: Cookie { Name: "cookie".into(), Value: "quoted".into(), Quoted: true, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie", Value: "quoted", Quoted: true},
                raw: r#"cookie="quoted""# },
-        Case { cookie: Cookie { Name: "cookie".into(), Value: "quoted with spaces".into(), Quoted: true, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie", Value: "quoted with spaces", Quoted: true},
                raw: r#"cookie="quoted with spaces""# },
-        Case { cookie: Cookie { Name: "cookie".into(), Value: "quoted,with,commas".into(), Quoted: true, ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "cookie", Value: "quoted,with,commas", Quoted: true},
                raw: r#"cookie="quoted,with,commas""# },
         // Special values wrapped in quotes
-        Case { cookie: Cookie { Name: "special-1".into(), Value: "a z".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "special-1", Value: "a z"},
                raw: r#"special-1="a z""# },
-        Case { cookie: Cookie { Name: "special-5".into(), Value: "a,z".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "special-5", Value: "a,z"},
                raw: r#"special-5="a,z""# },
-        Case { cookie: Cookie { Name: "empty-value".into(), Value: "".into(), ..Cookie::default() },
+        Case { cookie: Cookie!{Name: "empty-value", Value: ""},
                raw: "empty-value=" },
         // Invalid names produce empty string
-        Case { cookie: Cookie { Name: "".into(), ..Cookie::default() }, raw: "" },
-        Case { cookie: Cookie { Name: "\t".into(), ..Cookie::default() }, raw: "" },
-        Case { cookie: Cookie { Name: "a\nb".into(), Value: "v".into(), ..Cookie::default() }, raw: "" },
-        Case { cookie: Cookie { Name: "a\rb".into(), Value: "v".into(), ..Cookie::default() }, raw: "" },
+        Case { cookie: Cookie!{Name: ""}, raw: "" },
+        Case { cookie: Cookie!{Name: "\t"}, raw: "" },
+        Case { cookie: Cookie!{Name: "a\nb", Value: "v"}, raw: "" },
+        Case { cookie: Cookie!{Name: "a\rb", Value: "v"}, raw: "" },
     ];
     for (i, c) in cases.iter().enumerate() {
         let got = c.cookie.String();

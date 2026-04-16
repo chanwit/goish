@@ -22,10 +22,11 @@ struct MockServer {
 /// (expected-command-prefix, response) pairs. The server emits its 220
 /// greeting first, then loops reading commands and writing responses
 /// according to the script (or a default 250 response).
-fn start_mock(responses: Vec<String>) -> MockServer {
+fn start_mock(responses: &[&str]) -> MockServer {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let addr = listener.local_addr().unwrap().to_string();
     let (tx, rx) = mpsc::channel();
+    let responses: Vec<String> = responses.iter().map(|s| (*s).to_string()).collect();
 
     thread::spawn(move || {
         let (stream, _) = listener.accept().expect("accept");
@@ -77,18 +78,14 @@ fn start_mock(responses: Vec<String>) -> MockServer {
 // ── TestDialAndBasicFlow ───────────────────────────────────────────
 
 test!{ fn TestDialAndBasicFlow(t) {
-    let script = vec![
-        // HELO
-        "250 mock.test Hello".to_string(),
-        // MAIL FROM
-        "250 OK".to_string(),
-        // RCPT TO
-        "250 OK".to_string(),
-        // (DATA handled inline — not from script)
-        // QUIT
-        "221 bye".to_string(),
+    let script = [
+        "250 mock.test Hello",  // HELO/EHLO
+        "250 OK",                // MAIL FROM
+        "250 OK",                // RCPT TO
+        // (DATA handled inline)
+        "221 bye",              // QUIT
     ];
-    let server = start_mock(script);
+    let server = start_mock(&script);
 
     let (mut c, err) = smtp::Dial(&server.addr);
     if err != nil { t.Fatal(&Sprintf!("Dial: %s", err)); }
@@ -130,8 +127,8 @@ test!{ fn TestDialAndBasicFlow(t) {
 // ── TestValidateLine (message injection guard) ─────────────────────
 
 test!{ fn TestValidateLine(t) {
-    let script = vec!["250 ok".to_string(), "250 ok".to_string(), "250 ok".to_string(), "221 bye".to_string()];
-    let server = start_mock(script);
+    let script = ["250 ok", "250 ok", "250 ok", "221 bye"];
+    let server = start_mock(&script);
     let (mut c, err) = smtp::Dial(&server.addr);
     if err != nil { t.Fatal(&Sprintf!("Dial: %s", err)); }
     // Send legit HELO so future calls don't retry the exchange.

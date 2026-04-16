@@ -42,6 +42,42 @@ pub struct Cookie {
     pub Unparsed: Vec<string>,
 }
 
+/// Go-shape Cookie literal.
+///
+/// ```ignore
+/// let c = Cookie!{Name: "foo", Value: "bar"};
+/// let c = Cookie!{Name: "foo", Value: "bar", HttpOnly: true};
+/// ```
+///
+/// Mirrors Go's `&http.Cookie{Name: "foo", Value: "bar"}` — accepts
+/// string literals without `.to_string()` / `.into()` noise.
+#[macro_export]
+macro_rules! Cookie {
+    ( $($field:ident : $value:expr),* $(,)? ) => {{
+        let mut c = $crate::net::http::Cookie::default();
+        $( $crate::__cookie_set!(c, $field, $value); )*
+        c
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __cookie_set {
+    ($c:ident, Name,        $v:expr) => { $c.Name        = $v.to_string(); };
+    ($c:ident, Value,       $v:expr) => { $c.Value       = $v.to_string(); };
+    ($c:ident, Path,        $v:expr) => { $c.Path        = $v.to_string(); };
+    ($c:ident, Domain,      $v:expr) => { $c.Domain      = $v.to_string(); };
+    ($c:ident, Expires,     $v:expr) => { $c.Expires     = $v.to_string(); };
+    ($c:ident, RawExpires,  $v:expr) => { $c.RawExpires  = $v.to_string(); };
+    ($c:ident, Raw,         $v:expr) => { $c.Raw         = $v.to_string(); };
+    ($c:ident, Quoted,      $v:expr) => { $c.Quoted      = $v; };
+    ($c:ident, MaxAge,      $v:expr) => { $c.MaxAge      = $v; };
+    ($c:ident, Secure,      $v:expr) => { $c.Secure      = $v; };
+    ($c:ident, HttpOnly,    $v:expr) => { $c.HttpOnly    = $v; };
+    ($c:ident, SameSite,    $v:expr) => { $c.SameSite    = $v; };
+    ($c:ident, Partitioned, $v:expr) => { $c.Partitioned = $v; };
+}
+
 impl Cookie {
     pub fn String(&self) -> string {
         if !is_token(&self.Name) { return String::new(); }

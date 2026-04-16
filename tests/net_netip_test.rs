@@ -334,10 +334,10 @@ test!{ fn TestPrefix_CGNAT(t) {
 
 test!{ fn TestPrefixFromInvalidBits(t) {
     let v4 = netip::MustParseAddr("1.2.3.4");
-    let p = netip::PrefixFrom(v4.clone(), 33);
+    let p = netip::PrefixFrom(v4, 33);
     if p.IsValid() { t.Errorf(Sprintf!("PrefixFrom(v4, 33) valid")); }
     let v6 = netip::MustParseAddr("::1");
-    let p6 = netip::PrefixFrom(v6.clone(), 129);
+    let p6 = netip::PrefixFrom(v6, 129);
     if p6.IsValid() { t.Errorf(Sprintf!("PrefixFrom(v6, 129) valid")); }
     let bad = netip::PrefixFrom(v4, -1);
     if bad.IsValid() { t.Errorf(Sprintf!("PrefixFrom(v4, -1) valid")); }

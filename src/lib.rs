@@ -190,7 +190,7 @@ pub mod prelude {
     pub use crate::types::*;
     pub use crate::goroutine::Goroutine;
     pub use crate::{
-        Errorf, Fprintf, Printf, Println, Sprintf,
+        Cookie, Errorf, Fprintf, MailAddress, Printf, Println, Sprintf,
         append, benchmark, chan, close, const_block, defer, delete, go, len, make, map,
         range, recover, select, slice, stringer, Struct, test, test_h, test_main,
     };

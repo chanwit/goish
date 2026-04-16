@@ -48,10 +48,10 @@ test!{ fn TestMIMEHeaderMultipleValues(t) {
     }
 }}
 
-// ── Reader helper ───────────────────────────────────────────────────
+// ── Reader helper — Go-shape textproto.NewReader(strings.NewReader(s)) ──
 
 fn reader(s: &'static str) -> textproto::Reader<Cursor<&'static [u8]>> {
-    textproto::Reader::NewReader(Cursor::new(s.as_bytes()))
+    textproto::NewReader(Cursor::new(s.as_bytes()))
 }
 
 // ── TestReadLine ────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ test!{ fn TestReadLineLongLine(t) {
     let data = format!("{}\r\n", line);
     // Need a 'static-like data source: box+leak the data for the Cursor.
     let leaked: &'static [u8] = Box::leak(data.into_boxed_str().into_boxed_bytes());
-    let mut r = textproto::Reader::NewReader(Cursor::new(leaked));
+    let mut r = textproto::NewReader(Cursor::new(leaked));
     let (s, err) = r.ReadLine();
     if err != nil { t.Fatal(&Sprintf!("Line 1: %s", err)); }
     if s != line {
@@ -206,5 +206,5 @@ test!{ fn TestReadMIMEHeaderMalformed(t) {
 // Helper: owned-input reader for malformed tests (no 'static lifetime
 // constraint on the input string).
 fn reader_owned(s: &str) -> textproto::Reader<std::io::Cursor<Vec<u8>>> {
-    textproto::Reader::NewReader(std::io::Cursor::new(s.as_bytes().to_vec()))
+    textproto::NewReader(std::io::Cursor::new(s.as_bytes().to_vec()))
 }

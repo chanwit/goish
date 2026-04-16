@@ -116,6 +116,17 @@ enum DotState {
     Done,
 }
 
+/// Free function — Go-shape `textproto.NewReader(r)`. Preferred call
+/// site; the `Reader::NewReader` method stays for backward compat.
+pub fn NewReader<R: Read>(r: R) -> Reader<R> {
+    Reader { r: BufReader::new(r), dot_state: None }
+}
+
+/// Free function — Go-shape `textproto.NewWriter(w)`.
+pub fn NewWriter<W: Write>(w: W) -> Writer<W> {
+    Writer { w }
+}
+
 impl<R: Read> Reader<R> {
     pub fn NewReader(r: R) -> Reader<R> {
         Reader { r: BufReader::new(r), dot_state: None }

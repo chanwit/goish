@@ -138,7 +138,7 @@ test!{ fn TestAddressString(t) {
         Case { name: "Joe; Public", address: "joe@example.com", want: "\"Joe; Public\" <joe@example.com>" },
     ];
     for c in &cases {
-        let a = mail::Address { Name: c.name.to_string(), Address: c.address.to_string() };
+        let a = MailAddress!{Name: c.name, Address: c.address};
         let got = a.String();
         if got != c.want {
             t.Errorf(Sprintf!("String(%s,%s) = %s, want %s", c.name, c.address, got, c.want));

@@ -28,6 +28,16 @@ pub struct Writer<W: Write> {
     wrote_first_boundary: bool,
 }
 
+/// Free function — Go-shape `multipart.NewWriter(w)`.
+pub fn NewWriter<W: Write>(w: W) -> Writer<W> {
+    Writer { w, boundary: random_boundary(), last_part_open: false, wrote_first_boundary: false }
+}
+
+/// Free function — Go-shape `multipart.NewReader(r, boundary)`.
+pub fn NewReader<R: Read>(r: R, boundary: &str) -> Reader {
+    Reader::NewReader(r, boundary)
+}
+
 impl<W: Write> Writer<W> {
     pub fn NewWriter(w: W) -> Writer<W> {
         Writer { w, boundary: random_boundary(), last_part_open: false, wrote_first_boundary: false }

@@ -21,6 +21,24 @@ pub struct Address {
     pub Address: string,
 }
 
+/// Go-shape `mail.Address{Name: "…", Address: "…"}` literal.
+/// Accepts string literals without `.to_string()` noise.
+#[macro_export]
+macro_rules! MailAddress {
+    ( $($field:ident : $value:expr),* $(,)? ) => {{
+        let mut a = $crate::net::mail::Address::default();
+        $( $crate::__mail_addr_set!(a, $field, $value); )*
+        a
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __mail_addr_set {
+    ($a:ident, Name,    $v:expr) => { $a.Name    = $v.to_string(); };
+    ($a:ident, Address, $v:expr) => { $a.Address = $v.to_string(); };
+}
+
 impl Address {
     pub fn String(&self) -> string {
         // If there's a display name, quote if it has non-atom chars.

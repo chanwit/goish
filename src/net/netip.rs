@@ -19,15 +19,51 @@ use crate::types::string;
 
 // ── Addr ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+// ── Zone interner ────────────────────────────────────────────────────
+// Go's netip.Addr is a pure value type — `v := a` copies. To preserve
+// that call-site ergonomics in Rust, we intern zones into a static
+// table and store just the `u32` index in Addr, so the whole struct is
+// Copy. Zone strings live for the process lifetime (Go does the same
+// via `unique.Make`).
+
+fn zone_table() -> &'static std::sync::RwLock<Vec<String>> {
+    use std::sync::{OnceLock, RwLock};
+    static TABLE: OnceLock<RwLock<Vec<String>>> = OnceLock::new();
+    TABLE.get_or_init(|| RwLock::new(vec![String::new()]))
+}
+
+fn intern_zone(s: &str) -> u32 {
+    if s.is_empty() { return 0; }
+    let t = zone_table();
+    {
+        let guard = t.read().unwrap();
+        if let Some(idx) = guard.iter().position(|x| x == s) {
+            return idx as u32;
+        }
+    }
+    let mut guard = t.write().unwrap();
+    if let Some(idx) = guard.iter().position(|x| x == s) {
+        return idx as u32;
+    }
+    guard.push(s.to_string());
+    (guard.len() - 1) as u32
+}
+
+fn zone_str(idx: u32) -> String {
+    if idx == 0 { return String::new(); }
+    let guard = zone_table().read().unwrap();
+    guard.get(idx as usize).cloned().unwrap_or_default()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Addr {
     // 128 bits; 4in6-mapped form when holding IPv4.
     hi: u64,
     lo: u64,
     // true iff the address was constructed as IPv4 (influences String()).
     is4: bool,
-    // RFC 4007 zone. Only meaningful when !is4 and non-empty.
-    zone: string,
+    // RFC 4007 zone: interned index (0 = no zone).
+    zone_idx: u32,
     // invalid (zero) if false.
     valid: bool,
 }
@@ -46,7 +82,7 @@ impl Addr {
             let b = (self.lo & 0xffff_ffff) as u32;
             return AddrFrom4([(b >> 24) as u8, (b >> 16) as u8, (b >> 8) as u8, b as u8]);
         }
-        self.clone()
+        *self
     }
 
     pub fn As4(&self) -> [u8; 4] {
@@ -87,12 +123,12 @@ impl Addr {
         if self.is4 { 32 } else { 128 }
     }
 
-    pub fn Zone(&self) -> string { self.zone.clone() }
+    pub fn Zone(&self) -> string { zone_str(self.zone_idx) }
 
-    pub fn WithZone(&self, zone: impl Into<string>) -> Addr {
-        if self.is4 { return self.clone(); } // Go drops zones on IPv4.
-        let mut a = self.clone();
-        a.zone = zone.into();
+    pub fn WithZone(&self, zone: impl AsRef<str>) -> Addr {
+        if self.is4 { return *self; } // Go drops zones on IPv4.
+        let mut a = *self;
+        a.zone_idx = intern_zone(zone.as_ref());
         a
     }
 
@@ -146,9 +182,9 @@ impl Addr {
             return format!("{}.{}.{}.{}", b[0], b[1], b[2], b[3]);
         }
         let mut out = v6_string(self.hi, self.lo);
-        if !self.zone.is_empty() {
+        if self.zone_idx != 0 {
             out.push('%');
-            out.push_str(&self.zone);
+            out.push_str(&zone_str(self.zone_idx));
         }
         out
     }
@@ -161,40 +197,41 @@ impl Addr {
         if !self.valid { return 0; }
         if self.hi != other.hi { return if self.hi < other.hi { -1 } else { 1 }; }
         if self.lo != other.lo { return if self.lo < other.lo { -1 } else { 1 }; }
-        if self.zone == other.zone { 0 }
-        else if self.zone < other.zone { -1 } else { 1 }
+        let za = zone_str(self.zone_idx);
+        let zb = zone_str(other.zone_idx);
+        if za == zb { 0 } else if za < zb { -1 } else { 1 }
     }
 
     pub fn Less(&self, other: &Addr) -> bool { self.Compare(other) < 0 }
 
     pub fn Next(&self) -> Addr {
-        if !self.valid { return self.clone(); }
+        if !self.valid { return *self; }
         let (lo, carry) = self.lo.overflowing_add(1);
         let hi = if carry { self.hi.wrapping_add(1) } else { self.hi };
         if self.is4 {
             if (lo & 0xffff_ffff) == 0 {
                 return Addr::default();
             }
-            return Addr { hi: 0, lo: lo & 0xffff_ffff, is4: true, zone: String::new(), valid: true };
+            return Addr { hi: 0, lo: lo & 0xffff_ffff, is4: true, zone_idx: 0, valid: true };
         }
         if carry && hi == 0 {
             return Addr::default();
         }
-        Addr { hi, lo, is4: false, zone: self.zone.clone(), valid: true }
+        Addr { hi, lo, is4: false, zone_idx: self.zone_idx, valid: true }
     }
 
     pub fn Prev(&self) -> Addr {
-        if !self.valid { return self.clone(); }
+        if !self.valid { return *self; }
         if self.is4 {
             let v = (self.lo & 0xffff_ffff) as u32;
             if v == 0 { return Addr::default(); }
             let v = v - 1;
-            return Addr { hi: 0, lo: v as u64, is4: true, zone: String::new(), valid: true };
+            return Addr { hi: 0, lo: v as u64, is4: true, zone_idx: 0, valid: true };
         }
         if self.hi == 0 && self.lo == 0 { return Addr::default(); }
         let (lo, borrow) = self.lo.overflowing_sub(1);
         let hi = if borrow { self.hi.wrapping_sub(1) } else { self.hi };
-        Addr { hi, lo, is4: false, zone: self.zone.clone(), valid: true }
+        Addr { hi, lo, is4: false, zone_idx: self.zone_idx, valid: true }
     }
 
     pub fn MarshalText(&self) -> (Vec<u8>, error) {
@@ -211,7 +248,7 @@ pub fn IPv6Loopback() -> Addr {
 
 pub fn AddrFrom4(b: [u8; 4]) -> Addr {
     let v = u32::from_be_bytes(b) as u64;
-    Addr { hi: 0, lo: v, is4: true, zone: String::new(), valid: true }
+    Addr { hi: 0, lo: v, is4: true, zone_idx: 0, valid: true }
 }
 
 pub fn AddrFrom16(b: [u8; 16]) -> Addr {
@@ -219,7 +256,7 @@ pub fn AddrFrom16(b: [u8; 16]) -> Addr {
     let mut lo8 = [0u8; 8];
     hi8.copy_from_slice(&b[..8]);
     lo8.copy_from_slice(&b[8..]);
-    Addr { hi: u64::from_be_bytes(hi8), lo: u64::from_be_bytes(lo8), is4: false, zone: String::new(), valid: true }
+    Addr { hi: u64::from_be_bytes(hi8), lo: u64::from_be_bytes(lo8), is4: false, zone_idx: 0, valid: true }
 }
 
 pub fn AddrFromSlice(b: &[u8]) -> (Addr, bool) {
@@ -245,8 +282,8 @@ pub fn ParseAddr(s: &str) -> (Addr, error) {
         // IPv6 (+ maybe embedded IPv4 in last 32 bits)
         match parse_v6(addr_part) {
             Ok((hi, lo)) => {
-                let mut a = Addr { hi, lo, is4: false, zone: String::new(), valid: true };
-                if !zone.is_empty() { a.zone = zone; }
+                let mut a = Addr { hi, lo, is4: false, zone_idx: 0, valid: true };
+                if !zone.is_empty() { a.zone_idx = intern_zone(&zone); }
                 (a, nil)
             }
             Err(e) => (Addr::default(), New(&format!("ParseAddr({:?}): {}", s, e))),
@@ -463,7 +500,7 @@ fn v6_string(hi: u64, lo: u64) -> string {
 
 // ── AddrPort ─────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct AddrPort {
     ip: Addr,
     port: u16,
@@ -532,7 +569,7 @@ pub fn MustParseAddrPort(s: &str) -> AddrPort {
 
 // ── Prefix (CIDR) ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Prefix {
     ip: Addr,
     bits: i32,
@@ -565,7 +602,7 @@ impl Prefix {
     }
 
     pub fn Masked(&self) -> Prefix {
-        if !self.valid { return self.clone(); }
+        if !self.valid { return *self; }
         let bits = self.bits as u32;
         let mut ip = self.ip.clone();
         if ip.is4 {
@@ -576,7 +613,7 @@ impl Prefix {
             let (m_hi, m_lo) = v6_mask(bits);
             ip.hi &= m_hi;
             ip.lo &= m_lo;
-            ip.zone = String::new();
+            ip.zone_idx = 0;
         }
         Prefix { ip, bits: self.bits, valid: true }
     }
@@ -602,6 +639,7 @@ pub fn PrefixFrom(ip: Addr, bits: i64) -> Prefix {
     }
     Prefix { ip, bits: bits as i32, valid: true }
 }
+
 
 pub fn ParsePrefix(s: &str) -> (Prefix, error) {
     let slash = match s.rfind('/') {
