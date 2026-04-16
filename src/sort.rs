@@ -62,6 +62,162 @@ where
     });
 }
 
+// ── sort.Interface + sort.Sort / sort.Stable ─────────────────────────
+//
+// Go's `sort.Interface` is the Len/Less/Swap triple. In Rust we express it
+// as a trait; `sort::Sort(&mut data)` drives the underlying sort using
+// only trait calls (no element access), matching Go's semantics.
+//
+//   Go                                        goish
+//   ──────────────────────────────────        ──────────────────────────────────
+//   type Uint64Slice []uint64                 struct Uint64Slice(pub slice<uint64>);
+//   func (p Uint64Slice) Len() int { … }      impl sort::Interface for Uint64Slice { fn Len(&self) -> int { … } }
+//   sort.Sort(g)                              sort::Sort(&mut g);
+
+#[allow(non_snake_case)]
+pub trait Interface {
+    fn Len(&self) -> int;
+    fn Less(&self, i: int, j: int) -> bool;
+    fn Swap(&mut self, i: int, j: int);
+}
+
+/// sort.Sort(data) — sorts via the Interface trait. O(n log n) using
+/// heapsort (in-place, no allocations), matching Go's guarantee.
+#[allow(non_snake_case)]
+pub fn Sort<T: Interface + ?Sized>(data: &mut T) {
+    let n = data.Len();
+    if n < 2 { return; }
+    // Build max-heap.
+    let mut i = n / 2 - 1;
+    loop {
+        sift_down(data, i, n);
+        if i == 0 { break; }
+        i -= 1;
+    }
+    // Repeatedly swap max to the end.
+    let mut end = n - 1;
+    while end > 0 {
+        data.Swap(0, end);
+        sift_down(data, 0, end);
+        end -= 1;
+    }
+}
+
+fn sift_down<T: Interface + ?Sized>(data: &mut T, mut root: int, end: int) {
+    loop {
+        let mut child = 2 * root + 1;
+        if child >= end { break; }
+        if child + 1 < end && data.Less(child, child + 1) {
+            child += 1;
+        }
+        if !data.Less(root, child) { break; }
+        data.Swap(root, child);
+        root = child;
+    }
+}
+
+/// sort.Stable(data) — stable sort via the Interface trait. O(n log² n)
+/// using in-place mergesort; matches Go's sort.Stable semantics.
+#[allow(non_snake_case)]
+pub fn Stable<T: Interface + ?Sized>(data: &mut T) {
+    // Simple stable insertion sort within blocks, then merge.
+    let n = data.Len();
+    let block_size: int = 20;
+    let mut a: int = 0;
+    while a < n {
+        let b = (a + block_size).min(n);
+        insertion_sort(data, a, b);
+        a = b;
+    }
+    let mut size = block_size;
+    while size < n {
+        let mut a: int = 0;
+        while a + size < n {
+            let mid = a + size;
+            let b = (a + 2 * size).min(n);
+            sym_merge(data, a, mid, b);
+            a = b;
+        }
+        size *= 2;
+    }
+}
+
+fn insertion_sort<T: Interface + ?Sized>(data: &mut T, a: int, b: int) {
+    for i in (a + 1)..b {
+        let mut j = i;
+        while j > a && data.Less(j, j - 1) {
+            data.Swap(j, j - 1);
+            j -= 1;
+        }
+    }
+}
+
+// SymMerge from Go's sort/sort.go — O(m+n) time, O(log) stack.
+fn sym_merge<T: Interface + ?Sized>(data: &mut T, a: int, m: int, b: int) {
+    if m - a == 1 {
+        let mut i = m;
+        while i < b && data.Less(i, a) { i += 1; }
+        rotate(data, a, m, i);
+        return;
+    }
+    if b - m == 1 {
+        let mut i = a;
+        while i < m && !data.Less(m, i) { i += 1; }
+        rotate(data, i, m, b);
+        return;
+    }
+    let mid = (a + b) / 2;
+    let n = mid + m;
+    let (start, _r) = if m > mid {
+        let mut start = n - b;
+        let mut r = mid;
+        while start < r {
+            let c = (start + r) / 2;
+            if !data.Less(n - c - 1, c) { start = c + 1; } else { r = c; }
+        }
+        (start, r)
+    } else {
+        let mut start = a;
+        let mut r = m;
+        while start < r {
+            let c = (start + r) / 2;
+            if !data.Less(n - c - 1, c) { start = c + 1; } else { r = c; }
+        }
+        (start, r)
+    };
+    let end = n - start;
+    if start < m && m < end {
+        rotate(data, start, m, end);
+    }
+    if a < start && start < mid {
+        sym_merge(data, a, start, mid);
+    }
+    if mid < end && end < b {
+        sym_merge(data, mid, end, b);
+    }
+}
+
+fn rotate<T: Interface + ?Sized>(data: &mut T, a: int, m: int, b: int) {
+    let mut i = m - a;
+    let mut j = b - m;
+    while i != j {
+        if i > j {
+            swap_range(data, m - i, m, j);
+            i -= j;
+        } else {
+            swap_range(data, m - i, m + j - i, i);
+            j -= i;
+        }
+    }
+    swap_range(data, m - i, m, i);
+}
+
+fn swap_range<T: Interface + ?Sized>(data: &mut T, a: int, b: int, n: int) {
+    for i in 0..n {
+        data.Swap(a + i, b + i);
+    }
+}
+
 #[allow(non_snake_case)]
 pub fn IntsAreSorted(s: &[int]) -> bool {
     s.windows(2).all(|w| w[0] <= w[1])
@@ -268,6 +424,41 @@ mod tests {
         let mut v: Vec<string> = vec!["b".into(), "a".into(), "c".into()];
         ReverseStrings(&mut v);
         assert_eq!(v, vec![string::from("c"), "b".into(), "a".into()]);
+    }
+
+    #[test]
+    fn sort_interface_on_custom_type() {
+        // Port of the Uint64Slice example from the user's upstream report.
+        use crate::types::{slice, uint64};
+        struct Uint64Slice(slice<uint64>);
+        impl Interface for Uint64Slice {
+            fn Len(&self) -> int { self.0.len() as int }
+            fn Less(&self, i: int, j: int) -> bool { self.0[i] < self.0[j] }
+            fn Swap(&mut self, i: int, j: int) {
+                self.0.as_vec_mut().swap(i as usize, j as usize);
+            }
+        }
+        let mut g = Uint64Slice(crate::slice!([]uint64{10, 500, 5, 1, 100, 25}));
+        Sort(&mut g);
+        let want = crate::slice!([]uint64{1, 5, 10, 25, 100, 500});
+        assert_eq!(g.0.as_vec(), want.as_vec());
+    }
+
+    #[test]
+    fn sort_interface_stable_preserves_order() {
+        // (priority, original_index) — stable sort by priority keeps original index order.
+        use crate::_slice::slice as SliceNew;
+        struct Items(SliceNew<(int, int)>);
+        impl Interface for Items {
+            fn Len(&self) -> int { self.0.len() as int }
+            fn Less(&self, i: int, j: int) -> bool { self.0[i].0 < self.0[j].0 }
+            fn Swap(&mut self, i: int, j: int) {
+                self.0.as_vec_mut().swap(i as usize, j as usize);
+            }
+        }
+        let mut it = Items(SliceNew(vec![(2i64, 0i64), (1, 1), (2, 2), (1, 3)]));
+        Stable(&mut it);
+        assert_eq!(it.0.as_vec(), &vec![(1i64, 1i64), (1, 3), (2, 0), (2, 2)]);
     }
 
     #[test]

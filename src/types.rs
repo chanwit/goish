@@ -59,7 +59,26 @@ pub type map<K, V> = std::collections::HashMap<K, V>;
 /// `&str` literals become `string`, `i32` literals widen to `int64`, etc.
 #[macro_export]
 macro_rules! slice {
-    // Go-shaped:  slice!([]T{a, b, c})
+    // Go-shaped, primitive numeric types — use `as` cast so bare literals
+    // widen/truncate naturally (Go: `[]uint64{10, 500}` works with untyped
+    // int literals; Rust wouldn't otherwise accept i32 → u64 via From).
+    ([] int    { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::int ),*    ]) };
+    ([] int8   { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::int8 ),*   ]) };
+    ([] int16  { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::int16 ),*  ]) };
+    ([] int32  { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::int32 ),*  ]) };
+    ([] int64  { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::int64 ),*  ]) };
+    ([] uint   { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::uint ),*   ]) };
+    ([] uint8  { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::uint8 ),*  ]) };
+    ([] uint16 { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::uint16 ),* ]) };
+    ([] uint32 { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::uint32 ),* ]) };
+    ([] uint64 { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::uint64 ),* ]) };
+    ([] float32 { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::float32 ),* ]) };
+    ([] float64 { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::float64 ),* ]) };
+    ([] byte   { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::byte ),*   ]) };
+    ([] rune   { $($x:expr),* $(,)? }) => { $crate::_slice::slice(vec![ $( ($x) as $crate::types::rune ),*   ]) };
+
+    // Go-shaped, generic:  slice!([]T{a, b, c}) — .into() for &str→string,
+    // struct literal identity, and anything with From<_>.
     ([] $t:ty { $($x:expr),* $(,)? }) => {
         {
             let v: $crate::types::slice<$t> =
