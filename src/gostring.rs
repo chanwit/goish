@@ -331,6 +331,27 @@ macro_rules! cat {
     }};
 }
 
+/// `string!("literal")` — lazy-initialized module-scoped `string`.
+///
+/// Returns `&'static GoString`. The first call allocates (Arc::from); every
+/// subsequent call at the same expansion site returns the cached value.
+/// Lets Go-shape `string[int]` indexing apply to what would otherwise be a
+/// `&'static str` in Rust:
+///
+///   // Go:    chars := "abc..."; chars[i]
+///   // goish: let chars = string!("abc..."); chars[i]
+///
+/// Only accepts literal strings — for runtime values, use
+/// `GoString::from(...)` or `.into()` directly.
+#[macro_export]
+macro_rules! string {
+    ($s:literal) => {{
+        static __GOISH_STRING: ::std::sync::OnceLock<$crate::gostring::GoString>
+            = ::std::sync::OnceLock::new();
+        __GOISH_STRING.get_or_init(|| $crate::gostring::GoString::from($s))
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,6 +447,20 @@ mod tests {
     fn index_negative_panics() {
         let p: GoString = "ab".into();
         let _ = p[-1];
+    }
+
+    #[test]
+    fn string_macro_indexable() {
+        // Literal const string → cached GoString, Go-shape indexing.
+        let chars = crate::string!("abcdef");
+        let i: i64 = 2;
+        assert_eq!(chars[i], b'c');
+        assert_eq!(chars.len(), 6);
+        // Same expansion site on repeated calls hits the OnceLock cache.
+        let get = || crate::string!("cached");
+        let a = get();
+        let b = get();
+        assert!(std::ptr::eq(a as *const _, b as *const _));
     }
 
     #[test]

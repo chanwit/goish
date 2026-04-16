@@ -4,13 +4,12 @@
 use goish::prelude::*;
 
 fn rand_string(l: int) -> string {
-    // Declared once as `string`, so indexing below is Go-shape.
-    let chars: string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".into();
+    // v0.17.2: string!("...") — cached, indexable with Go's int (i64).
+    let chars = string!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
     let mut s: slice<byte> = make!([]byte, l);
     for i in 0..l {
         s[i] = chars[rand::Intn(len!(chars))];
     }
-    // v0.17.1: From<slice<u8>> for string — no more String::from_utf8(...).unwrap().
     string::from(s)
 }
 

@@ -195,6 +195,6 @@ pub mod prelude {
     pub use crate::{
         Cookie, Errorf, Fprintf, MailAddress, Printf, Println, Sprintf,
         append, benchmark, cat, chan, close, const_block, defer, delete, go, len, make, map,
-        range, recover, select, slice, stringer, Struct, test, test_h, test_main,
+        range, recover, select, slice, string, stringer, Struct, test, test_h, test_main,
     };
 }
