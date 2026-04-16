@@ -33,7 +33,7 @@ exclude = [
 #     b996384 — 2× faster rendezvous, 3.5× less RSS vs async-channel).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
 goish-macros = { version = "0.5", path = "goish-macros" }
-flume = { version = "0.11", default-features = false, features = ["async"] }
+flume = { version = "0.11", default-features = false, features = ["async", "select"] }
 serde = "1"
 serde_json = "1"
 regex = "1"
