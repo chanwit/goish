@@ -347,20 +347,20 @@ impl<R: std::io::Read> Reader<R> {
         if let Some(b) = self.unread.take() {
             buf.push(b);
             if b == delim {
-                return (String::from_utf8_lossy(&buf).into_owned(), nil);
+                return (String::from_utf8_lossy(&buf).into_owned().into(), nil);
             }
         }
         match self.inner.read_until(delim, &mut buf) {
-            Ok(0) if buf.is_empty() => (String::new(), New("EOF")),
-            Ok(0) => (String::from_utf8_lossy(&buf).into_owned(), New("EOF")),
+            Ok(0) if buf.is_empty() => ("".into(), New("EOF")),
+            Ok(0) => (String::from_utf8_lossy(&buf).into_owned().into(), New("EOF")),
             Ok(_) => {
                 if buf.last() != Some(&delim) {
-                    (String::from_utf8_lossy(&buf).into_owned(), New("EOF"))
+                    (String::from_utf8_lossy(&buf).into_owned().into(), New("EOF"))
                 } else {
-                    (String::from_utf8_lossy(&buf).into_owned(), nil)
+                    (String::from_utf8_lossy(&buf).into_owned().into(), nil)
                 }
             }
-            Err(e) => (String::from_utf8_lossy(&buf).into_owned(), New(&format!("bufio.ReadString: {}", e))),
+            Err(e) => (String::from_utf8_lossy(&buf).into_owned().into(), New(&format!("bufio.ReadString: {}", e))),
         }
     }
 

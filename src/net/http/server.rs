@@ -70,9 +70,9 @@ impl ServeMux {
         let mut best: Option<(usize, HandlerFunc)> = None;
         for (pat, h) in g.iter() {
             if path.starts_with(pat.as_str())
-                && pat.len() >= best.as_ref().map(|(l, _)| *l).unwrap_or(0)
+                && pat.as_str().len() >= best.as_ref().map(|(l, _)| *l).unwrap_or(0)
             {
-                best = Some((pat.len(), h.clone()));
+                best = Some((pat.as_str().len(), h.clone()));
             }
         }
         best.map(|(_, h)| h)
@@ -261,10 +261,10 @@ async fn serve_one(
 ) -> hyper::Response<http_body_util::Full<bytes::Bytes>> {
     use http_body_util::BodyExt;
 
-    let method = req.method().as_str().into();
+    let method: string = req.method().as_str().into();
     let uri = req.uri().clone();
-    let version = format!("{:?}", req.version());
-    let host_hdr = req
+    let version: string = format!("{:?}", req.version()).into();
+    let host_hdr: string = req
         .headers()
         .get(hyper::header::HOST)
         .and_then(|v| v.to_str().ok())
@@ -301,7 +301,7 @@ async fn serve_one(
         header,
         crate::net::http::body::Body::from_bytes(body_bytes.to_vec()),
         host_hdr,
-        remote.into(),
+        remote.to_string().into(),
         content_length,
     );
 
@@ -339,7 +339,7 @@ async fn serve_one(
         .status(u16::try_from(w.status).unwrap_or(200));
     for (k, vs) in w.header.iter() {
         for v in vs {
-            builder = builder.header(k.as_str(), v);
+            builder = builder.header(k.as_str(), v.as_str());
         }
     }
     // Default Content-Type if handler didn't set one.

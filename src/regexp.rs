@@ -88,22 +88,21 @@ impl Regexp {
 
     /// re.ReplaceAllString(s, repl) — Go-style `$1` / `$name` refs.
     pub fn ReplaceAllString(&self, s: impl AsRef<str>, repl: impl AsRef<str>) -> string {
-        self.inner.replace_all(s.as_ref(), repl.as_ref()).into_owned()
+        self.inner.replace_all(s.as_ref(), repl.as_ref()).into_owned().into()
     }
 
     pub fn ReplaceAllLiteralString(&self, s: impl AsRef<str>, repl: impl AsRef<str>) -> string {
         let replacer = regex::NoExpand(repl.as_ref());
-        self.inner.replace_all(s.as_ref(), replacer).into_owned()
+        self.inner.replace_all(s.as_ref(), replacer).into_owned().into()
     }
 
-    /// re.ReplaceAllStringFunc(s, |m| ...)
     pub fn ReplaceAllStringFunc<F>(&self, s: impl AsRef<str>, mut f: F) -> string
     where
         F: FnMut(string) -> string,
     {
         self.inner.replace_all(s.as_ref(), |caps: &regex::Captures| {
-            f(caps.get(0).map(|m| m.as_str().into()).unwrap_or_default())
-        }).into_owned()
+            f(caps.get(0).map(|m| m.as_str().into()).unwrap_or_default()).as_str().to_string()
+        }).into_owned().into()
     }
 
     /// re.Split(s, n) — split s around matches. n<0 = all.
@@ -127,7 +126,7 @@ impl Regexp {
         self.inner.captures_len() as int - 1
     }
 
-    pub fn String(&self) -> string { self.src.clone() }
+    pub fn String(&self) -> string { self.src.clone().into() }
 }
 
 #[allow(non_snake_case)]
@@ -154,7 +153,7 @@ pub fn MatchString(pat: impl AsRef<str>, s: impl AsRef<str>) -> (bool, error) {
 
 #[allow(non_snake_case)]
 pub fn QuoteMeta(s: impl AsRef<str>) -> string {
-    regex::escape(s.as_ref())
+    regex::escape(s.as_ref()).into()
 }
 
 // Internal: a never-used "empty" regex returned as a placeholder when
