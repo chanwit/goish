@@ -52,8 +52,8 @@ test!{ fn TestAddressParsingList(t) {
     let input = "Mary Smith <mary@x.test>, jdoe@example.org, Who? <one@y.test>";
     let (list, err) = mail::ParseAddressList(input);
     if err != nil { t.Fatal(&Sprintf!("ParseAddressList: %s", err)); }
-    if list.len() != 3 {
-        t.Fatal(&Sprintf!("list len = %d, want 3", list.len() as i64));
+    if len!(list) != 3 {
+        t.Fatal(&Sprintf!("list len = %d, want 3", len!(list) as i64));
     }
     let want: [(&str, &str); 3] = [
         ("Mary Smith", "mary@x.test"),
@@ -118,7 +118,7 @@ test!{ fn TestAddressParsingAngleOnlyForm(t) {
     if a.Address != "boss@nil.test" {
         t.Errorf(Sprintf!("Address = %s", a.Address));
     }
-    if !a.Name.is_empty() {
+    if len!(a.Name) != 0 {
         t.Errorf(Sprintf!("Name = %s, want empty", a.Name));
     }
 }}

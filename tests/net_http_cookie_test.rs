@@ -59,12 +59,12 @@ test!{ fn TestWriteSetCookies(t) {
         Case { cookie: Cookie!{Name: "a\nb", Value: "v"}, raw: "" },
         Case { cookie: Cookie!{Name: "a\rb", Value: "v"}, raw: "" },
     ];
-    for (i, c) in cases.iter().enumerate() {
+    range!(&cases[..], |i, c| {
         let got = c.cookie.String();
         if got != c.raw {
             t.Errorf(Sprintf!("Test %d:\nwant: %s\n got: %s", i as i64, c.raw, got));
         }
-    }
+    });
 }}
 
 // ── TestParseCookie (Cookie request header parsing) ─────────────────
@@ -72,13 +72,13 @@ test!{ fn TestWriteSetCookies(t) {
 test!{ fn TestParseCookie(t) {
     struct Case {
         line: &'static str,
-        names: Vec<&'static str>,
-        values: Vec<&'static str>,
+        names: &'static [&'static str],
+        values: &'static [&'static str],
     }
-    let cases = vec![
-        Case { line: "Cookie-1=v$1",                           names: vec!["Cookie-1"],              values: vec!["v$1"] },
-        Case { line: "Cookie-1=v$1; c2=v2",                    names: vec!["Cookie-1", "c2"],         values: vec!["v$1", "v2"] },
-        Case { line: r#"quoted="hello world""#,                names: vec!["quoted"],                 values: vec!["hello world"] },
+    let cases = [
+        Case { line: "Cookie-1=v$1",                 names: &["Cookie-1"][..],         values: &["v$1"][..] },
+        Case { line: "Cookie-1=v$1; c2=v2",          names: &["Cookie-1", "c2"][..],    values: &["v$1", "v2"][..] },
+        Case { line: r#"quoted="hello world""#,      names: &["quoted"][..],            values: &["hello world"][..] },
     ];
     for c in &cases {
         let (cookies, err) = http::ParseCookie(c.line);
@@ -86,18 +86,19 @@ test!{ fn TestParseCookie(t) {
             t.Errorf(Sprintf!("ParseCookie(%s): error: %s", c.line, err));
             continue;
         }
-        if cookies.len() != c.names.len() {
-            t.Errorf(Sprintf!("ParseCookie(%s): len = %d, want %d", c.line, cookies.len() as i64, c.names.len() as i64));
+        if len!(cookies) != len!(c.names) {
+            t.Errorf(Sprintf!("ParseCookie(%s): len = %d, want %d",
+                c.line, len!(cookies) as i64, len!(c.names) as i64));
             continue;
         }
-        for (i, ck) in cookies.iter().enumerate() {
+        range!(&cookies[..], |i, ck| {
             if ck.Name != c.names[i] {
                 t.Errorf(Sprintf!("[%d].Name = %s, want %s", i as i64, ck.Name, c.names[i]));
             }
             if ck.Value != c.values[i] {
                 t.Errorf(Sprintf!("[%d].Value = %s, want %s", i as i64, ck.Value, c.values[i]));
             }
-        }
+        });
     }
     // Invalid
     let bad = ["", "no-equals"];

@@ -42,8 +42,8 @@ test!{ fn TestMIMEHeaderMultipleValues(t) {
     h.Add("Set-Cookie", "cookie 1");
     h.Add("Set-Cookie", "cookie 2");
     let values = h.Values("set-cookie");
-    if values.len() != 2 {
-        t.Errorf(Sprintf!("count: %d; want 2", values.len() as i64));
+    if len!(values) != 2 {
+        t.Errorf(Sprintf!("count: %d; want 2", len!(values) as i64));
     }
 }}
 
@@ -66,7 +66,7 @@ test!{ fn TestReadLine(t) {
         t.Fatal(&Sprintf!("Line 2: %s, %s", s, err));
     }
     let (s, err) = r.ReadLine();
-    if !s.is_empty() || err == nil {
+    if len!(s) != 0 || err == nil {
         t.Fatal(&Sprintf!("EOF: %s, %s", s, err));
     }
 }}
@@ -104,14 +104,14 @@ test!{ fn TestReadDotLines(t) {
     let (s, err) = r.ReadDotLines();
     let want = ["dotlines", "foo", ".bar", "..baz", "quux", ""];
     if err != nil { t.Fatal(&Sprintf!("ReadDotLines err: %s", err)); }
-    if s.len() != want.len() {
-        t.Fatal(&Sprintf!("ReadDotLines len = %d, want %d", s.len() as i64, want.len() as i64));
+    if len!(s) != len!(want) {
+        t.Fatal(&Sprintf!("ReadDotLines len = %d, want %d", len!(s), len!(want)));
     }
-    for i in 0..s.len() {
-        if s[i] != want[i] {
-            t.Errorf(Sprintf!("ReadDotLines[%d] = %s, want %s", i as i64, s[i], want[i]));
+    range!(&s[..], |i, v| {
+        if *v != want[i] {
+            t.Errorf(Sprintf!("ReadDotLines[%d] = %s, want %s", i as i64, v, want[i]));
         }
-    }
+    });
 }}
 
 // ── TestReadDotBytes ────────────────────────────────────────────────
@@ -122,7 +122,7 @@ test!{ fn TestReadDotBytes(t) {
     let want = b"dotlines\nfoo\n.bar\n..baz\nquux\n\n".to_vec();
     if err != nil { t.Fatal(&Sprintf!("ReadDotBytes err: %s", err)); }
     if b != want {
-        t.Errorf(Sprintf!("ReadDotBytes len = %d, want %d", b.len() as i64, want.len() as i64));
+        t.Errorf(Sprintf!("ReadDotBytes len = %d, want %d", len!(b) as i64, len!(want) as i64));
     }
 }}
 
@@ -133,16 +133,16 @@ test!{ fn TestReadMIMEHeader(t) {
     let (h, err) = r.ReadMIMEHeader();
     if err != nil { t.Fatal(&Sprintf!("ReadMIMEHeader err: %s", err)); }
     let mk = h.Values("My-Key");
-    if mk.len() != 2 || mk[0] != "Value 1" || mk[1] != "Value 2" {
-        // Note: Go trims trailing whitespace from values ("Value 1  " → "Value 1").
-        t.Errorf(Sprintf!("My-Key values = [%s, %s]",
-            mk.get(0).cloned().unwrap_or_default(),
-            mk.get(1).cloned().unwrap_or_default()));
+    if len!(mk) != 2 || mk[0] != "Value 1" || mk[1] != "Value 2" {
+        // Go trims trailing whitespace from values ("Value 1  " → "Value 1").
+        let first  = if len!(mk) > 0 { mk[0].clone() } else { String::new() };
+        let second = if len!(mk) > 1 { mk[1].clone() } else { String::new() };
+        t.Errorf(Sprintf!("My-Key values = [%s, %s]", first, second));
     }
     let lk = h.Values("Long-Key");
-    if lk.len() != 1 || lk[0] != "Even Longer Value" {
-        t.Errorf(Sprintf!("Long-Key value = %s",
-            lk.get(0).cloned().unwrap_or_default()));
+    if len!(lk) != 1 || lk[0] != "Even Longer Value" {
+        let first = if len!(lk) > 0 { lk[0].clone() } else { String::new() };
+        t.Errorf(Sprintf!("Long-Key value = %s", first));
     }
 }}
 

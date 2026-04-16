@@ -32,7 +32,7 @@ fn start_mock(responses: &[&str]) -> MockServer {
         let (stream, _) = listener.accept().expect("accept");
         let mut writer = stream.try_clone().expect("clone");
         let mut reader = BufReader::new(stream);
-        let mut collected = Vec::new();
+        let mut collected = make!([]string, 0);
 
         let _ = writer.write_all(b"220 mock.test SMTP ready\r\n");
 
@@ -119,7 +119,7 @@ test!{ fn TestDialAndBasicFlow(t) {
         let found = received.iter().any(|l| l.starts_with(ep));
         if !found {
             t.Errorf(Sprintf!("expected server to receive %s, got %d lines",
-                ep, received.len() as i64));
+                ep, len!(received) as i64));
         }
     }
 }}
