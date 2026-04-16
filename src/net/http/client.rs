@@ -174,12 +174,12 @@ async fn do_request(req: &mut Request) -> (Response, error) {
         );
     }
 
-    let host = match uri.host() {
+    let host: std::string::String = match uri.host() {
         Some(h) => h.into(),
         None => return (Response::empty(0), New("http: missing host in URL")),
     };
     let port = uri.port_u16().unwrap_or(80);
-    let authority = format!("{}:{}", host, port);
+    let authority: std::string::String = format!("{}:{}", host, port);
 
     let stream = match TcpStream::connect(&authority).await {
         Ok(s) => s,
@@ -196,15 +196,15 @@ async fn do_request(req: &mut Request) -> (Response, error) {
     });
 
     // Build the hyper request.
+    let pq = path_and_query(&req.URL);
     let mut builder = hyper::Request::builder()
         .method(req.Method.as_str())
-        .uri(path_and_query(&req.URL));
-    // Host header is mandatory for HTTP/1.1.
-    builder = builder.header("Host", &authority);
+        .uri(pq.as_str());
+    builder = builder.header("Host", authority.as_str());
 
     for (k, vs) in req.Header.iter() {
         for v in vs {
-            builder = builder.header(k.as_str(), v);
+            builder = builder.header(k.as_str(), v.as_str());
         }
     }
 
@@ -239,9 +239,9 @@ async fn do_request(req: &mut Request) -> (Response, error) {
 
     (
         Response {
-            Status: format!("{} {}", status.as_u16(), status.canonical_reason().unwrap_or("")),
+            Status: format!("{} {}", status.as_u16(), status.canonical_reason().unwrap_or("")).into(),
             StatusCode: status.as_u16() as int,
-            Proto: proto,
+            Proto: proto.into(),
             Header: hdr,
             Body: Body::from_bytes(bytes_body.to_vec()),
             ContentLength: cl,
@@ -263,14 +263,14 @@ fn build_uri(u: &URL) -> string {
         s.push('?');
         s.push_str(&u.RawQuery);
     }
-    s
+    s.into()
 }
 
 fn path_and_query(u: &URL) -> string {
-    let mut s = if u.Path.is_empty() { "/".into() } else { u.Path.clone() };
+    let mut s: std::string::String = if u.Path.is_empty() { "/".into() } else { u.Path.as_str().into() };
     if !u.RawQuery.is_empty() {
         s.push('?');
         s.push_str(&u.RawQuery);
     }
-    s
+    s.into()
 }

@@ -133,12 +133,13 @@ impl Cmd {
     }
 
     fn build(&self) -> RustCmd {
-        let mut c = RustCmd::new(&self.Path);
+        let mut c = RustCmd::new(self.Path.as_str());
         if self.Args.len() > 1 {
-            c.args(&self.Args[1..]);
+            let args: Vec<&str> = self.Args[1..].iter().map(|s| s.as_str()).collect();
+            c.args(&args);
         }
         if let Some(d) = &self.Dir {
-            c.current_dir(d);
+            c.current_dir(d.as_str());
         }
         if let Some(env) = &self.Env {
             c.env_clear();
@@ -192,7 +193,7 @@ impl Cmd {
 /// varargs tail, which fits Rust macro ergonomics better.
 #[allow(non_snake_case)]
 pub fn Command(name: impl AsRef<str>, args: &[impl AsRef<str>]) -> Cmd {
-    let name = name.as_ref().into();
+    let name: string = name.as_ref().into();
     let mut all: slice<string> = Vec::with_capacity(args.len() + 1);
     all.push(name.clone());
     for a in args {
@@ -217,16 +218,16 @@ pub fn LookPath(name: impl AsRef<str>) -> (string, error) {
         if std::path::Path::new(name).exists() {
             return (name.into(), nil);
         }
-        return (String::new(), New(&format!("exec: \"{}\": file does not exist", name)));
+        return ("".into(), New(&format!("exec: \"{}\": file does not exist", name)));
     }
     let path = std::env::var_os("PATH").unwrap_or_default();
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join(name);
         if candidate.is_file() {
-            return (candidate.to_string_lossy().into_owned(), nil);
+            return (candidate.to_string_lossy().into_owned().into(), nil);
         }
     }
-    (String::new(), New(&format!("exec: \"{}\": executable file not found in $PATH", name)))
+    ("".into(), New(&format!("exec: \"{}\": executable file not found in $PATH", name)))
 }
 
 #[cfg(test)]
