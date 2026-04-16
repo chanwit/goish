@@ -201,6 +201,41 @@ impl std::hash::Hash for GoString {
     }
 }
 
+// ── `p[i]` — Go's `s[i]` byte index ─────────────────────────────────
+//
+// Indexed by Go's `int` (i64). Returns `u8` by reference — the byte lives
+// in our Arc<str> buffer, which is address-stable. Out-of-range panics
+// just like Go.
+
+impl std::ops::Index<i64> for GoString {
+    type Output = u8;
+    fn index(&self, i: i64) -> &u8 {
+        if i < 0 || (i as u64) >= self.len as u64 {
+            panic!("runtime error: index out of range [{}] with length {}", i, self.len);
+        }
+        &self.buf.as_bytes()[(self.off + i as u32) as usize]
+    }
+}
+
+// Range indexing — delegates to str. Without these, adding Index<i64> above
+// would block auto-deref resolution of `s[a..b]`, `s[..n]`, etc.
+macro_rules! impl_range_index {
+    ($($r:ty),+ $(,)?) => { $(
+        impl std::ops::Index<$r> for GoString {
+            type Output = str;
+            fn index(&self, r: $r) -> &str { &self.as_str()[r] }
+        }
+    )+ };
+}
+impl_range_index!(
+    std::ops::Range<usize>,
+    std::ops::RangeTo<usize>,
+    std::ops::RangeFrom<usize>,
+    std::ops::RangeFull,
+    std::ops::RangeInclusive<usize>,
+    std::ops::RangeToInclusive<usize>,
+);
+
 // ── `+` operator — Go's `a + b` ─────────────────────────────────────
 
 impl std::ops::Add for GoString {
@@ -329,6 +364,32 @@ mod tests {
         p += "/";
         p += "bar";
         assert_eq!(p, "foo/bar");
+    }
+
+    #[test]
+    fn index_byte() {
+        let p: GoString = "hello".into();
+        assert_eq!(p[0], b'h');
+        assert_eq!(p[4], b'o');
+        // Iteration with integer index — the Go-shape use case.
+        let n = p.len();
+        let mut sum: u64 = 0;
+        for i in 0..n { sum += p[i] as u64; }
+        assert_eq!(sum, (b'h' as u64) + (b'e' as u64) + (b'l' as u64) * 2 + (b'o' as u64));
+    }
+
+    #[test]
+    #[should_panic]
+    fn index_out_of_range_panics() {
+        let p: GoString = "ab".into();
+        let _ = p[5];
+    }
+
+    #[test]
+    #[should_panic]
+    fn index_negative_panics() {
+        let p: GoString = "ab".into();
+        let _ = p[-1];
     }
 
     #[test]
