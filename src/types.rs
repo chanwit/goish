@@ -178,6 +178,19 @@ macro_rules! append {
     };
 }
 
+/// Converts any int-shaped length to `usize`, panicking on negative or
+/// overflow — matches Go's runtime check on `make([]T, n)` with n < 0.
+/// Used by `make!` to accept `int` (i64) / `usize` / literals interchangeably.
+#[doc(hidden)]
+pub fn __goish_len<N>(n: N) -> usize
+where
+    N: TryInto<usize> + Copy + std::fmt::Display,
+    <N as TryInto<usize>>::Error: std::fmt::Debug,
+{
+    n.try_into()
+        .unwrap_or_else(|_| panic!("make: length {} out of range", n))
+}
+
 /// `make!(...)` — Go's `make()` builtin: allocate empty/sized container.
 ///
 ///   make!(chan int)              // unbuffered channel
@@ -196,7 +209,7 @@ macro_rules! make {
     };
     // make(chan T, n)
     (chan $t:ty, $cap:expr) => {
-        $crate::chan::Chan::<$t>::new($cap)
+        $crate::chan::Chan::<$t>::new($crate::types::__goish_len($cap))
     };
     // make(map[K]V)
     (map [$k:ty] $v:ty) => {
@@ -208,15 +221,19 @@ macro_rules! make {
     // make([]T, 0, cap) — empty slice with capacity; no Default needed
     ([] $t:ty, 0, $cap:expr) => {
         {
-            let v: $crate::types::slice<$t> = Vec::<$t>::with_capacity($cap).into();
+            let v: $crate::types::slice<$t> =
+                Vec::<$t>::with_capacity($crate::types::__goish_len($cap)).into();
             v
         }
     };
     // make([]T, len, cap)
     ([] $t:ty, $len:expr, $cap:expr) => {
         {
-            let mut __v: Vec<$t> = Vec::with_capacity($cap);
-            __v.resize_with($len, <$t as ::std::default::Default>::default);
+            let mut __v: Vec<$t> = Vec::with_capacity($crate::types::__goish_len($cap));
+            __v.resize_with(
+                $crate::types::__goish_len($len),
+                <$t as ::std::default::Default>::default,
+            );
             let v: $crate::types::slice<$t> = __v.into();
             v
         }
@@ -231,8 +248,10 @@ macro_rules! make {
     // make([]T, n)
     ([] $t:ty, $n:expr) => {
         {
-            let v: $crate::types::slice<$t> =
-                vec![<$t as ::std::default::Default>::default(); $n].into();
+            let v: $crate::types::slice<$t> = vec![
+                <$t as ::std::default::Default>::default();
+                $crate::types::__goish_len($n)
+            ].into();
             v
         }
     };
@@ -401,6 +420,33 @@ mod tests {
         crate::delete!(m, &1);
         assert_eq!(m.len(), 1);
         assert!(m.contains_key(&2));
+    }
+
+    #[test]
+    fn make_slice_accepts_int_len() {
+        let l: int = 5;
+        let v = crate::make!([]int, l);
+        assert_eq!(v.len(), 5);
+        // Also works with usize directly.
+        let u: usize = 3;
+        let v = crate::make!([]int, u);
+        assert_eq!(v.len(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "out of range")]
+    fn make_slice_negative_len_panics() {
+        let l: int = -1;
+        let _ = crate::make!([]int, l);
+    }
+
+    #[test]
+    fn make_slice_len_cap_accepts_int() {
+        let l: int = 2;
+        let c: int = 10;
+        let v = crate::make!([]int, l, c);
+        assert_eq!(v.len(), 2);
+        assert!(v.capacity() >= 10);
     }
 
     #[test]

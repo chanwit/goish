@@ -122,6 +122,11 @@ impl GoString {
 
     /// Go's Stringer — returns self.
     pub fn String(&self) -> GoString { self.clone() }
+
+    /// Go's `[]byte(s)` — copy bytes into a new slice<u8>. O(n).
+    pub fn to_bytes(&self) -> crate::_slice::slice<u8> {
+        crate::_slice::slice(self.as_bytes().to_vec())
+    }
 }
 
 // ── Conversions in ──────────────────────────────────────────────────
@@ -152,6 +157,26 @@ impl From<char> for GoString {
 }
 impl<'a> From<std::borrow::Cow<'a, str>> for GoString {
     fn from(c: std::borrow::Cow<'a, str>) -> Self { GoString::from(c.into_owned()) }
+}
+
+// Go's `string([]byte)` — bytes → string. Go reinterprets the bytes as-is;
+// Rust's str requires valid UTF-8, so we use lossy decode (invalid sequences
+// become U+FFFD). Matches `fmt.Sprintf("%s", b)` output in practice.
+impl From<Vec<u8>> for GoString {
+    fn from(v: Vec<u8>) -> Self {
+        match std::string::String::from_utf8(v) {
+            Ok(s) => GoString::from(s),
+            Err(e) => GoString::from(std::string::String::from_utf8_lossy(&e.into_bytes()).into_owned()),
+        }
+    }
+}
+impl From<&[u8]> for GoString {
+    fn from(b: &[u8]) -> Self {
+        GoString::from(std::string::String::from_utf8_lossy(b).into_owned())
+    }
+}
+impl From<crate::_slice::slice<u8>> for GoString {
+    fn from(s: crate::_slice::slice<u8>) -> Self { GoString::from(s.into_vec()) }
 }
 
 // ── Deref / AsRef / Borrow ──────────────────────────────────────────
@@ -401,6 +426,36 @@ mod tests {
     fn index_negative_panics() {
         let p: GoString = "ab".into();
         let _ = p[-1];
+    }
+
+    #[test]
+    fn from_vec_u8_roundtrip() {
+        let bytes: Vec<u8> = b"hello".to_vec();
+        let s: GoString = bytes.into();
+        assert_eq!(s, "hello");
+        let back = s.to_bytes();
+        assert_eq!(back.as_vec(), &vec![b'h', b'e', b'l', b'l', b'o']);
+    }
+
+    #[test]
+    fn from_byte_slice() {
+        let s: GoString = (&b"world"[..]).into();
+        assert_eq!(s, "world");
+    }
+
+    #[test]
+    fn from_slice_u8() {
+        let v: crate::_slice::slice<u8> = crate::_slice::slice(b"abc".to_vec());
+        let s: GoString = v.into();
+        assert_eq!(s, "abc");
+    }
+
+    #[test]
+    fn from_invalid_utf8_is_lossy() {
+        let bytes: Vec<u8> = vec![0xff, 0xfe, b'x'];
+        let s: GoString = bytes.into();
+        // Invalid bytes became U+FFFD; valid ones preserved.
+        assert!(s.as_str().contains('x'));
     }
 
     #[test]

@@ -1,7 +1,18 @@
-// Demonstrates v0.17.0 slice<T> Index<i64>: `ss[i]` where i: int (i64)
-// works without `as usize`.
+// Demonstrates v0.17 Go-shape indexing: `ss[i]` on slice<T> and `p[i]`
+// on string — both with i: int (i64), no `as usize` casts.
 
 use goish::prelude::*;
+
+fn rand_string(l: int) -> string {
+    // Declared once as `string`, so indexing below is Go-shape.
+    let chars: string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".into();
+    let mut s: slice<byte> = make!([]byte, l);
+    for i in 0..l {
+        s[i] = chars[rand::Intn(len!(chars))];
+    }
+    // v0.17.1: From<slice<u8>> for string — no more String::from_utf8(...).unwrap().
+    string::from(s)
+}
 
 fn main() {
     let mut ss: slice<string> = slice!([]string{"banana", "apple", "cherry", "date", "banana"});
@@ -13,5 +24,6 @@ fn main() {
     }
     let p: string = "hello".into();
     assert_eq!(p[0], b'h');
+    println!("rand: {}", rand_string(12));
     println!("done");
 }
