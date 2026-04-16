@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.14"     # latest
+goish = "0.15"     # latest
 ```
 
 Then in every file where you want Go-shaped code:
@@ -331,6 +331,12 @@ if r.is_none() { t.Fatal("expected panic"); }
 | **`text::tabwriter`** | `text/tabwriter` | NewWriter, Write, Flush (column alignment) |
 | **`text::scanner`** | `text/scanner` | Scanner, Scan, TokenText, Pos (Ident/Int/Float/String/Char) |
 | **`text::template`** | `text/template` | New/Parse/Execute — {{.}}, {{.Field}}, {{if}}, {{range}}, {{define}}, {{template}} |
+| **`net/netip`** | `net/netip` | Addr/AddrPort/Prefix — Parse/String/Contains/Masked, IPv4/IPv6, zones |
+| **`net/textproto`** | `net/textproto` | Reader (ReadLine/ReadContinuedLine/ReadMIMEHeader/ReadDotLines), Writer, CanonicalMIMEHeaderKey, MIMEHeader |
+| **`net/mail`** | `net/mail` | Address + ParseAddress/ParseAddressList (addr-spec, display-name, comma-separated) |
+| **`net/smtp`** | `net/smtp` | Client (Dial/Hello/Mail/Rcpt/Data/Quit/Noop/Reset/Verify) with dot-stuffing |
+| **`net/http` cookies** | `net/http` Cookie | Cookie struct + ParseCookie + ParseSetCookie + Cookie::String() |
+| **`mime/multipart`** | `mime/multipart` | Writer (CreateFormFile/WriteField/SetBoundary) + Reader (NextPart/FormName/FileName/Body) |
 
 ## Known gaps
 

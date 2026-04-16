@@ -9,9 +9,9 @@ Overall score = unweighted mean of per-package "Overall %". Packages
 that goish does not target (unsafe, reflect, go/*, image, plugin, …)
 are listed under **Out of scope** and excluded from the rollup.
 
-## Overall: **64%**
+## Overall: **66%**
 
-_Last updated: v0.14.0 — 878 tests green._
+_Last updated: v0.15.0 — 914 tests green._
 
 ## Ported packages (in rollup)
 
@@ -26,6 +26,12 @@ _Last updated: v0.14.0 — 878 tests green._
 | `text/tabwriter` | `src/text/tabwriter` | `src/text/tabwriter.rs` | 5 | 50% | 55% | **55%** |
 | `text/scanner` | `src/text/scanner` | `src/text/scanner.rs` | 7 | 40% | 55% | **50%** |
 | `text/template` | `src/text/template` | `src/text/template.rs` | 10 | 30% | 50% | **40%** |
+| `net/netip` | `src/net/netip` | `src/net/netip.rs` | 15 | 70% | 60% | **65%** |
+| `net/textproto` | `src/net/textproto` | `src/net/textproto.rs` | 9 | 55% | 50% | **55%** |
+| `net/mail` | `src/net/mail` | `src/net/mail.rs` | 4 | 40% | 30% | **35%** |
+| `net/smtp` | `src/net/smtp` | `src/net/smtp.rs` | 2 | 55% | 30% | **45%** |
+| `mime/multipart` | `src/mime/multipart` | `src/mime/multipart.rs` | 3 | 45% | 40% | **45%** |
+| `net/http` cookies | `src/net/http/cookie` | `src/net/http/cookie.rs` | 3 | 70% | 50% | **60%** |
 | `bufio` | `src/bufio` | `src/bufio.rs` | 17 | 70% | 40% | **55%** |
 | `bytes` | `src/bytes` | `src/bytes.rs` | 4 | 55% | 30% | **40%** |
 | `container/heap` + `container/list` + `container/ring` | `src/container/*` | `src/container/*.rs` | 20 | 70% | 60% | **65%** |
@@ -186,6 +192,7 @@ into a milestone.
 | v0.12.0 | sort + container + math + unicode | `sort`, `math`, `math/rand`, `unicode`, `unicode/utf8`, `container/{heap,list,ring}` + new `container/ring` impl | 65 | ✅ |
 | v0.13.0 | generics-era helpers | `cmp`, `slices`, `maps`, `iter` (all new impls + tests) | 48 | ✅ |
 | v0.14.0 | text toolkit | `html`, `text/{tabwriter,scanner,template}` (all new impls + tests) | 45 | ✅ |
+| v0.15.0 | networking depth | `net/{netip,textproto,mail,smtp}`, `net/http` cookies, `mime/multipart` | 36 | ✅ |
 | v0.11.0 | crypto + encoding | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | – | ⏳ planned |
 | v0.12.0 | sort + container + math + unicode | `sort`, `container/*`, `math`, `math/rand`, `unicode`, `unicode/utf8` | – | ⏳ planned |
 | v0.13.0 | generics-era helpers | `slices`, `maps`, `cmp`, `iter` | – | 📋 |

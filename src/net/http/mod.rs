@@ -16,6 +16,7 @@
 
 mod body;
 mod client;
+mod cookie;
 mod request;
 mod response;
 mod server;
@@ -23,6 +24,8 @@ mod status;
 
 pub use body::Body;
 pub use client::{Client, DefaultClient, Do, Get, Head, NewRequest, NewRequestWithContext, Post, PostForm};
+pub use cookie::{Cookie, ParseCookie, ParseSetCookie, SameSite,
+                 SameSiteDefaultMode, SameSiteLaxMode, SameSiteNoneMode, SameSiteStrictMode};
 pub use request::{Header, IntoReqBody, ParseHTTPVersion, Request};
 pub use response::{Response, ResponseWriter};
 pub use server::{HandleFunc, Handler, HandlerFunc, IntoMux, ListenAndServe, Server, ServeMux};

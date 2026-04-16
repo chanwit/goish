@@ -9,4 +9,8 @@
 // those remain a later milestone (see tracking #23).
 
 pub mod http;
+pub mod mail;
+pub mod netip;
+pub mod smtp;
+pub mod textproto;
 pub mod url;

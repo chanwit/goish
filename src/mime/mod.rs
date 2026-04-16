@@ -10,6 +10,8 @@
 // table is much larger; callers needing something obscure can register with
 // AddExtensionType.
 
+pub mod multipart;
+
 use crate::errors::{error, nil, New};
 use crate::types::{slice, string};
 use std::sync::{OnceLock, RwLock};
