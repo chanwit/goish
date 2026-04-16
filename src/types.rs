@@ -210,7 +210,7 @@ macro_rules! IntNewtype {
 macro_rules! SliceNewtype {
     ($name:ident = $elem:ty) => {
         #[allow(non_camel_case_types)]
-        #[derive(Clone, Debug, Default)]
+        #[derive(Clone, Debug, Default, PartialEq, Eq)]
         pub struct $name(pub $crate::types::slice<$elem>);
 
         impl ::std::ops::Deref for $name {
@@ -618,6 +618,13 @@ mod tests {
         // IntoIterator by reference.
         let sum: u64 = (&ids).into_iter().map(|u| u.0).sum();
         assert_eq!(sum, 60);
+
+        // v0.17.8: PartialEq/Eq derived — no manual impl needed.
+        let a: UserIds = vec![UserId(1), UserId(2)].into();
+        let b: UserIds = vec![UserId(1), UserId(2)].into();
+        let c: UserIds = vec![UserId(1), UserId(3)].into();
+        assert_eq!(a, b);
+        assert_ne!(a, c);
     }
 
     #[test]
