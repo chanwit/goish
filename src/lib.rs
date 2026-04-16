@@ -111,6 +111,7 @@ pub mod __goish_inventory {
 pub mod chan;
 pub mod consts;
 pub mod defer;
+pub mod gostring;
 pub mod goroutine;
 pub mod range;
 pub mod types;
