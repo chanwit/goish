@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.13"     # latest
+goish = "0.14"     # latest
 ```
 
 Then in every file where you want Go-shaped code:
@@ -327,6 +327,10 @@ if r.is_none() { t.Fatal("expected panic"); }
 | **`slices`** | `slices` | Contains/Index/Sort/SortFunc/Reverse/Min/Max/BinarySearch/Insert/Delete/Compact/Concat/Repeat/Clone |
 | **`maps`** | `maps` | Keys/Values/Equal/Clone/Copy/DeleteFunc |
 | **`iter`** | `iter` | Seq&lt;V&gt;/Seq2&lt;K,V&gt; traits + FromIterator/Collect bridges |
+| **`html`** | `html` | EscapeString/UnescapeString (core entities + numeric) |
+| **`text::tabwriter`** | `text/tabwriter` | NewWriter, Write, Flush (column alignment) |
+| **`text::scanner`** | `text/scanner` | Scanner, Scan, TokenText, Pos (Ident/Int/Float/String/Char) |
+| **`text::template`** | `text/template` | New/Parse/Execute — {{.}}, {{.Field}}, {{if}}, {{range}}, {{define}}, {{template}} |
 
 ## Known gaps
 

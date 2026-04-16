@@ -11,7 +11,7 @@ are listed under **Out of scope** and excluded from the rollup.
 
 ## Overall: **64%**
 
-_Last updated: v0.13.0 — 833 tests green._
+_Last updated: v0.14.0 — 878 tests green._
 
 ## Ported packages (in rollup)
 
@@ -22,6 +22,10 @@ _Last updated: v0.13.0 — 833 tests green._
 | `slices` | `src/slices` | `src/slices.rs` | 14 | 70% | 65% | **70%** |
 | `maps` | `src/maps` | `src/maps.rs` | 6 | 80% | 70% | **75%** |
 | `iter` | `src/iter` | `src/iter.rs` | 5 | 60% | 55% | **60%** |
+| `html` | `src/html` | `src/html.rs` | 5 | 40% | 55% | **50%** |
+| `text/tabwriter` | `src/text/tabwriter` | `src/text/tabwriter.rs` | 5 | 50% | 55% | **55%** |
+| `text/scanner` | `src/text/scanner` | `src/text/scanner.rs` | 7 | 40% | 55% | **50%** |
+| `text/template` | `src/text/template` | `src/text/template.rs` | 10 | 30% | 50% | **40%** |
 | `bufio` | `src/bufio` | `src/bufio.rs` | 17 | 70% | 40% | **55%** |
 | `bytes` | `src/bytes` | `src/bytes.rs` | 4 | 55% | 30% | **40%** |
 | `container/heap` + `container/list` + `container/ring` | `src/container/*` | `src/container/*.rs` | 20 | 70% | 60% | **65%** |
@@ -62,15 +66,13 @@ _Last updated: v0.13.0 — 833 tests green._
 | `unicode` | `src/unicode` | `src/unicode/mod.rs` | 8 | 30% | 55% | **45%** |
 | `unicode/utf8` | `src/unicode/utf8` | `src/unicode/utf8.rs` | 6 | 75% | 65% | **70%** |
 
-**Count: 44 packages ported, mean 64%.**
+**Count: 48 packages ported, mean 62%.**
 
 ## Not yet ported — scheduled on milestones
 
 Tracked on [GitHub milestones v0.11–v0.19](https://github.com/chanwit/goish/milestones).
 Each bullet has a tracker issue + per-file porting issues.
 
-- **v0.14.0** (text toolkit) — `text/{template,tabwriter,scanner}`,
-  `html`, `html/template`.
 - **v0.15.0** (networking depth) — `net/{netip,mail,smtp,textproto}`,
   plus `net/http` multipart + cookies.
 - **v0.16.0** (compression + archive) — `compress/{flate,gzip,zlib}`,
@@ -183,6 +185,7 @@ into a milestone.
 | v0.11.0 | crypto + encoding + hash | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | 49 | ✅ |
 | v0.12.0 | sort + container + math + unicode | `sort`, `math`, `math/rand`, `unicode`, `unicode/utf8`, `container/{heap,list,ring}` + new `container/ring` impl | 65 | ✅ |
 | v0.13.0 | generics-era helpers | `cmp`, `slices`, `maps`, `iter` (all new impls + tests) | 48 | ✅ |
+| v0.14.0 | text toolkit | `html`, `text/{tabwriter,scanner,template}` (all new impls + tests) | 45 | ✅ |
 | v0.11.0 | crypto + encoding | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | – | ⏳ planned |
 | v0.12.0 | sort + container + math + unicode | `sort`, `container/*`, `math`, `math/rand`, `unicode`, `unicode/utf8` | – | ⏳ planned |
 | v0.13.0 | generics-era helpers | `slices`, `maps`, `cmp`, `iter` | – | 📋 |

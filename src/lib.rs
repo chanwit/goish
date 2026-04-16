@@ -59,6 +59,7 @@ pub mod errors;
 pub mod flag;
 pub mod fmt;
 pub mod hash;             // hash/{crc32,fnv}
+pub mod html;
 pub mod io;
 pub mod iter;
 pub mod log;
@@ -76,6 +77,7 @@ pub mod strconv;
 pub mod strings;
 pub mod sync;             // sync + sync/atomic
 pub mod testing;
+pub mod text;             // text/{tabwriter,scanner,template}
 pub mod time;
 pub mod unicode;          // unicode + unicode/utf8
 
@@ -147,6 +149,7 @@ pub mod prelude {
     pub use crate::flag;
     pub use crate::fmt;
     pub use crate::hash;
+    pub use crate::html;
     pub use crate::io;
     pub use crate::io::{Reader as _GoishIoReader, Writer as _GoishIoWriter,
                         Closer as _GoishIoCloser, Seeker as _GoishIoSeeker,
@@ -167,6 +170,7 @@ pub mod prelude {
     pub use crate::strings;
     pub use crate::sync;
     pub use crate::testing;
+    pub use crate::text;
     pub use crate::time;
     pub use crate::unicode;
 
