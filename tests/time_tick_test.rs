@@ -110,9 +110,17 @@ test!{ fn TestAfterFunc(t) {
     let _timer = time::AfterFunc(Millisecond * 20i64, move || {
         r.store(true, Ordering::SeqCst);
     });
-    std::thread::sleep(std::time::Duration::from_millis(80));
+    // Poll up to 2s. Fast local machines observe the callback within
+    // ~25ms; loaded CI runners can need several hundred ms for the
+    // spawned thread to get scheduled. The polling keeps the happy
+    // path fast while giving CI enough headroom to avoid false
+    // negatives.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(2000);
+    while !ran.load(Ordering::SeqCst) && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
     if !ran.load(Ordering::SeqCst) {
-        t.Errorf(Sprintf!("AfterFunc callback did not run"));
+        t.Errorf(Sprintf!("AfterFunc callback did not run within 2s"));
     }
 }}
 
