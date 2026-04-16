@@ -46,7 +46,7 @@ pub fn Compare(a: impl AsRef<str>, b: impl AsRef<str>) -> int {
 /// a string's underlying storage; in goish `String` is owned so it's a
 /// plain clone.
 pub fn Clone(s: impl AsRef<str>) -> string {
-    s.as_ref().to_string()
+    s.as_ref().into()
 }
 
 pub fn HasPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> bool {
@@ -85,9 +85,9 @@ pub fn Split(s: impl AsRef<str>, sep: impl AsRef<str>) -> slice<string> {
     let s = s.as_ref();
     let sep = sep.as_ref();
     if sep.is_empty() {
-        return s.chars().map(|c| c.to_string()).collect();
+        return s.chars().map(|c| string::from(c.to_string())).collect();
     }
-    s.split(sep).map(String::from).collect()
+    s.split(sep).map(string::from).collect()
 }
 
 /// strings.SplitN — like Split but stops after n substrings (n<0 = all, n==0 = empty).
@@ -100,11 +100,17 @@ pub fn SplitN(s: impl AsRef<str>, sep: impl AsRef<str>, n: int) -> slice<string>
     if n < 0 {
         return Split(s, sep);
     }
-    s.splitn(n as usize, sep).map(String::from).collect()
+    s.splitn(n as usize, sep).map(string::from).collect()
 }
 
 pub fn Join(elems: &[string], sep: impl AsRef<str>) -> string {
-    elems.join(sep.as_ref())
+    let sep = sep.as_ref();
+    let mut out = std::string::String::new();
+    for (i, e) in elems.iter().enumerate() {
+        if i > 0 { out.push_str(sep); }
+        out.push_str(e);
+    }
+    out.into()
 }
 
 /// strings.Replace — replace first n occurrences (n<0 = all).
@@ -113,52 +119,52 @@ pub fn Replace(s: impl AsRef<str>, old: impl AsRef<str>, new: impl AsRef<str>, n
     let old = old.as_ref();
     let new = new.as_ref();
     if n < 0 {
-        s.replace(old, new)
+        s.replace(old, new).into()
     } else {
-        s.replacen(old, new, n as usize)
+        s.replacen(old, new, n as usize).into()
     }
 }
 
 pub fn ReplaceAll(s: impl AsRef<str>, old: impl AsRef<str>, new: impl AsRef<str>) -> string {
-    s.as_ref().replace(old.as_ref(), new.as_ref())
+    s.as_ref().replace(old.as_ref(), new.as_ref()).into()
 }
 
 pub fn ToUpper(s: impl AsRef<str>) -> string {
-    s.as_ref().to_uppercase()
+    s.as_ref().to_uppercase().into()
 }
 
 pub fn ToLower(s: impl AsRef<str>) -> string {
-    s.as_ref().to_lowercase()
+    s.as_ref().to_lowercase().into()
 }
 
 pub fn TrimSpace(s: impl AsRef<str>) -> string {
-    s.as_ref().trim().to_string()
+    s.as_ref().trim().into()
 }
 
 pub fn TrimPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> string {
     let s = s.as_ref();
-    s.strip_prefix(prefix.as_ref()).unwrap_or(s).to_string()
+    s.strip_prefix(prefix.as_ref()).unwrap_or(s).into()
 }
 
 pub fn TrimSuffix(s: impl AsRef<str>, suffix: impl AsRef<str>) -> string {
     let s = s.as_ref();
-    s.strip_suffix(suffix.as_ref()).unwrap_or(s).to_string()
+    s.strip_suffix(suffix.as_ref()).unwrap_or(s).into()
 }
 
 pub fn Trim(s: impl AsRef<str>, cutset: impl AsRef<str>) -> string {
     let cutset = cutset.as_ref().to_string();
-    s.as_ref().trim_matches(|c: char| cutset.contains(c)).to_string()
+    s.as_ref().trim_matches(|c: char| cutset.contains(c)).into()
 }
 
 pub fn Fields(s: impl AsRef<str>) -> slice<string> {
-    s.as_ref().split_whitespace().map(String::from).collect()
+    s.as_ref().split_whitespace().map(string::from).collect()
 }
 
 pub fn Repeat(s: impl AsRef<str>, count: int) -> string {
     if count < 0 {
         panic!("strings: negative Repeat count");
     }
-    s.as_ref().repeat(count as usize)
+    s.as_ref().repeat(count as usize).into()
 }
 
 /// ASCII-only fold (Go does full Unicode; close enough for now).
@@ -198,7 +204,8 @@ pub fn EqualFold(s: impl AsRef<str>, t: impl AsRef<str>) -> bool {
 
 #[derive(Debug, Clone, Default)]
 pub struct Builder {
-    inner: string,
+    // Mutable String internally; exposed as `string` (Arc<str>) via .String().
+    inner: std::string::String,
 }
 
 impl Builder {
@@ -229,7 +236,7 @@ impl Builder {
     }
 
     pub fn String(&self) -> string {
-        self.inner.clone()
+        self.inner.clone().into()
     }
 
     /// `b.Cap()` — underlying capacity of the backing buffer. Used by
@@ -414,7 +421,7 @@ impl Replacer {
             out.push(ch);
             i += ch.len_utf8();
         }
-        out
+        out.into()
     }
 
     pub fn WriteString<W: std::io::Write>(&self, w: &mut W, s: impl AsRef<str>) -> (int, crate::errors::error) {
@@ -458,7 +465,7 @@ pub fn Map(mut f: impl FnMut(char) -> char, s: impl AsRef<str>) -> string {
             out.push(r);
         }
     }
-    out
+    out.into()
 }
 
 // ── strings.ContainsAny / IndexAny / ContainsRune ──────────────────────
@@ -503,8 +510,8 @@ pub fn IndexRune(s: impl AsRef<str>, r: char) -> int {
 pub fn Cut(s: impl AsRef<str>, sep: impl AsRef<str>) -> (string, string, bool) {
     let s = s.as_ref(); let sep = sep.as_ref();
     match s.find(sep) {
-        Some(i) => (s[..i].to_string(), s[i + sep.len()..].to_string(), true),
-        None => (s.to_string(), String::new(), false),
+        Some(i) => (s[..i].into(), s[i + sep.len()..].into(), true),
+        None => (s.into(), "".into(), false),
     }
 }
 
@@ -513,8 +520,8 @@ pub fn Cut(s: impl AsRef<str>, sep: impl AsRef<str>) -> (string, string, bool) {
 pub fn CutPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> (string, bool) {
     let s = s.as_ref(); let p = prefix.as_ref();
     match s.strip_prefix(p) {
-        Some(rest) => (rest.to_string(), true),
-        None => (s.to_string(), false),
+        Some(rest) => (rest.into(), true),
+        None => (s.into(), false),
     }
 }
 
@@ -523,8 +530,8 @@ pub fn CutPrefix(s: impl AsRef<str>, prefix: impl AsRef<str>) -> (string, bool) 
 pub fn CutSuffix(s: impl AsRef<str>, suffix: impl AsRef<str>) -> (string, bool) {
     let s = s.as_ref(); let suf = suffix.as_ref();
     match s.strip_suffix(suf) {
-        Some(rest) => (rest.to_string(), true),
-        None => (s.to_string(), false),
+        Some(rest) => (rest.into(), true),
+        None => (s.into(), false),
     }
 }
 
@@ -532,14 +539,14 @@ pub fn CutSuffix(s: impl AsRef<str>, suffix: impl AsRef<str>) -> (string, bool) 
 #[allow(non_snake_case)]
 pub fn TrimLeft(s: impl AsRef<str>, cutset: impl AsRef<str>) -> string {
     let cut: Vec<char> = cutset.as_ref().chars().collect();
-    s.as_ref().trim_start_matches(|c: char| cut.contains(&c)).to_string()
+    s.as_ref().trim_start_matches(|c: char| cut.contains(&c)).into()
 }
 
 /// `strings.TrimRight(s, cutset)` — drop trailing runes in `cutset`.
 #[allow(non_snake_case)]
 pub fn TrimRight(s: impl AsRef<str>, cutset: impl AsRef<str>) -> string {
     let cut: Vec<char> = cutset.as_ref().chars().collect();
-    s.as_ref().trim_end_matches(|c: char| cut.contains(&c)).to_string()
+    s.as_ref().trim_end_matches(|c: char| cut.contains(&c)).into()
 }
 
 /// `strings.LastIndexByte(s, c)` — last index of the byte `c` in `s`, or -1.
@@ -583,19 +590,19 @@ pub fn LastIndexFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> int
 /// `strings.TrimFunc(s, f)` — trim runes satisfying f from both ends.
 #[allow(non_snake_case)]
 pub fn TrimFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> string {
-    s.as_ref().trim_matches(|c: char| f(c)).to_string()
+    s.as_ref().trim_matches(|c: char| f(c)).into()
 }
 
 /// `strings.TrimLeftFunc(s, f)` — trim runes satisfying f from the start.
 #[allow(non_snake_case)]
 pub fn TrimLeftFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> string {
-    s.as_ref().trim_start_matches(|c: char| f(c)).to_string()
+    s.as_ref().trim_start_matches(|c: char| f(c)).into()
 }
 
 /// `strings.TrimRightFunc(s, f)` — trim runes satisfying f from the end.
 #[allow(non_snake_case)]
 pub fn TrimRightFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> string {
-    s.as_ref().trim_end_matches(|c: char| f(c)).to_string()
+    s.as_ref().trim_end_matches(|c: char| f(c)).into()
 }
 
 /// `strings.SplitAfter(s, sep)` — like Split but keeps sep at the end of
@@ -604,20 +611,19 @@ pub fn TrimRightFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> str
 pub fn SplitAfter(s: impl AsRef<str>, sep: impl AsRef<str>) -> slice<string> {
     let s = s.as_ref(); let sep = sep.as_ref();
     if sep.is_empty() {
-        // Go's behavior: split after every rune.
-        return s.chars().map(|c| c.to_string()).collect();
+        return s.chars().map(|c| string::from(c.to_string())).collect();
     }
-    let mut out = Vec::new();
+    let mut out: Vec<string> = Vec::new();
     let mut start = 0usize;
     loop {
         match s[start..].find(sep) {
             Some(i) => {
                 let end = start + i + sep.len();
-                out.push(s[start..end].to_string());
+                out.push(s[start..end].into());
                 start = end;
             }
             None => {
-                out.push(s[start..].to_string());
+                out.push(s[start..].into());
                 break;
             }
         }
@@ -631,7 +637,7 @@ pub fn FieldsFunc(s: impl AsRef<str>, mut f: impl FnMut(char) -> bool) -> slice<
     s.as_ref()
         .split(|c: char| f(c))
         .filter(|seg| !seg.is_empty())
-        .map(|seg| seg.to_string())
+        .map(string::from)
         .collect()
 }
 
@@ -654,7 +660,7 @@ pub fn Title(s: impl AsRef<str>) -> string {
             out.push(c);
         }
     }
-    out
+    out.into()
 }
 
 #[cfg(test)]
