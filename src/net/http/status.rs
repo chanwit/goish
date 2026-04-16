@@ -65,5 +65,5 @@ pub fn StatusText(code: int) -> crate::types::string {
         504 => "Gateway Timeout",
         _ => "",
     };
-    s.to_owned()
+    s.into()
 }

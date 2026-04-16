@@ -55,7 +55,7 @@ impl Body {
     #[allow(non_snake_case)]
     pub fn String(&self) -> string {
         let b = self.Bytes();
-        String::from_utf8_lossy(&b).into_owned()
+        String::from_utf8_lossy(&b).into_owned().into()
     }
 
     fn drain_into(&self, out: &mut Vec<u8>) {

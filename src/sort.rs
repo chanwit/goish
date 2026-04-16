@@ -106,7 +106,7 @@ pub fn SearchInts(s: &[int], v: int) -> int {
 #[allow(non_snake_case)]
 pub fn SearchStrings(s: &[string], v: impl AsRef<str>) -> int {
     let v = v.as_ref();
-    Search(s.len() as int, |i| s[i as usize].as_str() >= v)
+    Search(s.len() as int, |i| &*s[i as usize] >= v)
 }
 
 #[allow(non_snake_case)]

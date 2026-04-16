@@ -25,7 +25,7 @@ pub fn EncodeToString(src: &[byte]) -> string {
         out.push(HEX[(b >> 4) as usize] as char);
         out.push(HEX[(b & 0x0f) as usize] as char);
     }
-    out
+    out.into()
 }
 
 /// Decode a hex string. Odd length or non-hex chars return an error.

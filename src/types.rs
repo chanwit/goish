@@ -36,7 +36,7 @@ pub type float64 = f64;
 pub type byte = u8;
 pub type rune = i32;
 
-pub type string = std::string::String;
+pub type string = std::sync::Arc<str>;
 
 // Go: []T  →  goish: slice<T>
 pub type slice<T> = Vec<T>;
