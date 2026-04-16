@@ -434,9 +434,7 @@ mod tests {
         impl Interface for Uint64Slice {
             fn Len(&self) -> int { self.0.len() as int }
             fn Less(&self, i: int, j: int) -> bool { self.0[i] < self.0[j] }
-            fn Swap(&mut self, i: int, j: int) {
-                self.0.as_vec_mut().swap(i as usize, j as usize);
-            }
+            fn Swap(&mut self, i: int, j: int) { self.0.Swap(i, j); }
         }
         let mut g = Uint64Slice(crate::slice!([]uint64{10, 500, 5, 1, 100, 25}));
         Sort(&mut g);
@@ -452,9 +450,7 @@ mod tests {
         impl Interface for Items {
             fn Len(&self) -> int { self.0.len() as int }
             fn Less(&self, i: int, j: int) -> bool { self.0[i].0 < self.0[j].0 }
-            fn Swap(&mut self, i: int, j: int) {
-                self.0.as_vec_mut().swap(i as usize, j as usize);
-            }
+            fn Swap(&mut self, i: int, j: int) { self.0.Swap(i, j); }
         }
         let mut it = Items(SliceNew(vec![(2i64, 0i64), (1, 1), (2, 2), (1, 3)]));
         Stable(&mut it);

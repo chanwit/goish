@@ -18,7 +18,7 @@ struct Uint64Slice(slice<uint64>);
 impl sort::Interface for Uint64Slice {
     fn Len(&self) -> int { self.0.len() as int }
     fn Less(&self, i: int, j: int) -> bool { self.0[i] < self.0[j] }
-    fn Swap(&mut self, i: int, j: int) { self.0.as_vec_mut().swap(i as usize, j as usize); }
+    fn Swap(&mut self, i: int, j: int) { self.0.Swap(i, j); }
 }
 
 fn main() {

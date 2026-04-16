@@ -25,6 +25,20 @@ impl<T> slice<T> {
     pub fn into_vec(self) -> Vec<T> { self.0 }
     pub fn as_vec(&self) -> &Vec<T> { &self.0 }
     pub fn as_vec_mut(&mut self) -> &mut Vec<T> { &mut self.0 }
+
+    /// Go's `s[i], s[j] = s[j], s[i]` — swap two elements by index.
+    /// Indexed by Go's `int` (i64). Panics on out-of-range, matching Go.
+    #[allow(non_snake_case)]
+    pub fn Swap(&mut self, i: i64, j: i64) {
+        let n = self.0.len();
+        if i < 0 || (i as u64) >= n as u64 {
+            panic!("runtime error: index out of range [{}] with length {}", i, n);
+        }
+        if j < 0 || (j as u64) >= n as u64 {
+            panic!("runtime error: index out of range [{}] with length {}", j, n);
+        }
+        self.0.swap(i as usize, j as usize);
+    }
 }
 
 // ── Deref / AsRef ─────────────────────────────────────────────────────
@@ -228,6 +242,20 @@ mod tests {
         assert_eq!(borrowed, 6);
         let owned: i64 = s.into_iter().sum();
         assert_eq!(owned, 6);
+    }
+
+    #[test]
+    fn swap_by_int_indices() {
+        let mut s: slice<i64> = slice(vec![10, 20, 30]);
+        s.Swap(0i64, 2i64);
+        assert_eq!(s.as_vec(), &vec![30, 20, 10]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn swap_out_of_range_panics() {
+        let mut s: slice<i64> = slice(vec![1, 2]);
+        s.Swap(0, 5);
     }
 
     #[test]
