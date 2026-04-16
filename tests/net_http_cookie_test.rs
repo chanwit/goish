@@ -59,12 +59,12 @@ test!{ fn TestWriteSetCookies(t) {
         Case { cookie: Cookie!{Name: "a\nb", Value: "v"}, raw: "" },
         Case { cookie: Cookie!{Name: "a\rb", Value: "v"}, raw: "" },
     ];
-    range!{ i, c := cases[..];
+    r#for!{ i, c := range (cases[..]) {
         let got = c.cookie.String();
         if got != c.raw {
             t.Errorf(Sprintf!("Test %d:\nwant: %s\n got: %s", i as i64, c.raw, got));
         }
-    }
+    }}
 }}
 
 // ── TestParseCookie (Cookie request header parsing) ─────────────────
@@ -91,14 +91,14 @@ test!{ fn TestParseCookie(t) {
                 c.line, len!(cookies) as i64, len!(c.names) as i64));
             continue;
         }
-        range!{ i, ck := cookies[..];
+        r#for!{ i, ck := range (cookies[..]) {
             if ck.Name != c.names[i] {
                 t.Errorf(Sprintf!("[%d].Name = %s, want %s", i as i64, ck.Name, c.names[i]));
             }
             if ck.Value != c.values[i] {
                 t.Errorf(Sprintf!("[%d].Value = %s, want %s", i as i64, ck.Value, c.values[i]));
             }
-        }
+        }}
     }
     // Invalid
     let bad = ["", "no-equals"];
@@ -147,7 +147,7 @@ test!{ fn TestParseSetCookieTable(t) {
                name: "special-2", value: " z", path: "", domain: "",
                http_only: false, secure: false, same_site: Default },
     ];
-    range!{ i, c := cases[..];
+    r#for!{ i, c := range (cases[..]) {
         let (got, err) = http::ParseSetCookie(c.input);
         if err != nil { t.Fatal(&Sprintf!("case %d: ParseSetCookie: %s", i as i64, err)); }
         if got.Name != c.name {
@@ -171,7 +171,7 @@ test!{ fn TestParseSetCookieTable(t) {
         if got.SameSite != c.same_site {
             t.Errorf(Sprintf!("case %d: SameSite mismatch", i as i64));
         }
-    }
+    }}
 }}
 
 // ── TestParseSetCookie (Set-Cookie response header parsing) ─────────

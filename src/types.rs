@@ -90,6 +90,12 @@ macro_rules! slice {
 ///   range!{ v := xs; body_stmts }          // Go: for _, v := range xs
 ///   range!{ i := xs; body_stmts }          // Go: for i := range xs  (index only)
 ///
+/// Or use the shorter Go-literal `for!` macro:
+///
+///   for!{ i, v := range xs { body } }      // Go: for i, v := range xs { body }
+///   for!{ _, v := range xs { body } }      // Go: for _, v := range xs { body }
+///   for!{ v := range xs { body } }         // value only
+///
 /// The legacy closure form `range!(xs, |i, v| { ... })` is kept for
 /// backward compatibility.
 #[macro_export]
@@ -118,6 +124,34 @@ macro_rules! range {
         for $v in ($iter).into_iter() {
             $body
         }
+    };
+}
+
+/// Go-literal `for!{ i, v := range xs { body } }` — mirrors
+/// `for i, v := range xs { body }` token-for-token (apart from the
+/// `!` and outer braces that macro invocations need).
+///
+/// The range expression `xs` must be a single token tree — either a
+/// bare identifier (`xs`) or parenthesised (`(&cases[..])`). This
+/// restriction is a macro-rules follow-set limitation; passing a
+/// complex path or indexing expression requires parens.
+#[macro_export]
+macro_rules! r#for {
+    // for i, v := range xs { body }
+    ($i:ident , $v:ident : = range $iter:tt $body:block) => {
+        for ($i, $v) in $crate::range::RangeIter::range(&$iter) $body
+    };
+    // for _, v := range xs { body }
+    (_ , $v:ident : = range $iter:tt $body:block) => {
+        for (_, $v) in $crate::range::RangeIter::range(&$iter) $body
+    };
+    // for i, _ := range xs { body }
+    ($i:ident , _ : = range $iter:tt $body:block) => {
+        for ($i, _) in $crate::range::RangeIter::range(&$iter) $body
+    };
+    // for v := range xs { body }  — value only (Go: for _, v := range xs)
+    ($v:ident : = range $iter:tt $body:block) => {
+        for (_, $v) in $crate::range::RangeIter::range(&$iter) $body
     };
 }
 
