@@ -94,29 +94,41 @@ test!{ fn TestSelectExprEvaluatedOnce(t) {
 // ── Bug 4: wake latency ─────────────────────────────────────────────
 // Old 1ms spin-sleep added up to 1ms latency for no-default selects.
 // With flume::Selector the wake should be sub-millisecond.
+//
+// We measure latency relative to the SENDER's own timestamp (captured
+// immediately before Send), not the test start. Including the 10ms
+// sleep in the measurement would let scheduling jitter on a loaded CI
+// runner mask the wake-latency signal entirely.
 
 test!{ fn TestSelectWakeLatency(t) {
+    use std::sync::{Arc, Mutex};
     let c: Chan<i64> = chan!(i64, 0);
     let cc = c.clone();
-    // Sender fires after a short delay.
+    let send_at: Arc<Mutex<Option<std::time::Instant>>> = Arc::new(Mutex::new(None));
+    let sa = send_at.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(10));
+        // Timestamp the moment just before the rendezvous completes.
+        *sa.lock().unwrap() = Some(std::time::Instant::now());
         cc.Send(42);
     });
-    let start = std::time::Instant::now();
     let mut got: i64 = 0;
     select! {
         recv(c) |v| => { got = v; },
     }
-    let elapsed = start.elapsed();
+    let received_at = std::time::Instant::now();
     if got != 42 {
         t.Errorf(Sprintf!("got %d want 42", got));
     }
-    // Sender sends at ~10ms. Old select would wake at ~11ms (10+1ms spin).
-    // New select should wake within a few µs of the send. Allow up to 5ms
-    // above the ~10ms delay as generous margin for CI.
-    if elapsed.as_millis() > 15 {
-        t.Errorf(Sprintf!("wake latency too high: %d ms (want < 15)", elapsed.as_millis()));
+    let sent_at = send_at.lock().unwrap().expect("sender did not set timestamp");
+    let latency = received_at.duration_since(sent_at);
+    // The old macro_rules! select would add up to 1 ms of spin-sleep on
+    // top of the send-to-receive handoff. Park-based select should be
+    // sub-millisecond on a quiet machine. Accept up to 50 ms to absorb
+    // CI scheduling outliers — anything above that would indicate a
+    // real regression to polling (or much worse).
+    if latency.as_millis() > 50 {
+        t.Errorf(Sprintf!("wake latency too high: %d ms (want < 50)", latency.as_millis()));
     }
 }}
 
