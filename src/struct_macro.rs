@@ -53,7 +53,23 @@ macro_rules! __goish_struct_parse {
         $crate::__goish_struct_parse!(@collect [$name] [$($fd)*] [$($ord)*] [$f] $($rest)*);
     };
 
-    // Single field: `name TYPE ;` or `name TYPE` at end
+    // Qualified-path type: `name A::B::...::C ;` or trailing.
+    // Matched BEFORE the single-tt arm so `semver::Version` is consumed as
+    // a unit; the emitted type is paren-wrapped to keep it a single tt for
+    // downstream __goish_type! / __goish_cast! dispatch.
+    (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident $h:ident $(:: $s:ident)+ ; $($rest:tt)*) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* ($f : ($h $(:: $s)+) ,)]
+            [$($ord)* ($f ($h $(:: $s)+))]
+            $($rest)*);
+    };
+    (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident $h:ident $(:: $s:ident)+) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* ($f : ($h $(:: $s)+) ,)]
+            [$($ord)* ($f ($h $(:: $s)+))]);
+    };
+
+    // Single field: `name TYPE ;` or `name TYPE` at end (TYPE = single tt)
     (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident $ty:tt ; $($rest:tt)*) => {
         $crate::__goish_struct_parse!(@start [$name]
             [$($fd)* ($f : $ty ,)]
@@ -70,7 +86,19 @@ macro_rules! __goish_struct_parse {
     (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $next:ident , $($rest:tt)*) => {
         $crate::__goish_struct_parse!(@collect [$name] [$($fd)*] [$($ord)*] [$($names)+ $next] $($rest)*);
     };
-    // Last ident in group + type + optional ; + more
+    // Multi-name group ending with qualified-path type.
+    (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident $h:ident $(:: $s:ident)+ ; $($rest:tt)*) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* $( ($names : ($h $(:: $s)+) ,) )+ ($last : ($h $(:: $s)+) ,)]
+            [$($ord)* $( ($names ($h $(:: $s)+)) )+ ($last ($h $(:: $s)+))]
+            $($rest)*);
+    };
+    (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident $h:ident $(:: $s:ident)+) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* $( ($names : ($h $(:: $s)+) ,) )+ ($last : ($h $(:: $s)+) ,)]
+            [$($ord)* $( ($names ($h $(:: $s)+)) )+ ($last ($h $(:: $s)+))]);
+    };
+    // Last ident in group + single-tt type + optional ; + more
     (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident $ty:tt ; $($rest:tt)*) => {
         $crate::__goish_struct_parse!(@start [$name]
             [$($fd)* $( ($names : $ty ,) )+ ($last : $ty ,)]
@@ -259,5 +287,32 @@ mod tests {
         assert_eq!(t.name, "alpha");
         assert_eq!(t.count, 42);
         assert_eq!(t.ok, true);
+    }
+
+    // Nested module for the qualified-path test.
+    mod semver {
+        #[allow(non_snake_case)]
+        #[derive(Clone, Debug, Default, PartialEq)]
+        pub struct Version { pub Major: i64, pub Minor: i64, pub Patch: i64 }
+    }
+    Struct!{ type tcase struct {
+        name string;
+        ver1 semver::Version;
+        ver2 semver::Version;
+        expected int
+    } }
+
+    #[test]
+    fn qualified_path_field_types() {
+        let t = tcase!(
+            "1.2.0 vs 1.3.0",
+            semver::Version { Major: 1, Minor: 2, Patch: 0 },
+            semver::Version { Major: 1, Minor: 3, Patch: 0 },
+            -1i64
+        );
+        assert_eq!(t.name, "1.2.0 vs 1.3.0");
+        assert_eq!(t.ver1.Minor, 2);
+        assert_eq!(t.ver2.Minor, 3);
+        assert_eq!(t.expected, -1);
     }
 }
