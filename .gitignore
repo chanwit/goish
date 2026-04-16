@@ -17,3 +17,4 @@ Cargo.lock
 
 # Reference / scratch material (not part of the published crate)
 /refs/
+examples/gostring_prototype/target/

@@ -44,12 +44,12 @@ impl Userinfo {
     pub fn Password(&self) -> (string, bool) {
         match &self.password {
             Some(p) => (p.clone(), true),
-            None => (String::new(), false),
+            None => ("".into(), false),
         }
     }
     pub fn String(&self) -> string {
         match &self.password {
-            Some(p) => format!("{}:{}", QueryEscape(&self.username), QueryEscape(p)),
+            Some(p) => format!("{}:{}", QueryEscape(&self.username), QueryEscape(p)).into(),
             None => QueryEscape(&self.username),
         }
     }
@@ -57,7 +57,7 @@ impl Userinfo {
 
 impl URL {
     pub fn String(&self) -> string {
-        let mut out = String::new();
+        let mut out = std::string::String::new();
         if !self.Scheme.is_empty() {
             out.push_str(&self.Scheme);
             out.push(':');
@@ -66,8 +66,8 @@ impl URL {
             out.push_str(&self.Opaque);
         } else {
             if !self.Host.is_empty() || self.User.is_some()
-                || self.Scheme == "http" || self.Scheme == "https"
-                || self.Scheme == "ws" || self.Scheme == "wss" || self.Scheme == "ftp"
+                || &*self.Scheme == "http" || &*self.Scheme == "https"
+                || &*self.Scheme == "ws" || &*self.Scheme == "wss" || &*self.Scheme == "ftp"
             {
                 out.push_str("//");
                 if let Some(u) = &self.User {
@@ -86,7 +86,7 @@ impl URL {
             out.push('#');
             out.push_str(&self.Fragment);
         }
-        out
+        out.into()
     }
 
     pub fn Query(&self) -> Values {
@@ -98,17 +98,17 @@ impl URL {
     pub fn Hostname(&self) -> string {
         let h = &self.Host;
         if h.starts_with('[') {
-            if let Some(end) = h.find(']') { return h[1..end].to_string(); }
+            if let Some(end) = h.find(']') { return h[1..end].into(); }
         }
         match h.rsplit_once(':') {
-            Some((host, _)) => host.to_string(),
-            None => h.to_string(),
+            Some((host, _)) => host.into(),
+            None => h.clone(),
         }
     }
 
     /// URL.RequestURI — the path?query portion, suitable for an HTTP request.
     pub fn RequestURI(&self) -> string {
-        let mut out = String::new();
+        let mut out = std::string::String::new();
         if !self.Opaque.is_empty() {
             out.push_str(&self.Opaque);
         } else {
@@ -122,12 +122,12 @@ impl URL {
             out.push('?');
             out.push_str(&self.RawQuery);
         }
-        out
+        out.into()
     }
 
     /// URL.JoinPath — returns a new URL with the given path components appended.
     pub fn JoinPath(&self, elem: &[impl AsRef<str>]) -> URL {
-        let mut joined = self.Path.clone();
+        let mut joined = String::from(&*self.Path);
         for e in elem {
             let s = e.as_ref();
             if s.is_empty() { continue; }
@@ -137,8 +137,8 @@ impl URL {
         // Normalise ./ and ../ like path.Clean would do for a pure path.
         let cleaned = path_clean(&joined);
         let mut u = self.clone();
-        u.Path = cleaned;
-        u.RawPath = String::new();
+        u.Path = cleaned.into();
+        u.RawPath = "".into();
         u
     }
 
@@ -147,14 +147,14 @@ impl URL {
         if h.starts_with('[') {
             if let Some(end) = h.find(']') {
                 if h.len() > end + 1 && &h[end + 1..end + 2] == ":" {
-                    return h[end + 2..].to_string();
+                    return h[end + 2..].into();
                 }
-                return String::new();
+                return "".into();
             }
         }
         match h.rsplit_once(':') {
-            Some((_, p)) => p.to_string(),
-            None => String::new(),
+            Some((_, p)) => p.into(),
+            None => "".into(),
         }
     }
 }
@@ -167,19 +167,19 @@ pub fn Parse(raw: impl AsRef<str>) -> (URL, error) {
 
     // Fragment.
     if let Some(i) = rest.find('#') {
-        u.Fragment = rest[i + 1..].to_string();
+        u.Fragment = rest[i + 1..].into();
         rest = &rest[..i];
     }
 
     // Query.
     if let Some(i) = rest.find('?') {
-        u.RawQuery = rest[i + 1..].to_string();
+        u.RawQuery = rest[i + 1..].into();
         rest = &rest[..i];
     }
 
     // Scheme.
     if let Some(i) = find_scheme_end(rest) {
-        u.Scheme = rest[..i].to_ascii_lowercase();
+        u.Scheme = rest[..i].to_ascii_lowercase().into();
         rest = &rest[i + 1..];
     }
 
@@ -203,14 +203,14 @@ pub fn Parse(raw: impl AsRef<str>) -> (URL, error) {
             };
             u.User = Some(Userinfo { username: user, password: pwd });
         }
-        u.Host = host.to_string();
+        u.Host = host.into();
     } else if !u.Scheme.is_empty() && !rest.starts_with('/') {
         // Opaque URL: e.g. "mailto:foo@bar".
-        u.Opaque = rest.to_string();
+        u.Opaque = rest.into();
         return (u, nil);
     }
 
-    u.RawPath = rest.to_string();
+    u.RawPath = rest.into();
     let (decoded, err) = PathUnescape(rest);
     if err != nil {
         return (u, New(&format!("parse {:?}: invalid URL escape", s)));
@@ -251,12 +251,12 @@ impl Values {
     }
 
     pub fn Set(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) {
-        self.inner.insert(key.as_ref().to_string(), vec![value.as_ref().to_string()]);
+        self.inner.insert(key.as_ref().into(), vec![value.as_ref().into()]);
     }
 
     pub fn Add(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) {
-        self.inner.entry(key.as_ref().to_string()).or_default()
-            .push(value.as_ref().to_string());
+        self.inner.entry(key.as_ref().into()).or_default()
+            .push(value.as_ref().into());
     }
 
     pub fn Del(&mut self, key: impl AsRef<str>) {
@@ -268,19 +268,21 @@ impl Values {
     }
 
     pub fn Encode(&self) -> string {
-        let mut keys: Vec<&String> = self.inner.keys().collect();
+        let mut keys: Vec<&string> = self.inner.keys().collect();
         keys.sort();
-        let mut out = String::new();
+        let mut out = std::string::String::new();
         for k in keys {
-            let enc_k = QueryEscape(k);
-            for v in &self.inner[k] {
-                if !out.is_empty() { out.push('&'); }
-                out.push_str(&enc_k);
-                out.push('=');
-                out.push_str(&QueryEscape(v));
+            let enc_k = QueryEscape(&**k);
+            if let Some(vs) = self.inner.get(k) {
+                for v in vs {
+                    if !out.is_empty() { out.push('&'); }
+                    out.push_str(&enc_k);
+                    out.push('=');
+                    out.push_str(&QueryEscape(&**v));
+                }
             }
         }
-        out
+        out.into()
     }
 
     pub fn Len(&self) -> int { self.inner.len() as int }
@@ -334,7 +336,7 @@ fn escape(s: &str, is_query: bool) -> string {
             out.push(hex_digit(b & 0xf));
         }
     }
-    out
+    out.into()
 }
 
 fn should_not_escape(b: u8, is_query: bool) -> bool {
@@ -372,12 +374,12 @@ fn unescape(s: &str, is_query: bool) -> (string, error) {
         let b = bytes[i];
         if b == b'%' {
             if i + 2 >= bytes.len() {
-                return (String::new(), New("invalid URL escape"));
+                return ("".into(), New("invalid URL escape"));
             }
             let hi = hex_val(bytes[i + 1]);
             let lo = hex_val(bytes[i + 2]);
             if hi < 0 || lo < 0 {
-                return (String::new(), New("invalid URL escape"));
+                return ("".into(), New("invalid URL escape"));
             }
             out.push(((hi as u8) << 4) | (lo as u8));
             i += 3;
@@ -389,11 +391,11 @@ fn unescape(s: &str, is_query: bool) -> (string, error) {
             i += 1;
         }
     }
-    (String::from_utf8_lossy(&out).into_owned(), nil)
+    (String::from_utf8_lossy(&out).into_owned().into(), nil)
 }
 
 fn path_clean(p: &str) -> String {
-    if p.is_empty() { return ".".to_string(); }
+    if p.is_empty() { return ".".into(); }
     let absolute = p.starts_with('/');
     let mut stack: Vec<&str> = Vec::new();
     for part in p.split('/') {
@@ -411,7 +413,7 @@ fn path_clean(p: &str) -> String {
     }
     let joined = stack.join("/");
     if absolute { format!("/{}", joined) }
-    else if joined.is_empty() { ".".to_string() }
+    else if joined.is_empty() { ".".into() }
     else { joined }
 }
 
@@ -419,7 +421,7 @@ fn path_clean(p: &str) -> String {
 #[allow(non_snake_case)]
 pub fn JoinPath(base: impl AsRef<str>, elem: &[impl AsRef<str>]) -> (string, error) {
     let (u, err) = Parse(base);
-    if err != nil { return (String::new(), err); }
+    if err != nil { return ("".into(), err); }
     let out = u.JoinPath(elem);
     (out.String(), nil)
 }
@@ -465,7 +467,7 @@ mod tests {
         assert_eq!(u.Fragment, "section");
         let ui = u.User.as_ref().unwrap();
         assert_eq!(ui.username, "alice");
-        assert_eq!(ui.password, Some("s3cret".to_string()));
+        assert_eq!(ui.password, Some("s3cret".into()));
     }
 
     #[test]
