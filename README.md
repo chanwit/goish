@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.11"     # latest
+goish = "0.12"     # latest
 ```
 
 Then in every file where you want Go-shaped code:
@@ -316,7 +316,7 @@ if r.is_none() { t.Fatal("expected panic"); }
 | **`csv`** | `encoding/csv` | Reader/Writer with RFC 4180 quoting |
 | **`hash::{crc32,fnv}`** | `hash/crc32`, `hash/fnv` | IEEE CRC-32, FNV-1/1a 32/64 |
 | **`mime`** | `mime` | TypeByExtension/ExtensionsByType/AddExtensionType |
-| **`container::{list,heap}`** | `container/list`, `container/heap` | doubly linked list, generic binary heap |
+| **`container::{list,heap,ring}`** | `container/list`, `container/heap`, `container/ring` | doubly linked list, generic binary heap, circular list |
 | **`url`** | `net/url` | Parse/URL/Userinfo + Values + QueryEscape/PathEscape |
 | **`crypto::{md5,sha1,sha256}`** | `crypto/md5`, `crypto/sha1`, `crypto/sha256` | hand-rolled (no deps) |
 | **`json`** | `encoding/json` | Marshal/Unmarshal/MarshalIndent over `Value` |

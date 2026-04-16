@@ -9,9 +9,9 @@ Overall score = unweighted mean of per-package "Overall %". Packages
 that goish does not target (unsafe, reflect, go/*, image, plugin, …)
 are listed under **Out of scope** and excluded from the rollup.
 
-## Overall: **58%**
+## Overall: **63%**
 
-_Last updated: v0.11.0 — 720 tests green._
+_Last updated: v0.12.0 — 785 tests green._
 
 ## Ported packages (in rollup)
 
@@ -20,7 +20,7 @@ _Last updated: v0.11.0 — 720 tests green._
 | **Builtins** (chan / defer / go / range / select / close / len / make / append / delete / map / slice) | – | `src/{chan,defer,range,types,struct_macro}.rs` | 27 (chan + runtime + select semantics) | 85% | 65% | **75%** |
 | `bufio` | `src/bufio` | `src/bufio.rs` | 17 | 70% | 40% | **55%** |
 | `bytes` | `src/bytes` | `src/bytes.rs` | 4 | 55% | 30% | **40%** |
-| `container/heap` + `container/list` | `src/container/*` | `src/container/*.rs` | 0 | 60% | 0% | **30%** |
+| `container/heap` + `container/list` + `container/ring` | `src/container/*` | `src/container/*.rs` | 20 | 70% | 60% | **65%** |
 | `context` | `src/context` | `src/context.rs` | 10 | 80% | 55% | **70%** |
 | `crypto/md5` | `src/crypto/md5` | `src/crypto/md5.rs` | 3 | 80% | 65% | **75%** |
 | `crypto/sha1` | `src/crypto/sha1` | `src/crypto/sha1.rs` | 3 | 80% | 65% | **75%** |
@@ -37,8 +37,8 @@ _Last updated: v0.11.0 — 720 tests green._
 | `hash/fnv` | `src/hash/fnv` | `src/hash/fnv.rs` | 6 | 80% | 65% | **75%** |
 | `io` | `src/io` | `src/io.rs` | 19 | 80% | 65% | **75%** |
 | `log` | `src/log` | `src/log.rs` | 0 | 40% | 0% | **20%** |
-| `math` | `src/math` | `src/math/mod.rs` | 0 | 35% | 0% | **20%** |
-| `math/rand` | `src/math/rand` | `src/math/rand.rs` | 0 | 60% | 0% | **30%** |
+| `math` | `src/math` | `src/math/mod.rs` | 10 | 35% | 55% | **45%** |
+| `math/rand` | `src/math/rand` | `src/math/rand.rs` | 7 | 60% | 55% | **60%** |
 | `mime` | `src/mime` | `src/mime.rs` | 0 | 40% | 0% | **20%** |
 | `net/http` | `src/net/http` | `src/net/http/*.rs` | 23 | 55% | 35% | **45%** |
 | `net/url` | `src/net/url` | `src/net/url.rs` | 14 | 75% | 55% | **65%** |
@@ -48,15 +48,15 @@ _Last updated: v0.11.0 — 720 tests green._
 | `path/filepath` | `src/path/filepath` | `src/path/filepath.rs` | 12 | 65% | 55% | **60%** |
 | `regexp` | `src/regexp` | `src/regexp.rs` | 15 | 70% | 45% | **60%** |
 | `runtime` | `src/runtime` | `src/runtime.rs` | 5 (lib) | 20% | 20% | **20%** |
-| `sort` | `src/sort` | `src/sort.rs` | 0 | 65% | 0% | **35%** |
+| `sort` | `src/sort` | `src/sort.rs` | 9 | 65% | 55% | **60%** |
 | `strconv` | `src/strconv` | `src/strconv.rs` | 21 | 85% | 70% | **80%** |
 | `strings` | `src/strings` | `src/strings.rs` | 26 | 80% | 65% | **75%** |
 | `sync` | `src/sync` | `src/sync/mod.rs` | 11 | 65% | 45% | **55%** |
 | `sync/atomic` | `src/sync/atomic` | `src/sync/atomic.rs` | 12 | 70% | 60% | **65%** |
 | `testing` | `src/testing` | `src/testing.rs` | (self-hosted) | 60% | – | **40%** |
 | `time` | `src/time` | `src/time.rs` | 61 | 85% | 70% | **80%** |
-| `unicode` | `src/unicode` | `src/unicode/mod.rs` | 0 | 30% | 0% | **15%** |
-| `unicode/utf8` | `src/unicode/utf8` | `src/unicode/utf8.rs` | 0 | 75% | 0% | **40%** |
+| `unicode` | `src/unicode` | `src/unicode/mod.rs` | 8 | 30% | 55% | **45%** |
+| `unicode/utf8` | `src/unicode/utf8` | `src/unicode/utf8.rs` | 6 | 75% | 65% | **70%** |
 
 **Count: 40 packages ported, mean 53%.**
 
@@ -65,8 +65,6 @@ _Last updated: v0.11.0 — 720 tests green._
 Tracked on [GitHub milestones v0.11–v0.19](https://github.com/chanwit/goish/milestones).
 Each bullet has a tracker issue + per-file porting issues.
 
-- **v0.12.0** (sort + container + math + unicode) — tests for already-
-  implemented packages plus `container/ring`.
 - **v0.13.0** (generics-era helpers) — `slices`, `maps`, `cmp`, `iter`.
 - **v0.14.0** (text toolkit) — `text/{template,tabwriter,scanner}`,
   `html`, `html/template`.
@@ -180,6 +178,7 @@ into a milestone.
 | v0.10.0 | concurrency deep dive | `sync`, `sync/atomic`, `context`, `runtime/chan` | 41 | ✅ |
 | v0.10.1 | select! proc-macro rewrite | `chan/select` — 5 CSP-derived bug fixes | 5 | ✅ |
 | v0.11.0 | crypto + encoding + hash | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | 49 | ✅ |
+| v0.12.0 | sort + container + math + unicode | `sort`, `math`, `math/rand`, `unicode`, `unicode/utf8`, `container/{heap,list,ring}` + new `container/ring` impl | 65 | ✅ |
 | v0.11.0 | crypto + encoding | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | – | ⏳ planned |
 | v0.12.0 | sort + container + math + unicode | `sort`, `container/*`, `math`, `math/rand`, `unicode`, `unicode/utf8` | – | ⏳ planned |
 | v0.13.0 | generics-era helpers | `slices`, `maps`, `cmp`, `iter` | – | 📋 |
