@@ -362,6 +362,34 @@ test!{ fn TestAsSlice(t) {
     if len!(s) != 0 { t.Errorf(Sprintf!("invalid AsSlice len = %d, want 0", len!(s))); }
 }}
 
+// ── TestPrefixOverlaps ──────────────────────────────────────────────
+
+test!{ fn TestPrefixOverlaps(t) {
+    let pfx = |s| netip::MustParsePrefix(s);
+    struct Case { a: netip::Prefix, b: netip::Prefix, want: bool }
+    let cases = [
+        Case { a: netip::Prefix::default(),    b: pfx("1.2.0.0/16"),         want: false },
+        Case { a: pfx("1.2.0.0/16"),            b: netip::Prefix::default(),  want: false },
+        Case { a: pfx("::0/3"),                 b: pfx("0.0.0.0/3"),          want: false },
+        Case { a: pfx("1.2.0.0/16"),            b: pfx("1.2.0.0/16"),         want: true },
+        Case { a: pfx("1.2.0.0/16"),            b: pfx("1.2.3.0/24"),         want: true },
+        Case { a: pfx("1.2.3.0/24"),            b: pfx("1.2.0.0/16"),         want: true },
+        Case { a: pfx("1.2.0.0/16"),            b: pfx("1.2.3.0/32"),         want: true },
+        Case { a: pfx("1.2.3.0/32"),            b: pfx("0.0.0.0/0"),          want: true },
+        Case { a: pfx("5::1/128"),              b: pfx("5::0/8"),             want: true },
+        Case { a: pfx("1::1/128"),              b: pfx("2::2/128"),           want: false },
+    ];
+    range!(&cases[..], |i, c| {
+        let got = c.a.Overlaps(&c.b);
+        if got != c.want {
+            t.Errorf(Sprintf!("case %d: %s.Overlaps(%s) = %s, want %s",
+                i as i64, c.a.String(), c.b.String(),
+                if got {"true"} else {"false"},
+                if c.want {"true"} else {"false"}));
+        }
+    });
+}}
+
 // ── TestAddrZone ────────────────────────────────────────────────────
 
 // ── TestPrefix: CGNAT range + more Contains tables ─────────────────

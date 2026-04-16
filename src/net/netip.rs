@@ -601,6 +601,18 @@ impl Prefix {
         (a.hi & m_hi == self.ip.hi & m_hi) && (a.lo & m_lo == self.ip.lo & m_lo)
     }
 
+    /// Overlaps reports whether p and o contain any common IP addresses.
+    /// Both prefixes must be the same family (both v4 or both v6). An
+    /// invalid prefix never overlaps with anything.
+    pub fn Overlaps(&self, o: &Prefix) -> bool {
+        if !self.valid || !o.valid { return false; }
+        if self.ip.is4 != o.ip.is4 { return false; }
+        // Mask the smaller prefix and check whether it contains the other's
+        // network address.
+        let (outer, inner) = if self.bits <= o.bits { (self, o) } else { (o, self) };
+        outer.Contains(inner.ip)
+    }
+
     pub fn IsSingleIP(&self) -> bool {
         if !self.valid { return false; }
         let max = if self.ip.is4 { 32 } else { 128 };
