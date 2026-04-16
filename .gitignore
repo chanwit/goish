@@ -13,7 +13,7 @@ Cargo.lock
 
 # Claude Code local state
 /.claude/
-/.memsearch/
+.memsearch/
 
 # Reference / scratch material (not part of the published crate)
 /refs/

@@ -3,7 +3,7 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.15.2"
+version = "0.16.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
@@ -18,7 +18,8 @@ categories = ["development-tools", "rust-patterns", "api-bindings"]
 exclude = [
     "refs/*",
     "/.claude/*",
-    "/.memsearch/*",
+    "**/.memsearch/*",
+    "examples/gostring_prototype/*",
 ]
 
 [dependencies]
