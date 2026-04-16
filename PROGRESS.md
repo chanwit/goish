@@ -60,51 +60,115 @@ _Last updated: v0.10.0 — 666 tests green._
 
 **Count: 40 packages ported, mean 53%.**
 
-## Not yet ported
+## Not yet ported — scheduled on milestones
 
-These are in Go stdlib but absent from goish (0% across the board):
+Tracked on [GitHub milestones v0.11–v0.19](https://github.com/chanwit/goish/milestones).
+Each bullet has a tracker issue + per-file porting issues.
 
-- `archive/tar`, `archive/zip`
-- `cmp` (generic ordering helpers — Go 1.21+)
-- `compress/{flate,gzip,bzip2,zlib,lzw}`
-- `container/ring`
-- `crypto/{aes,cipher,des,dsa,ecdsa,ecdh,ed25519,elliptic,hkdf,hmac,mlkem,pbkdf2,rand,rc4,rsa,sha3,sha512,subtle,tls,x509}`
-- `database/{sql,driver}`
-- `encoding/{ascii85,asn1,base32,gob,pem,xml}`
-- `expvar`
-- `hash/{adler32,crc64,maphash}`
-- `html`, `html/template`
-- `iter` (iterator helpers — Go 1.23+)
-- `log/slog`, `log/syslog`
-- `maps` (generic map helpers — Go 1.21+)
-- `math/{big,bits,cmplx}`
-- `net/{mail,smtp,netip,rpc,textproto}`
-- `os/{signal,user}`
-- `runtime/{debug,metrics,pprof,trace}`
-- `slices` (generic slice helpers — Go 1.21+)
-- `text/{scanner,tabwriter,template}`
-- `time/tzdata`
-- `unicode/utf16`
-- `unique` (value canonicalisation — Go 1.23+)
+- **v0.11.0** (crypto + encoding) — `crypto/{md5,sha1,sha256}` *(impl
+  done; needs test vectors)*, `encoding/{base64,binary,csv,hex}` test
+  ports, `hash/{crc32,fnv}` test ports.
+- **v0.12.0** (sort + container + math + unicode) — tests for already-
+  implemented packages plus `container/ring`.
+- **v0.13.0** (generics-era helpers) — `slices`, `maps`, `cmp`, `iter`.
+- **v0.14.0** (text toolkit) — `text/{template,tabwriter,scanner}`,
+  `html`, `html/template`.
+- **v0.15.0** (networking depth) — `net/{netip,mail,smtp,textproto}`,
+  plus `net/http` multipart + cookies.
+- **v0.16.0** (compression + archive) — `compress/{flate,gzip,zlib}`,
+  `archive/{tar,zip}`.
+- **v0.17.0** (crypto completeness) — `crypto/{aes,cipher,rand,hmac,
+  ed25519,rsa,sha512}`.
+- **v0.18.0** (encoding completeness) — `encoding/{asn1,base32,gob,pem,
+  xml}`, `hash/{adler32,crc64,maphash}`.
+- **v0.19.0** (math depth) — `math/{big,bits,cmplx}`, `unicode/utf16`.
 
-## Out of scope
+## Not yet ported — long tail
 
-These Go packages do not port meaningfully to Rust:
+Portable but not scheduled. Most could land with user demand; open an
+issue if you need one.
 
-- `builtin` — Go's predeclared identifiers (we do these via `prelude::*`).
-- `debug/{dwarf,elf,macho,pe,plan9obj,gosym,buildinfo}` — platform binaries; tooling-only.
-- `embed` — requires Go's `go build` magic.
-- `go/{ast,parser,types,…}` — Go's own syntax tools; not portable.
-- `image/{color,draw,gif,jpeg,png}` — better served by Rust's `image` crate.
-- `index/suffixarray` — niche algorithm; not Go-specific.
-- `plugin` — OS-specific shared object loading.
-- `reflect` — Rust has static types; no runtime reflection.
-- `simd` — architecture-specific intrinsics.
-- `structs` — Go-specific struct field markers.
-- `syscall` — low-level OS ABI; Rust has its own.
-- `testing/{cryptotest,fstest,iotest,quick,slogtest,synctest}` — Go's internal test helpers.
-- `unsafe` — Rust has `unsafe` already.
-- `weak` — Go-specific weak pointers.
+- `compress/{bzip2,lzw}` — `flate/gzip/zlib` cover the 95% case.
+- `crypto/{des,dsa,ecdsa,ecdh,elliptic,hkdf,hpke,mlkem,pbkdf2,rc4,rsa,
+  sha3,subtle,tls,x509}` — lower demand after v0.17 lands the
+  widely-used subset.
+- `database/{sql,driver}` — multi-driver abstraction with its own
+  ecosystem.
+- `encoding/ascii85` — rarely used.
+- `net/rpc` — Go-specific wire format.
+- `os/{signal,user}` — doable; platform-specific surface.
+- `time/tzdata` — `chrono-tz` is the Rust idiom.
+- `html/template` — contextual-escape engine coupled to HTML parsing.
+
+## Excluded from scope — honest categorisation
+
+Earlier drafts lumped everything goish won't ship under a single
+"out of scope" heading. That hid the fact that most of those packages
+are portable in principle; they're just deprioritised. This section
+splits the exclusion into four honest buckets.
+
+### A. Genuinely incompatible with goish's premise
+
+Goish's premise is *static Rust types with Go-shaped syntax*. These
+three packages fight that premise and a port would be a leaky fake:
+
+- **`reflect`** — Go's reflection works because every value carries
+  runtime type metadata. Building that into goish means tagging every
+  value and wrapping every API — the opposite of "idiomatic Rust
+  under the hood". Crates like `bevy_reflect` prove it's possible,
+  but a goish version would contradict the project's design.
+- **`unsafe`** — Rust already has the `unsafe` keyword with different
+  semantics from `unsafe.Pointer`. Wrapping one as the other confuses
+  both Go and Rust readers.
+- **`builtin`** — Not a package; documentation of `int`, `len`, `make`,
+  `append`, etc. Goish implements these via `types.rs` and the macro
+  prelude, so the package itself has no porting target.
+
+### B. Would require reimplementing large Go tooling
+
+Portable in principle but the effort budget is prohibitive and the
+goish audience (Rust devs writing Go-flavored code) doesn't need them:
+
+- **`go/{ast,parser,types,token,scanner,format,printer,doc,build,constant,importer,version}`** —
+  a Go parser + type checker in Rust is ~50k LoC. Won't do.
+- **`plugin`** — Go's runtime linker needs .so symbol tables in a
+  Go-specific layout. `libloading` works for arbitrary shared objects
+  but the API shape doesn't map cleanly. Won't do.
+
+### C. Better served by Rust's existing ecosystem
+
+Portable, but duplicating well-funded Rust crates would be busywork:
+
+- **`image/{color,draw,gif,jpeg,png}`** — the `image` crate is ubiquitous.
+- **`debug/{dwarf,elf,macho,pe,plan9obj,gosym,buildinfo}`** — `object`
+  + `gimli` + `goblin` cover this.
+- **`syscall`** — `libc` and `std::os::{unix,windows}` already exist;
+  Go's own `syscall` is deprecated in favor of `golang.org/x/sys`.
+- **`simd`** — `std::simd` and `core::arch` are Rust's idiomatic
+  intrinsics.
+- **`index/suffixarray`** — `suffix` crate exists.
+
+### D. Honestly deprioritised — could port, not planning to
+
+These are portable and the code isn't hard. They're on the "nice to
+have, not scheduled" list:
+
+- **`embed`** — achievable via a macro wrapping `include_bytes!` +
+  a simulated `embed.FS`. Likely v0.20+.
+- **`weak`** — wraps `std::sync::Weak`; ~50 lines of glue.
+- **`unique`** — simple HashMap-backed value interner.
+- **`structs`** — marker types only; a doc-only mapping is trivial.
+- **`testing/{quick,fstest,iotest,slogtest,synctest,cryptotest}`** —
+  all portable. `testing/quick` (property-based testing) is the
+  most useful. Deprioritised because goish users write application
+  code, not test infrastructure.
+- **`expvar`** — exports `/debug/vars`; could wrap atomics + net/http.
+- **`log/slog`, `log/syslog`** — structured logging and syslog client.
+- **`runtime/{debug,metrics,pprof,trace}`** — runtime diagnostics;
+  partial mapping onto Rust profilers possible.
+
+If you want any of bucket D sooner, open an issue and I'll move it
+into a milestone.
 
 ## Per-version rollup
 
@@ -151,6 +215,12 @@ per-package Overall across the 40 rows in the "Ported packages" table.
 Packages in **Not yet ported** count as 0% when included in a rollup
 for a future milestone; they are excluded from the _current_ overall
 to keep the number reflective of what's shipped.
+
+Packages in the four **Excluded** buckets (genuinely incompatible,
+tooling-too-large, better-served-by-Rust, deprioritised) never enter
+the rollup. Including them would deflate the number to 20-something %
+and misrepresent how close goish is to covering the Go that's worth
+covering.
 
 ## See also
 
