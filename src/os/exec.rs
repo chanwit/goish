@@ -194,7 +194,7 @@ impl Cmd {
 #[allow(non_snake_case)]
 pub fn Command(name: impl AsRef<str>, args: &[impl AsRef<str>]) -> Cmd {
     let name: string = name.as_ref().into();
-    let mut all: slice<string> = Vec::with_capacity(args.len() + 1);
+    let mut all: slice<string> = slice::with_capacity(args.len() + 1);
     all.push(name.clone());
     for a in args {
         all.push(a.as_ref().into());

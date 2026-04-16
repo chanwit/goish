@@ -41,6 +41,16 @@ impl<'a, T> RangeIter for &'a Vec<T> {
     }
 }
 
+// Goish slice<T> — same shape as Vec<T>; Deref handles most call sites,
+// but trait impls don't walk Deref, so we impl RangeIter explicitly.
+impl<'a, T> RangeIter for &'a crate::_slice::slice<T> {
+    type Item = (usize, &'a T);
+    type Iter = std::iter::Enumerate<std::slice::Iter<'a, T>>;
+    fn range(self) -> Self::Iter {
+        self.as_vec().iter().enumerate()
+    }
+}
+
 // ── maps ───────────────────────────────────────────────────────────────
 
 impl<'a, K, V> RangeIter for &'a std::collections::HashMap<K, V> {

@@ -268,13 +268,13 @@ pub fn Indent(dst: &mut Vec<byte>, src: &[byte], _prefix: impl AsRef<str>, inden
 /// Build a JSON object Value from (key, value) pairs.
 #[allow(non_snake_case)]
 pub fn Object(pairs: slice<(string, Value)>) -> Value {
-    Value::Object(pairs)
+    Value::Object(pairs.into_vec())
 }
 
 /// Build a JSON array Value.
 #[allow(non_snake_case)]
 pub fn Array(values: slice<Value>) -> Value {
-    Value::Array(values)
+    Value::Array(values.into_vec())
 }
 
 #[cfg(test)]

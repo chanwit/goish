@@ -39,7 +39,12 @@ pub type rune = i32;
 pub type string = crate::gostring::GoString;
 
 // Go: []T  →  goish: slice<T>
-pub type slice<T> = Vec<T>;
+//
+// Newtype around Vec<T> so we can impl Index<i64> (Go's `int`) — the orphan
+// rule blocks adding foreign traits to foreign Vec directly. All the Vec
+// API stays reachable via Deref/DerefMut, and From<Vec<T>> / Into<Vec<T>>
+// keep Vec-returning stdlib calls fluent.
+pub use crate::_slice::slice;
 
 // Go: map[K]V  →  goish: map<K, V>
 pub type map<K, V> = std::collections::HashMap<K, V>;
@@ -57,20 +62,25 @@ macro_rules! slice {
     // Go-shaped:  slice!([]T{a, b, c})
     ([] $t:ty { $($x:expr),* $(,)? }) => {
         {
-            let v: $crate::types::slice<$t> = vec![ $( <$t as ::std::convert::From<_>>::from($x) ),* ];
+            let v: $crate::types::slice<$t> =
+                vec![ $( <$t as ::std::convert::From<_>>::from($x) ),* ].into();
             v
         }
     };
     // Typed semicolon form
     ($t:ty ; $($x:expr),* $(,)?) => {
         {
-            let v: $crate::types::slice<$t> = vec![ $( <$t as ::std::convert::From<_>>::from($x) ),* ];
+            let v: $crate::types::slice<$t> =
+                vec![ $( <$t as ::std::convert::From<_>>::from($x) ),* ].into();
             v
         }
     };
-    // Untyped (vec! alias)
+    // Untyped
     ($($x:expr),* $(,)?) => {
-        vec![ $($x),* ]
+        {
+            let v: $crate::types::slice<_> = vec![ $($x),* ].into();
+            v
+        }
     };
 }
 
@@ -198,29 +208,31 @@ macro_rules! make {
     // make([]T, 0, cap) — empty slice with capacity; no Default needed
     ([] $t:ty, 0, $cap:expr) => {
         {
-            let v: $crate::types::slice<$t> = Vec::with_capacity($cap);
+            let v: $crate::types::slice<$t> = Vec::<$t>::with_capacity($cap).into();
             v
         }
     };
     // make([]T, len, cap)
     ([] $t:ty, $len:expr, $cap:expr) => {
         {
-            let mut v: $crate::types::slice<$t> = Vec::with_capacity($cap);
-            v.resize_with($len, <$t as ::std::default::Default>::default);
+            let mut __v: Vec<$t> = Vec::with_capacity($cap);
+            __v.resize_with($len, <$t as ::std::default::Default>::default);
+            let v: $crate::types::slice<$t> = __v.into();
             v
         }
     };
     // make([]T, 0) — empty slice; no Default needed
     ([] $t:ty, 0) => {
         {
-            let v: $crate::types::slice<$t> = Vec::new();
+            let v: $crate::types::slice<$t> = Vec::<$t>::new().into();
             v
         }
     };
     // make([]T, n)
     ([] $t:ty, $n:expr) => {
         {
-            let v: $crate::types::slice<$t> = vec![<$t as ::std::default::Default>::default(); $n];
+            let v: $crate::types::slice<$t> =
+                vec![<$t as ::std::default::Default>::default(); $n].into();
             v
         }
     };

@@ -251,7 +251,7 @@ impl Values {
     }
 
     pub fn Set(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) {
-        self.inner.insert(key.as_ref().into(), vec![value.as_ref().into()]);
+        self.inner.insert(key.as_ref().into(), slice(vec![value.as_ref().into()]));
     }
 
     pub fn Add(&mut self, key: impl AsRef<str>, value: impl AsRef<str>) {

@@ -613,7 +613,7 @@ pub fn SplitAfter(s: impl AsRef<str>, sep: impl AsRef<str>) -> slice<string> {
     if sep.is_empty() {
         return s.chars().map(|c| string::from(c.to_string())).collect();
     }
-    let mut out: Vec<string> = Vec::new();
+    let mut out: slice<string> = slice::new();
     let mut start = 0usize;
     loop {
         match s[start..].find(sep) {

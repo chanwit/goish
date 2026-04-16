@@ -114,6 +114,8 @@ pub mod defer;
 pub mod gostring;
 pub mod goroutine;
 pub mod range;
+#[doc(hidden)]
+pub mod _slice;
 pub mod types;
 #[doc(hidden)]
 pub mod struct_macro;

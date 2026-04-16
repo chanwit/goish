@@ -37,7 +37,7 @@ impl Reader {
     pub fn Read(&mut self) -> (slice<string>, error) {
         loop {
             if self.pos >= self.data.len() {
-                return (Vec::new(), crate::io::EOF());
+                return (slice::new(), crate::io::EOF());
             }
             // Skip blank lines at the start of a record? Go keeps them.
             // Skip comment lines if Comment set.
@@ -60,8 +60,8 @@ impl Reader {
         }
     }
 
-    pub fn ReadAll(&mut self) -> (Vec<slice<string>>, error) {
-        let mut out = Vec::new();
+    pub fn ReadAll(&mut self) -> (slice<slice<string>>, error) {
+        let mut out: slice<slice<string>> = slice::new();
         loop {
             let (rec, err) = self.Read();
             if err == crate::io::EOF() { return (out, nil); }
@@ -85,7 +85,7 @@ impl Reader {
     }
 
     fn read_record(&mut self) -> (slice<string>, error) {
-        let mut fields: slice<string> = Vec::new();
+        let mut fields: slice<string> = slice::new();
         let mut field = String::new();
         let comma = self.Comma as u8;
         loop {
@@ -302,16 +302,16 @@ mod tests {
     #[test]
     fn round_trip() {
         let mut w = NewWriter();
-        let records: Vec<Vec<string>> = vec![
-            vec!["name".into(), "age".into()],
-            vec!["Alice, CEO".into(), "30".into()],
-            vec!["Bob".into(), "25".into()],
+        let records: Vec<slice<string>> = vec![
+            slice(vec!["name".into(), "age".into()]),
+            slice(vec!["Alice, CEO".into(), "30".into()]),
+            slice(vec!["Bob".into(), "25".into()]),
         ];
         w.WriteAll(&records);
         let s = w.Flush();
         let mut r = NewReader(s.as_str());
         let (all, err) = r.ReadAll();
         assert_eq!(err, nil);
-        assert_eq!(all, records);
+        assert_eq!(all.as_vec(), &records);
     }
 }

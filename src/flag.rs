@@ -51,7 +51,7 @@ fn cli() -> &'static FlagSet {
     static SET: OnceLock<FlagSet> = OnceLock::new();
     SET.get_or_init(|| FlagSet {
         specs: Mutex::new(Vec::new()),
-        args: Mutex::new(Vec::new()),
+        args: Mutex::new(slice::new()),
         parsed: Mutex::new(false),
     })
 }
@@ -206,7 +206,7 @@ pub fn Parse() {
 /// --name value, and --flag for bools.
 #[allow(non_snake_case)]
 pub fn ParseArgs(args: &[string]) {
-    let mut positional: slice<string> = Vec::new();
+    let mut positional: slice<string> = slice::new();
     let mut i = 0;
     while i < args.len() {
         let a = &args[i];

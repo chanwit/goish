@@ -116,7 +116,7 @@ pub fn Split(path: impl AsRef<str>) -> (string, string) {
 #[allow(non_snake_case)]
 pub fn SplitList(path: impl AsRef<str>) -> crate::types::slice<string> {
     let s = path.as_ref();
-    if s.is_empty() { return Vec::new(); }
+    if s.is_empty() { return crate::types::slice::new(); }
     let list_sep = if cfg!(windows) { ';' } else { ':' };
     s.split(list_sep).map(|s| s.into()).collect()
 }

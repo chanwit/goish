@@ -34,7 +34,7 @@ impl Header {
     #[allow(non_snake_case)]
     pub fn Set(&mut self, key: &str, value: &str) {
         let k = canonicalize(key);
-        self.inner.insert(k, vec![value.into()]);
+        self.inner.insert(k, slice(vec![value.into()]));
     }
 
     #[allow(non_snake_case)]

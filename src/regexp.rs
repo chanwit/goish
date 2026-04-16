@@ -50,8 +50,8 @@ impl Regexp {
     /// re.FindStringIndex(s) — returns [start, end] byte indices, or empty slice.
     pub fn FindStringIndex(&self, s: impl AsRef<str>) -> slice<int> {
         match self.inner.find(s.as_ref()) {
-            Some(m) => vec![m.start() as int, m.end() as int],
-            None => Vec::new(),
+            Some(m) => slice(vec![m.start() as int, m.end() as int]),
+            None => slice::new(),
         }
     }
 
@@ -73,15 +73,15 @@ impl Regexp {
             Some(caps) => (0..caps.len())
                 .map(|i| caps.get(i).map(|m| m.as_str().into()).unwrap_or_default())
                 .collect(),
-            None => Vec::new(),
+            None => slice::new(),
         }
     }
 
-    pub fn FindAllStringSubmatch(&self, s: impl AsRef<str>, n: int) -> Vec<slice<string>> {
+    pub fn FindAllStringSubmatch(&self, s: impl AsRef<str>, n: int) -> slice<slice<string>> {
         let iter = self.inner.captures_iter(s.as_ref()).map(|caps| {
             (0..caps.len())
                 .map(|i| caps.get(i).map(|m| m.as_str().into()).unwrap_or_default())
-                .collect::<Vec<_>>()
+                .collect::<slice<string>>()
         });
         if n < 0 { iter.collect() } else { iter.take(n as usize).collect() }
     }
@@ -108,8 +108,8 @@ impl Regexp {
     /// re.Split(s, n) — split s around matches. n<0 = all.
     pub fn Split(&self, s: impl AsRef<str>, n: int) -> slice<string> {
         let s_ref = s.as_ref();
-        if n == 0 { return Vec::new(); }
-        let mut out: slice<string> = Vec::new();
+        if n == 0 { return slice::new(); }
+        let mut out: slice<string> = slice::new();
         let mut last = 0usize;
         let mut count = 0i64;
         for m in self.inner.find_iter(s_ref) {

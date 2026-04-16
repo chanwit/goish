@@ -9,20 +9,24 @@
 //   sort.SliceStable(s, less)           sort::SliceStable(&mut s, |i, j| …);
 //   sort.IntsAreSorted(s)               sort::IntsAreSorted(&s)
 
-use crate::types::{float64, int, slice, string};
+use crate::types::{float64, int, string};
+
+// Sort funcs take `&mut [T]`, not `&mut slice<T>` — DerefMut on slice<T>
+// and the Vec→slice coercion for `&mut Vec<T>` both give `&mut [T]`, so
+// callers can pass either container.
 
 #[allow(non_snake_case)]
-pub fn Ints(s: &mut slice<int>) {
+pub fn Ints(s: &mut [int]) {
     s.sort();
 }
 
 #[allow(non_snake_case)]
-pub fn Strings(s: &mut slice<string>) {
+pub fn Strings(s: &mut [string]) {
     s.sort();
 }
 
 #[allow(non_snake_case)]
-pub fn Float64s(s: &mut slice<float64>) {
+pub fn Float64s(s: &mut [float64]) {
     // Go's sort.Float64s treats NaN as less than any non-NaN. std's f64 isn't
     // totally ordered; use total_cmp which matches Go's NaN positioning.
     s.sort_by(|a, b| a.total_cmp(b));
@@ -35,7 +39,7 @@ pub fn Float64s(s: &mut slice<float64>) {
 /// closure while it's being sorted, so we take `(&T, &T)` instead — same
 /// semantics, different arg form.
 #[allow(non_snake_case)]
-pub fn Slice<T, F>(s: &mut slice<T>, mut less: F)
+pub fn Slice<T, F>(s: &mut [T], mut less: F)
 where
     F: FnMut(&T, &T) -> bool,
 {
@@ -47,7 +51,7 @@ where
 }
 
 #[allow(non_snake_case)]
-pub fn SliceStable<T, F>(s: &mut slice<T>, mut less: F)
+pub fn SliceStable<T, F>(s: &mut [T], mut less: F)
 where
     F: FnMut(&T, &T) -> bool,
 {
@@ -121,7 +125,7 @@ pub fn SearchFloat64s(s: &[float64], v: float64) -> int {
 // typical call sites.
 
 #[allow(non_snake_case)]
-pub struct IntSlice<'a>(pub &'a mut slice<int>);
+pub struct IntSlice<'a>(pub &'a mut [int]);
 
 impl<'a> IntSlice<'a> {
     pub fn Sort(&mut self) { self.0.sort(); }
@@ -132,7 +136,7 @@ impl<'a> IntSlice<'a> {
 }
 
 #[allow(non_snake_case)]
-pub struct StringSlice<'a>(pub &'a mut slice<string>);
+pub struct StringSlice<'a>(pub &'a mut [string]);
 
 impl<'a> StringSlice<'a> {
     pub fn Sort(&mut self) { self.0.sort(); }
@@ -143,7 +147,7 @@ impl<'a> StringSlice<'a> {
 }
 
 #[allow(non_snake_case)]
-pub struct Float64Slice<'a>(pub &'a mut slice<float64>);
+pub struct Float64Slice<'a>(pub &'a mut [float64]);
 
 impl<'a> Float64Slice<'a> {
     pub fn Sort(&mut self) { self.0.sort_by(|a, b| a.total_cmp(b)); }
@@ -162,7 +166,7 @@ impl<'a> Float64Slice<'a> {
 // generic `Reverse(&mut slice, less)` that flips the comparator.
 
 #[allow(non_snake_case)]
-pub fn Reverse<T, F>(s: &mut slice<T>, mut less: F)
+pub fn Reverse<T, F>(s: &mut [T], mut less: F)
 where
     F: FnMut(&T, &T) -> bool,
 {
@@ -174,17 +178,17 @@ where
 }
 
 #[allow(non_snake_case)]
-pub fn ReverseInts(s: &mut slice<int>) {
+pub fn ReverseInts(s: &mut [int]) {
     s.sort_by(|a, b| b.cmp(a));
 }
 
 #[allow(non_snake_case)]
-pub fn ReverseStrings(s: &mut slice<string>) {
+pub fn ReverseStrings(s: &mut [string]) {
     s.sort_by(|a, b| b.cmp(a));
 }
 
 #[allow(non_snake_case)]
-pub fn ReverseFloat64s(s: &mut slice<float64>) {
+pub fn ReverseFloat64s(s: &mut [float64]) {
     s.sort_by(|a, b| b.total_cmp(a));
 }
 

@@ -210,7 +210,7 @@ async fn do_request(req: &mut Request) -> (Response, error) {
 
     // Drain the outbound request body.
     let body_bytes = req.Body.Bytes();
-    let body = Full::new(bytes::Bytes::from(body_bytes));
+    let body = Full::new(bytes::Bytes::from(body_bytes.into_vec()));
 
     let hyper_req = match builder.body(body) {
         Ok(r) => r,

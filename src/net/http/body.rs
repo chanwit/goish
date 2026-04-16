@@ -45,9 +45,9 @@ impl Body {
     /// `&self` thanks to interior `Mutex`, so `resp` doesn't need `mut`.
     #[allow(non_snake_case)]
     pub fn Bytes(&self) -> crate::types::slice<u8> {
-        let mut out = Vec::new();
+        let mut out: Vec<u8> = Vec::new();
         self.drain_into(&mut out);
-        out
+        out.into()
     }
 
     /// Drain the body and decode as UTF-8 (lossy). Shortcut equivalent to

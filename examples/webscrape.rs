@@ -27,7 +27,7 @@ fn main() {
     let parts_re = regexp::MustCompile(r"^(\w+)\s+(\S+)\s+(\d+)$");
     #[derive(Clone)]
     struct Req { method: string, host: string, path: string, status: int }
-    let mut reqs: slice<Req> = Vec::new();
+    let mut reqs: slice<Req> = slice::new();
     for l in &normalized {
         let caps = parts_re.FindStringSubmatch(l);
         if caps.is_empty() { continue; }

@@ -79,7 +79,7 @@ pub fn ExtensionsByType(type_: impl AsRef<str>) -> (slice<string>, error) {
     // Strip any parameters for matching.
     let base = t.split(';').next().unwrap_or(t).trim().to_ascii_lowercase();
     let tab = table().read().unwrap();
-    let mut out: slice<string> = Vec::new();
+    let mut out: slice<string> = slice::new();
     for (e, v) in tab.iter() {
         let vb = v.split(';').next().unwrap_or(v).trim().to_ascii_lowercase();
         if vb == base {
