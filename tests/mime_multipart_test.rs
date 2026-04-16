@@ -68,28 +68,40 @@ test!{ fn TestWriter(t) {
 // ── TestWriterSetBoundary ───────────────────────────────────────────
 
 test!{ fn TestWriterSetBoundary(t) {
-    struct Case { b: &'static str, ok: bool }
-    let cases = [
-        Case { b: "abc",          ok: true },
-        Case { b: "",              ok: false },
-        Case { b: "!",             ok: false },
-        Case { b: "my-separator",   ok: true },
-        Case { b: "with space",    ok: true },
-        Case { b: "badspace ",     ok: false },
+    struct Case { b: string, ok: bool }
+    let cases: Vec<Case> = vec![
+        Case { b: "abc".into(),                ok: true },
+        Case { b: "".into(),                    ok: false },
+        Case { b: "!".into(),                   ok: false },
+        Case { b: strings::Repeat("x", 70),     ok: true },
+        Case { b: strings::Repeat("x", 71),     ok: false },
+        Case { b: "my-separator".into(),        ok: true },
+        Case { b: "with space".into(),          ok: true },
+        Case { b: "badspace ".into(),           ok: false },
+        Case { b: "(boundary)".into(),          ok: true },
     ];
-    for c in &cases {
+    range!(&cases[..], |i, c| {
         let mut buf = bytes::Buffer::new();
         let mut w = multipart::NewWriter(&mut buf);
-        let err = w.SetBoundary(c.b);
+        let err = w.SetBoundary(&c.b);
         let got = err == nil;
         if got != c.ok {
-            t.Errorf(Sprintf!("SetBoundary(%s): got ok=%s want ok=%s",
-                c.b, if got {"true"} else {"false"}, if c.ok {"true"} else {"false"}));
+            t.Errorf(Sprintf!("%d. boundary %s = ok=%s; want ok=%s",
+                i as i64, c.b,
+                if got {"true"} else {"false"},
+                if c.ok {"true"} else {"false"}));
         }
-        if got && w.Boundary() != c.b {
-            t.Errorf(Sprintf!("Boundary() = %s, want %s", w.Boundary(), c.b));
+        if got {
+            if w.Boundary() != c.b {
+                t.Errorf(Sprintf!("%d. Boundary() = %s, want %s", i as i64, w.Boundary(), c.b));
+            }
+            let ct = w.FormDataContentType();
+            let want_ct = Sprintf!("multipart/form-data; boundary=%s", c.b);
+            if ct != want_ct {
+                t.Errorf(Sprintf!("%d. ContentType = %s, want %s", i as i64, ct, want_ct));
+            }
         }
-    }
+    });
 }}
 
 // ── TestNameAccessors: FormName/FileName parse Content-Disposition ──
