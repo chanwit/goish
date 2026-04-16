@@ -9,9 +9,9 @@ Overall score = unweighted mean of per-package "Overall %". Packages
 that goish does not target (unsafe, reflect, go/*, image, plugin, …)
 are listed under **Out of scope** and excluded from the rollup.
 
-## Overall: **53%**
+## Overall: **58%**
 
-_Last updated: v0.10.1 — 671 tests green._
+_Last updated: v0.11.0 — 720 tests green._
 
 ## Ported packages (in rollup)
 
@@ -22,19 +22,19 @@ _Last updated: v0.10.1 — 671 tests green._
 | `bytes` | `src/bytes` | `src/bytes.rs` | 4 | 55% | 30% | **40%** |
 | `container/heap` + `container/list` | `src/container/*` | `src/container/*.rs` | 0 | 60% | 0% | **30%** |
 | `context` | `src/context` | `src/context.rs` | 10 | 80% | 55% | **70%** |
-| `crypto/md5` | `src/crypto/md5` | `src/crypto/md5.rs` | 0 | 80% | 0% | **40%** |
-| `crypto/sha1` | `src/crypto/sha1` | `src/crypto/sha1.rs` | 0 | 80% | 0% | **40%** |
-| `crypto/sha256` | `src/crypto/sha256` | `src/crypto/sha256.rs` | 0 | 80% | 0% | **40%** |
-| `encoding/base64` | `src/encoding/base64` | `src/encoding/base64.rs` | 0 | 70% | 0% | **35%** |
-| `encoding/binary` | `src/encoding/binary` | `src/encoding/binary.rs` | 0 | 50% | 0% | **25%** |
-| `encoding/csv` | `src/encoding/csv` | `src/encoding/csv.rs` | 0 | 60% | 0% | **30%** |
-| `encoding/hex` | `src/encoding/hex` | `src/encoding/hex.rs` | 0 | 75% | 0% | **40%** |
+| `crypto/md5` | `src/crypto/md5` | `src/crypto/md5.rs` | 3 | 80% | 65% | **75%** |
+| `crypto/sha1` | `src/crypto/sha1` | `src/crypto/sha1.rs` | 3 | 80% | 65% | **75%** |
+| `crypto/sha256` | `src/crypto/sha256` | `src/crypto/sha256.rs` | 3 | 80% | 65% | **75%** |
+| `encoding/base64` | `src/encoding/base64` | `src/encoding/base64.rs` | 9 | 70% | 60% | **65%** |
+| `encoding/binary` | `src/encoding/binary` | `src/encoding/binary.rs` | 9 | 50% | 55% | **55%** |
+| `encoding/csv` | `src/encoding/csv` | `src/encoding/csv.rs` | 8 | 60% | 55% | **60%** |
+| `encoding/hex` | `src/encoding/hex` | `src/encoding/hex.rs` | 5 | 75% | 65% | **70%** |
 | `encoding/json` | `src/encoding/json` | `src/encoding/json.rs` | 28 | 55% | 35% | **45%** |
 | `errors` | `src/errors` | `src/errors.rs` | 8 (in fmt_errors) | 85% | 50% | **70%** |
 | `flag` | `src/flag` | `src/flag.rs` | 0 | 60% | 0% | **30%** |
 | `fmt` | `src/fmt` | `src/fmt.rs` | ~30 | 65% | 30% | **50%** |
-| `hash/crc32` | `src/hash/crc32` | `src/hash/crc32.rs` | 0 | 70% | 0% | **35%** |
-| `hash/fnv` | `src/hash/fnv` | `src/hash/fnv.rs` | 0 | 80% | 0% | **40%** |
+| `hash/crc32` | `src/hash/crc32` | `src/hash/crc32.rs` | 3 | 70% | 55% | **65%** |
+| `hash/fnv` | `src/hash/fnv` | `src/hash/fnv.rs` | 6 | 80% | 65% | **75%** |
 | `io` | `src/io` | `src/io.rs` | 19 | 80% | 65% | **75%** |
 | `log` | `src/log` | `src/log.rs` | 0 | 40% | 0% | **20%** |
 | `math` | `src/math` | `src/math/mod.rs` | 0 | 35% | 0% | **20%** |
@@ -65,9 +65,6 @@ _Last updated: v0.10.1 — 671 tests green._
 Tracked on [GitHub milestones v0.11–v0.19](https://github.com/chanwit/goish/milestones).
 Each bullet has a tracker issue + per-file porting issues.
 
-- **v0.11.0** (crypto + encoding) — `crypto/{md5,sha1,sha256}` *(impl
-  done; needs test vectors)*, `encoding/{base64,binary,csv,hex}` test
-  ports, `hash/{crc32,fnv}` test ports.
 - **v0.12.0** (sort + container + math + unicode) — tests for already-
   implemented packages plus `container/ring`.
 - **v0.13.0** (generics-era helpers) — `slices`, `maps`, `cmp`, `iter`.
@@ -182,6 +179,7 @@ into a milestone.
 | v0.9.0 | networking + regexp | `net/url`, `regexp`, `net/http` | 52 | ✅ |
 | v0.10.0 | concurrency deep dive | `sync`, `sync/atomic`, `context`, `runtime/chan` | 41 | ✅ |
 | v0.10.1 | select! proc-macro rewrite | `chan/select` — 5 CSP-derived bug fixes | 5 | ✅ |
+| v0.11.0 | crypto + encoding + hash | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | 49 | ✅ |
 | v0.11.0 | crypto + encoding | `crypto/{md5,sha1,sha256}`, `encoding/{base64,binary,csv,hex}`, `hash/{crc32,fnv}` | – | ⏳ planned |
 | v0.12.0 | sort + container + math + unicode | `sort`, `container/*`, `math`, `math/rand`, `unicode`, `unicode/utf8` | – | ⏳ planned |
 | v0.13.0 | generics-era helpers | `slices`, `maps`, `cmp`, `iter` | – | 📋 |

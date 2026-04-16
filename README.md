@@ -50,7 +50,7 @@ Or, from crates.io:
 
 ```toml
 [dependencies]
-goish = "0.10"     # latest (v0.10.1)
+goish = "0.11"     # latest
 ```
 
 Then in every file where you want Go-shaped code:
