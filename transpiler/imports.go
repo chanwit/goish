@@ -56,6 +56,10 @@ var importMap = map[string]string{
 	"testing":         "testing",
 	"runtime":         "runtime",
 	"mime/multipart":  "multipart",
+
+	// Common third-party shims — Goish library covers these via stdlib.
+	// go.uber.org/multierr.Append → errors::Append (v0.20.4).
+	"go.uber.org/multierr": "errors",
 }
 
 // resolveImport returns (goishPath, ok). ok=false means "complex / unknown" —

@@ -1686,6 +1686,24 @@ func (t *Transpiler) emitCallExpr(e *ast.CallExpr) {
 		}
 	}
 
+	// 3a. reflect.ValueOf(x).IsNil() → x == nil.
+	//
+	// Goish's `error` is a single newtype — there's no typed-nil shape to
+	// detect, so the Go idiom for guarding against nil-pointer-in-interface
+	// collapses to a plain equality check. Accept both
+	// `reflect.ValueOf(x).IsNil()` and the direct `reflect.Value.IsNil` on
+	// the ValueOf result.
+	if sel, ok := e.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "IsNil" && len(e.Args) == 0 {
+		if inner, ok := sel.X.(*ast.CallExpr); ok {
+			if isReflectValueOf(inner) && len(inner.Args) == 1 {
+				t.write("(")
+				t.emitExpr(inner.Args[0])
+				t.write(" == nil)")
+				return
+			}
+		}
+	}
+
 	// 3. testing.T / testing.B Printf-style methods → wrap args in Sprintf!.
 	if sel, ok := e.Fun.(*ast.SelectorExpr); ok && isTestingPrintfMethod(sel.Sel.Name) && len(e.Args) >= 1 {
 		t.emitExpr(sel.X)
@@ -1729,6 +1747,20 @@ func (t *Transpiler) emitCallExpr(e *ast.CallExpr) {
 		t.write("/* ... */")
 	}
 	t.write(")")
+}
+
+// isReflectValueOf matches `reflect.ValueOf(...)` — regardless of local
+// import alias, since we only inspect the outer Sel name.
+func isReflectValueOf(c *ast.CallExpr) bool {
+	sel, ok := c.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "ValueOf" {
+		return false
+	}
+	id, ok := sel.X.(*ast.Ident)
+	if !ok || id.Name != "reflect" {
+		return false
+	}
+	return true
 }
 
 // isTestingPrintfMethod returns true for testing.T / testing.B methods that
