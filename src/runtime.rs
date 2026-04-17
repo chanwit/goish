@@ -60,6 +60,34 @@ pub fn Version() -> &'static str {
     concat!("goish-", env!("CARGO_PKG_VERSION"))
 }
 
+// ── Goexit ─────────────────────────────────────────────────────────────
+//
+// Go's `runtime.Goexit()` terminates the calling goroutine after running
+// any deferred calls. We model it as a panic-with-sentinel:
+//   - scope-guard `defer!{}`s still fire (they run on drop during unwind)
+//   - the `test!` harness and `go!{}` wrapper both recognise the sentinel
+//     and treat it as a clean exit (not a panic)
+//
+// Calling Goexit from the *main* goroutine in a non-test binary will
+// terminate the process via the unwinding panic — same shape as Go.
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct GoexitSentinel;
+
+/// Returns true if the given panic payload is a Goexit.
+#[doc(hidden)]
+pub fn is_goexit_panic(e: &Box<dyn std::any::Any + Send>) -> bool {
+    e.is::<GoexitSentinel>()
+}
+
+/// runtime.Goexit — terminate the current goroutine, running deferred
+/// functions. See the comment above for semantics inside the test harness.
+#[allow(non_snake_case)]
+pub fn Goexit() -> ! {
+    std::panic::panic_any(GoexitSentinel);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

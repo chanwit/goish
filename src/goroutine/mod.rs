@@ -83,13 +83,13 @@ impl Goroutine {
     }
 
     /// `g.Wait()` — block the current (non-async) thread until the goroutine
-    /// finishes. Returns nil on clean exit, error on panic.
+    /// finishes. Returns nil on clean exit (including Goexit), error on panic.
     #[allow(non_snake_case)]
     pub fn Wait(mut self) -> crate::errors::error {
         match self.handle.take() {
             Some(h) => match runtime().block_on(h) {
                 Ok(()) => crate::errors::nil,
-                Err(_) => crate::errors::New("goroutine panicked"),
+                Err(e) => join_err_to_goish(e),
             },
             None => crate::errors::nil,
         }
@@ -102,11 +102,24 @@ impl Goroutine {
         match self.handle.take() {
             Some(h) => match h.await {
                 Ok(()) => crate::errors::nil,
-                Err(_) => crate::errors::New("goroutine panicked"),
+                Err(e) => join_err_to_goish(e),
             },
             None => crate::errors::nil,
         }
     }
+}
+
+/// Translates a tokio JoinError into a Goish error, preserving Goexit
+/// semantics: a goroutine that terminated via `runtime::Goexit()` is a
+/// clean exit, not a panic.
+fn join_err_to_goish(e: tokio::task::JoinError) -> crate::errors::error {
+    if e.is_panic() {
+        let payload = e.into_panic();
+        if crate::runtime::is_goexit_panic(&payload) {
+            return crate::errors::nil;
+        }
+    }
+    crate::errors::New("goroutine panicked")
 }
 
 /// `go!{ stmts }` — spawn a goroutine running the block.

@@ -1,14 +1,14 @@
-// const! — Go's const block with iota auto-increment.
+// Const! — Go's const block with iota auto-increment.
 //
 //   Go                                   goish
 //   ──────────────────────────────────   ──────────────────────────────────
-//   const (                              const! {
+//   const (                              Const! {
 //       Sunday = iota                        Sunday = iota;
 //       Monday                               Monday;
 //       Tuesday                              Tuesday;
 //   )                                    }
 //
-//   const (                              const! {
+//   const (                              Const! {
 //       KB = 1 << (10 * (iota + 1))          KB = 1 << (10 * (iota + 1));
 //       MB                                   MB;
 //       GB                                   GB;
@@ -19,15 +19,18 @@
 // Each `Name = expr;` resets both the expression template and type.
 //
 // Types can be given with `Name: T = expr;` or `Name: T;`. Default: i64.
+//
+// Title-case (like `Struct!`, `Enum!`, `Type!`) because `const` is a strict
+// Rust keyword — `const!(...)` fails to parse at the call site.
 
-/// `const!{}` — Go-style constant block with `iota`.
+/// `Const!{}` — Go-style constant block with `iota`.
 ///
 /// `iota` is available as a local `const` inside each generated constant,
 /// starting at 0 and incrementing by 1 for each subsequent entry in the
 /// block. To repeat the previous expression, write just the name:
 ///
 /// ```ignore
-/// goish::const_block! {
+/// goish::Const! {
 ///     Sunday: i64 = iota;
 ///     Monday;
 ///     Tuesday;
@@ -38,11 +41,18 @@
 /// //   pub const Tuesday: i64 = { const iota: i64 = 2; iota };
 /// ```
 #[macro_export]
-macro_rules! const_block {
+macro_rules! Const {
     // Entry point: seed with index 0 and no prior expression.
     ( $($rest:tt)* ) => {
         $crate::__const_block_inner!(@idx 0usize; @prev (0i64); $($rest)*);
     };
+}
+
+/// Backwards-compat alias for `Const!`. Prefer `Const!` in new code.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! const_block {
+    ( $($rest:tt)* ) => { $crate::Const!{ $($rest)* } };
 }
 
 #[doc(hidden)]
@@ -102,7 +112,7 @@ macro_rules! __const_block_inner {
 #[cfg(test)]
 mod tests {
     // Weekday enum pattern.
-    crate::const_block! {
+    crate::Const! {
         Sunday = iota;
         Monday;
         Tuesday;
@@ -121,7 +131,7 @@ mod tests {
     }
 
     // Storage units — iota shift pattern.
-    crate::const_block! {
+    crate::Const! {
         _ignored = 1 << (10 * iota);
         KB;
         MB;
@@ -138,7 +148,7 @@ mod tests {
     }
 
     // Typed + bit-flag pattern.
-    crate::const_block! {
+    crate::Const! {
         ReadPerm:  u32 = 1 << iota;
         WritePerm: u32;
         ExecPerm:  u32;

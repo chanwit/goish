@@ -195,10 +195,10 @@ pub mod prelude {
     pub use crate::types::*;
     pub use crate::goroutine::Goroutine;
     pub use crate::{
-        Cookie, Enum, Errorf, Fprintf, IntNewtype, MailAddress, Printf, Println, SliceNewtype, copy,
-        Sprintf, Type, append, benchmark, cap, cat, chan, close, const_block, defer, delete, go,
-        len, make, map, range, recover, select, slice, static_err, string, stringer, Struct,
-        test, test_h, test_main, var,
+        Const, Cookie, Enum, Errorf, Fprintf, IntNewtype, MailAddress, Printf, Println,
+        SliceNewtype, copy, Sprintf, Type, append, benchmark, cap, cat, chan, close, const_block,
+        defer, delete, go, len, make, map, range, recover, select, slice, static_err, string,
+        stringer, Struct, test, test_h, test_main, var,
     };
 
     // Trait re-exports — required in scope for trait-method resolution like

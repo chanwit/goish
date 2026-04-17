@@ -261,6 +261,20 @@ pub fn Join(errs: &[error]) -> error {
     error(Some(GoError::new(joined)))
 }
 
+/// errors.Append(err, more) — idiomatic pairwise append, mirroring uber's
+/// multierr.Append. Short-circuits on nil so:
+///   Append(nil, nil)  → nil
+///   Append(err, nil)  → err
+///   Append(nil, more) → more
+///   otherwise         → Join(&[err, more])
+///
+/// Chain by re-assigning: `err = errors::Append(err, more);`
+pub fn Append(err: error, more: error) -> error {
+    if err == nil { return more; }
+    if more == nil { return err; }
+    Join(&[err, more])
+}
+
 /// errors.As(err, target) — if any error in the wrap chain has the same
 /// message as target, write it into *target and return true. In Go this is
 /// type-based; here we simulate with message-equality since our error type

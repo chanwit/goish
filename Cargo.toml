@@ -3,7 +3,7 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.20.3"
+version = "0.20.4"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
@@ -82,6 +82,10 @@ path = "examples/webscrape.rs"
 [[example]]
 name = "webserver"
 path = "examples/webserver.rs"
+
+[[example]]
+name = "transpiled_hello"
+path = "examples/transpiled_hello.rs"
 
 [[test]]
 name = "test_main_harness"

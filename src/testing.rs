@@ -291,6 +291,10 @@ macro_rules! test {
             }));
             let finished = match outcome {
                 Ok(()) => __t.finish($crate::testing::__priv::Outcome::Ok),
+                Err(e) if $crate::runtime::is_goexit_panic(&e) => {
+                    // Goexit: clean termination per Go semantics.
+                    __t.finish($crate::testing::__priv::Outcome::Ok)
+                }
                 Err(e) if $crate::testing::__priv::is_abort_panic(&e) => {
                     __t.finish($crate::testing::__priv::Outcome::Aborted)
                 }
@@ -340,6 +344,10 @@ macro_rules! test_h {
             }));
             let finished = match outcome {
                 Ok(()) => __t.finish($crate::testing::__priv::Outcome::Ok),
+                Err(e) if $crate::runtime::is_goexit_panic(&e) => {
+                    // Goexit: clean termination per Go semantics.
+                    __t.finish($crate::testing::__priv::Outcome::Ok)
+                }
                 Err(e) if $crate::testing::__priv::is_abort_panic(&e) => {
                     __t.finish($crate::testing::__priv::Outcome::Aborted)
                 }
