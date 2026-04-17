@@ -294,6 +294,73 @@ macro_rules! Type {
     };
 }
 
+/// `Enum!(Name)` — Go's `type Name string` for named-constant enums.
+///
+/// Generates a `&'static str` newtype that's `const`-constructible, `Copy`,
+/// and pattern-matchable — the natural Rust equivalent of Go's string-enum
+/// pattern:
+///
+/// ```ignore
+/// // Go:
+/// type Status string
+/// const ( StatusOK Status = "ok"; StatusFail Status = "fail" )
+///
+/// // Goish:
+/// Enum!(Status);
+/// const StatusOK: Status = Status("ok");
+/// const StatusFail: Status = Status("fail");
+/// ```
+///
+/// Includes Display (prints the inner string) so `Sprintf!("%v", s)` works.
+/// Internal helper — int-backed enum body. Used by `Enum!` arms.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __goish_int_enum {
+    ($name:ident, $t:ty) => {
+        #[allow(non_camel_case_types)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+        pub struct $name(pub $t);
+
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                write!(f, "{}", self.0)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! Enum {
+    // String enum (default): Enum!(Status)
+    //   Go: type Status string
+    ($name:ident) => {
+        #[allow(non_camel_case_types)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+        pub struct $name(pub &'static str);
+
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                f.write_str(self.0)
+            }
+        }
+    };
+
+    // Int-backed enums: Enum!(Priority = int)
+    //   Go: type Priority int
+    ($name:ident = int)     => { $crate::__goish_int_enum!($name, $crate::types::int); };
+    ($name:ident = int8)    => { $crate::__goish_int_enum!($name, $crate::types::int8); };
+    ($name:ident = int16)   => { $crate::__goish_int_enum!($name, $crate::types::int16); };
+    ($name:ident = int32)   => { $crate::__goish_int_enum!($name, $crate::types::int32); };
+    ($name:ident = int64)   => { $crate::__goish_int_enum!($name, $crate::types::int64); };
+    ($name:ident = uint)    => { $crate::__goish_int_enum!($name, $crate::types::uint); };
+    ($name:ident = uint8)   => { $crate::__goish_int_enum!($name, $crate::types::uint8); };
+    ($name:ident = uint16)  => { $crate::__goish_int_enum!($name, $crate::types::uint16); };
+    ($name:ident = uint32)  => { $crate::__goish_int_enum!($name, $crate::types::uint32); };
+    ($name:ident = uint64)  => { $crate::__goish_int_enum!($name, $crate::types::uint64); };
+    ($name:ident = byte)    => { $crate::__goish_int_enum!($name, $crate::types::byte); };
+    ($name:ident = rune)    => { $crate::__goish_int_enum!($name, $crate::types::rune); };
+}
+
 /// `len!(x)` — Go's polymorphic `len()` builtin.
 ///
 /// Works on `string`, `&str`, `slice<T>`, `map<K,V>`, `Chan<T>`, and anything
@@ -599,6 +666,49 @@ mod tests {
         let v = crate::make!([]int, l, c);
         assert_eq!(v.len(), 2);
         assert!(v.capacity() >= 10);
+    }
+
+    #[test]
+    fn enum_macro_int_const() {
+        crate::Enum!(Priority = int);
+        const Low: Priority = Priority(0);
+        const High: Priority = Priority(10);
+        let p: Priority = Low;
+        assert_eq!(p, Low);
+        assert!(Low < High);  // PartialOrd/Ord derived
+        assert_eq!(format!("{}", High), "10");
+    }
+
+    #[test]
+    fn enum_macro_uint8_const() {
+        crate::Enum!(Level = uint8);
+        const Debug: Level = Level(0);
+        const Info: Level = Level(1);
+        const Warn: Level = Level(2);
+        match Info {
+            Debug => panic!("wrong"),
+            Info => {}
+            _ => panic!("unknown"),
+        }
+    }
+
+    #[test]
+    fn enum_macro_string_const() {
+        crate::Enum!(Color);
+        const Red: Color = Color("red");
+        const Blue: Color = Color("blue");
+        // const-constructible + Copy + PartialEq
+        let c: Color = Red;
+        assert_eq!(c, Red);
+        assert_ne!(c, Blue);
+        // Display prints the inner string.
+        assert_eq!(format!("{}", Red), "red");
+        // Pattern matching works.
+        match c {
+            Red => {}
+            Blue => panic!("wrong"),
+            _ => panic!("unknown"),
+        }
     }
 
     #[test]
