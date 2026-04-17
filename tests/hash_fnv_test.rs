@@ -46,7 +46,8 @@ fn golden64a() -> Vec<GoldenFnv64> {
 }
 
 test!{ fn TestGolden32(t) {
-    for g in golden32().iter() {
+    let __golden32 = golden32();
+    for (_, g) in range!(__golden32) {
         let mut h = hash::fnv::New32();
         h.Write(g.inp);
         let got = h.Sum32();
@@ -59,7 +60,8 @@ test!{ fn TestGolden32(t) {
 }}
 
 test!{ fn TestGolden32a(t) {
-    for g in golden32a().iter() {
+    let __golden32a = golden32a();
+    for (_, g) in range!(__golden32a) {
         let mut h = hash::fnv::New32a();
         h.Write(g.inp);
         let got = h.Sum32();
@@ -72,7 +74,8 @@ test!{ fn TestGolden32a(t) {
 }}
 
 test!{ fn TestGolden64(t) {
-    for g in golden64().iter() {
+    let __golden64 = golden64();
+    for (_, g) in range!(__golden64) {
         let mut h = hash::fnv::New64();
         h.Write(g.inp);
         let got = h.Sum64();
@@ -85,7 +88,8 @@ test!{ fn TestGolden64(t) {
 }}
 
 test!{ fn TestGolden64a(t) {
-    for g in golden64a().iter() {
+    let __golden64a = golden64a();
+    for (_, g) in range!(__golden64a) {
         let mut h = hash::fnv::New64a();
         h.Write(g.inp);
         let got = h.Sum64();

@@ -28,7 +28,7 @@ fn main() {
     let wg = sync::WaitGroup::new();
 
     // Fan out: one goroutine per input.
-    range!(&inputs, |i, n| {
+    for (i, n) in range!(inputs) {
         wg.Add(1);
         let wg = wg.clone();
         let results = results.clone();
@@ -50,7 +50,7 @@ fn main() {
             let mut g = results.Lock();
             g.insert(i, m);
         };
-    });
+    }
 
     wg.Wait();
 
@@ -67,17 +67,17 @@ fn main() {
     fmt::Println!();
     fmt::Printf!("%-8s %-10s %-10s\n", "n", "sqrt", "log");
     fmt::Println!(strings::Repeat("-", 30));
-    range!(&collected, |_i, m| {
+    for (_, m) in range!(collected) {
         fmt::Printf!("%-8.0f %-10.4f %-10.4f\n", m.n, m.sqrt, m.log);
-    });
+    }
 
     // Write a summary under a temp path built with filepath::Join.
-    let out_path = filepath::Join(&[os::TempDir(), "goish_pipeline_summary.txt".into()]);
+    let out_path = filepath::Join((os::TempDir(), "goish_pipeline_summary.txt"));
     let mut buf = bytes::Buffer::new();
     fmt::Fprintf!(&mut buf, "pipeline summary — %d metrics\n", len!(collected));
-    range!(&collected, |_i, m| {
+    for (_, m) in range!(collected) {
         fmt::Fprintf!(&mut buf, "%.0f -> sqrt=%.4f log=%.4f\n", m.n, m.sqrt, m.log);
-    });
+    }
     let err = os::WriteFile(&out_path, buf.Bytes(), 0o644);
     if err != nil {
         log::Fatalf!("writing summary: %s", err);

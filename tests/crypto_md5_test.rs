@@ -61,7 +61,8 @@ fn to_hex(bytes: &[u8]) -> String {
 }
 
 test!{ fn TestGolden(t) {
-    for g in golden().iter() {
+    let __golden = golden();
+    for (_, g) in range!(__golden) {
         let sum = crypto::md5::Sum(g.inp.as_bytes());
         let hex = to_hex(&sum);
         if hex != g.out {

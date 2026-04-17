@@ -23,7 +23,8 @@ fn pairs() -> Vec<Pair> {
 }
 
 test!{ fn TestEncode(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let got = encoding::hex::EncodeToString(p.decoded);
         if got != p.encoded {
             t.Errorf(Sprintf!("EncodeToString = %q, want %q", got, p.encoded));
@@ -32,7 +33,8 @@ test!{ fn TestEncode(t) {
 }}
 
 test!{ fn TestDecodeString(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let (got, err) = encoding::hex::DecodeString(p.encoded);
         if err != nil {
             t.Errorf(Sprintf!("DecodeString(%q) error = %s", p.encoded, err));

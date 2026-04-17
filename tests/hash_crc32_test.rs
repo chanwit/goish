@@ -49,7 +49,8 @@ fn golden() -> Vec<Golden> {
 }
 
 test!{ fn TestGolden(t) {
-    for g in golden().iter() {
+    let __golden = golden();
+    for (_, g) in range!(__golden) {
         let got = hash::crc32::ChecksumIEEE(g.inp.as_bytes());
         if got != g.ieee {
             t.Errorf(Sprintf!("ChecksumIEEE(%q) = %x, want %x", g.inp, got as i64, g.ieee as i64));
@@ -59,7 +60,8 @@ test!{ fn TestGolden(t) {
 
 test!{ fn TestStreaming(t) {
     // Accumulate in pieces, should match one-shot.
-    for g in golden().iter() {
+    let __golden = golden();
+    for (_, g) in range!(__golden) {
         let mut h = hash::crc32::NewIEEE();
         let half = g.inp.len() / 2;
         h.Write(&g.inp.as_bytes()[..half]);

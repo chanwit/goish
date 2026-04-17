@@ -90,19 +90,19 @@ fn main() {
     }
 
     // Wait for workers to finish (they'll exit after their sentinel job).
-    range!(handles, |g| { let _ = g.Wait(); });
+    for g in handles { let _ = g.Wait(); }
 
     // Summary.
     fmt::Println!();
     fmt::Println!("results by worker:");
     let mut worker_ids: slice<&int> = by_worker.keys().collect();
     worker_ids.sort();
-    range!(&worker_ids, |_i, wid| {
+    for (_, wid) in range!(worker_ids) {
         let squares = &by_worker[*wid];
         let as_strs: slice<string> = squares.iter().map(|n| strconv::Itoa(*n)).collect();
         fmt::Printf!("  worker %d: %d squares [%s]\n",
             **wid, len!(squares), strings::Join(&as_strs, ", "));
-    });
+    }
 
     let elapsed = time::Since(start);
     fmt::Printf!("\nfinished in %s\n", elapsed);

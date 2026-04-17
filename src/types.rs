@@ -103,47 +103,21 @@ macro_rules! slice {
     };
 }
 
-/// `range!(x, |i, v| body)` — Go's `for i, v := range x { body }` pattern.
-///
-///   range!(slice_expr, |i, v| { ... })   // i: usize, v: &T
-///   range!(map_expr,   |k, v| { ... })   // k, v: &K, &V
-///   range!(&str_expr,  |i, r| { ... })   // i: usize, r: char (rune)
-///
-/// Uses `.iter().enumerate()` for slices and arrays, `.iter()` for maps, and
-/// `.chars().enumerate()` for string slices — whichever the expression's
-/// inherent method resolution picks first.
-///
-/// Preferred Go-shape form — use native Rust `for`/`in` and let `range!`
-/// produce the iterator:
+/// `range!(xs)` — Go's `for i, v := range xs` as a Rust iterator.
 ///
 ///   // Go:    for i, v := range xs { body }
 ///   // goish: for (i, v) in range!(xs) { body }
 ///
-/// For a single-arg range over integers (Go 1.22+):
+///   // Go:    for _, v := range xs { body }
+///   // goish: for (_, v) in range!(xs) { body }
 ///
-///   // Go:    for i := range n { body }
-///   // goish: for i in range!(n) { body }   // where n is int
-///
-/// The legacy closure form `range!(xs, |i, v| { ... })` is kept for
-/// backward compatibility.
+/// Works on slices, arrays, maps, and strings. Uses `.iter().enumerate()`
+/// for slices/arrays, `.iter()` for maps, and `.chars().enumerate()` for
+/// string slices.
 #[macro_export]
 macro_rules! range {
-    // range!(xs) — returns a goish RangeIter over xs.
-    //   for (i, v) in range!(xs) { body }      // slices, arrays, maps
-    //   for v      in range!(xs).vals() { body }  // (future) values only
     ($iter:expr) => {
         $crate::range::RangeIter::range(&$iter)
-    };
-    // Legacy closure forms — retained for backward compatibility.
-    ($iter:expr, |$i:pat_param, $v:pat_param| $body:block) => {
-        for ($i, $v) in $crate::range::RangeIter::range($iter) {
-            $body
-        }
-    };
-    ($iter:expr, |$v:pat_param| $body:block) => {
-        for $v in ($iter).into_iter() {
-            $body
-        }
     };
 }
 

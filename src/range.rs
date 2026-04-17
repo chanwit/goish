@@ -79,6 +79,15 @@ impl<'a> RangeIter for &'a String {
     }
 }
 
+// Double-ref for string literals: range!("abc") expands to range(&"abc") = &&str.
+impl<'a> RangeIter for &'a &str {
+    type Item = (usize, char);
+    type Iter = std::iter::Enumerate<std::str::Chars<'a>>;
+    fn range(self) -> Self::Iter {
+        (*self).chars().enumerate()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::types::*;
@@ -87,9 +96,9 @@ mod tests {
     fn range_slice_gives_index_and_ref() {
         let v: slice<int> = crate::slice!([]int{10, 20, 30});
         let mut collected: Vec<(usize, int)> = Vec::new();
-        crate::range!(&v, |i, val| {
+        for (i, val) in crate::range!(v) {
             collected.push((i, *val));
-        });
+        }
         assert_eq!(collected, vec![(0, 10), (1, 20), (2, 30)]);
     }
 
@@ -97,18 +106,18 @@ mod tests {
     fn range_map_gives_key_and_value_refs() {
         let m: map<string, int> = crate::map!([string]int{"a" => 1, "b" => 2});
         let mut total = 0i64;
-        crate::range!(&m, |_k, v| {
+        for (_k, v) in crate::range!(m) {
             total += *v;
-        });
+        }
         assert_eq!(total, 3);
     }
 
     #[test]
     fn range_str_gives_index_and_rune() {
         let mut chars: Vec<(usize, char)> = Vec::new();
-        crate::range!("abc", |i, r| {
+        for (i, r) in crate::range!("abc") {
             chars.push((i, r));
-        });
+        }
         assert_eq!(chars, vec![(0, 'a'), (1, 'b'), (2, 'c')]);
     }
 
@@ -116,7 +125,7 @@ mod tests {
     fn range_value_only_form() {
         let v: slice<int> = crate::slice!([]int{1, 2, 3});
         let mut sum = 0i64;
-        crate::range!(v, |x| { sum += x; });
+        for x in v.into_iter() { sum += x; }
         assert_eq!(sum, 6);
     }
 }

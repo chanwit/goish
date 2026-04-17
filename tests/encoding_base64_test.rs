@@ -50,7 +50,8 @@ fn raw_url_ref(s: &str) -> String {
 }
 
 test!{ fn TestEncodeStd(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let got = encoding::base64::StdEncoding.EncodeToString(p.decoded);
         if got != p.encoded {
             t.Errorf(Sprintf!("StdEncoding.EncodeToString(%q) = %q, want %q",
@@ -60,7 +61,8 @@ test!{ fn TestEncodeStd(t) {
 }}
 
 test!{ fn TestDecodeStd(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let (got, err) = encoding::base64::StdEncoding.DecodeString(p.encoded);
         if err != nil {
             t.Errorf(Sprintf!("StdEncoding.DecodeString(%q) error = %s", p.encoded, err));
@@ -74,7 +76,8 @@ test!{ fn TestDecodeStd(t) {
 }}
 
 test!{ fn TestEncodeURL(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let want = url_ref(p.encoded);
         let got = encoding::base64::URLEncoding.EncodeToString(p.decoded);
         if got != want {
@@ -84,7 +87,8 @@ test!{ fn TestEncodeURL(t) {
 }}
 
 test!{ fn TestDecodeURL(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let encoded = url_ref(p.encoded);
         let (got, err) = encoding::base64::URLEncoding.DecodeString(&encoded);
         if err != nil {
@@ -98,7 +102,8 @@ test!{ fn TestDecodeURL(t) {
 }}
 
 test!{ fn TestEncodeRawStd(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let want = raw_ref(p.encoded);
         let got = encoding::base64::RawStdEncoding.EncodeToString(p.decoded);
         if got != want {
@@ -108,7 +113,8 @@ test!{ fn TestEncodeRawStd(t) {
 }}
 
 test!{ fn TestDecodeRawStd(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let encoded = raw_ref(p.encoded);
         let (got, err) = encoding::base64::RawStdEncoding.DecodeString(&encoded);
         if err != nil {
@@ -122,7 +128,8 @@ test!{ fn TestDecodeRawStd(t) {
 }}
 
 test!{ fn TestEncodeRawURL(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let want = raw_url_ref(p.encoded);
         let got = encoding::base64::RawURLEncoding.EncodeToString(p.decoded);
         if got != want {
@@ -132,7 +139,8 @@ test!{ fn TestEncodeRawURL(t) {
 }}
 
 test!{ fn TestDecodeRawURL(t) {
-    for p in pairs().iter() {
+    let __pairs = pairs();
+    for (_, p) in range!(__pairs) {
         let encoded = raw_url_ref(p.encoded);
         let (got, err) = encoding::base64::RawURLEncoding.DecodeString(&encoded);
         if err != nil {
