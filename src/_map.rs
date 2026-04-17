@@ -234,12 +234,22 @@ mod tests {
     }
 
     #[test]
+    fn nil_chan_equals_nil() {
+        use crate::chan::Chan;
+        use crate::errors::nil;
+        let ch: Chan<i64> = Chan::default();
+        // Go-shape: ch == nil
+        assert!(ch == nil);
+        let live: Chan<i64> = Chan::new(1);
+        assert!(live != nil);
+    }
+
+    #[test]
     #[should_panic(expected = "use of nil channel")]
     fn nil_chan_send_panics() {
         use crate::chan::Chan;
         let ch: Chan<i64> = Chan::default();
-        assert!(ch.is_nil());
-        ch.Send(42); // should panic
+        ch.Send(42);
     }
 
     #[test]
@@ -247,7 +257,7 @@ mod tests {
     fn nil_chan_close_panics() {
         use crate::chan::Chan;
         let ch: Chan<()> = Chan::default();
-        ch.Close(); // Go: panic("close of nil channel")
+        ch.Close();
     }
 
     #[test]

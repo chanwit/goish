@@ -76,9 +76,42 @@ impl Display for error {
     }
 }
 
+// ── IsNil trait: Go's universal nil check ─────────────────────────────
+//
+// Go's `nil` is untyped — it adopts the type of whatever it's compared to.
+// In goish, `nil` is typed as `error` (for `return nil` ergonomics in the
+// 99% case). Cross-type `PartialEq<error>` impls on other nil-able types
+// (Chan<T>, future Box<dyn Trait>) simulate Go's untyped nil comparison.
+//
+// The `IsNil` trait formalizes the contract: any goish type with a nil
+// state implements it, enabling generic nil-checking code.
+//
+// Future (tracked): true polymorphic nil via a `NilValue` unit type +
+// `From<NilValue>` for each nil-able type, so `return nil` works for ALL
+// nil-able return types (not just error). Would require changing all
+// `return nil` to `return nil.into()` or introducing return-type coercion
+// via a proc macro. Deferred until the migration cost is justified.
+
+/// Trait for types that have a nil (zero-value) state, mirroring Go's
+/// polymorphic `== nil` check.
+///
+/// Implemented by: `error`, `Chan<T>`. Future: `Box<dyn Trait>` wrappers.
+pub trait IsNil {
+    fn is_nil(&self) -> bool;
+}
+
+impl IsNil for error {
+    fn is_nil(&self) -> bool { self.0.is_none() }
+}
+
 /// `nil` — the zero value of `error`.
 ///
-/// Compares equal to any nil error: `if err == nil { ... }`.
+/// Also serves as Go's polymorphic nil for comparisons with other nil-able
+/// types (Chan<T>) via cross-type `PartialEq` impls. See `IsNil` trait.
+///
+///   if err == nil { ... }     // error nil check
+///   if ch  != nil { ... }     // channel nil check (same `nil`)
+///   return nil;               // works in -> error functions
 #[allow(non_upper_case_globals)]
 pub const nil: error = error(None);
 

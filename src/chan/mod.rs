@@ -29,6 +29,23 @@ impl<T> Default for Chan<T> {
     fn default() -> Self { Chan { inner: None } }
 }
 
+impl<T> crate::errors::IsNil for Chan<T> {
+    fn is_nil(&self) -> bool { self.inner.is_none() }
+}
+
+/// `ch != nil` / `ch == nil` — Go's polymorphic nil comparison for channels.
+/// A nil channel equals nil; a live channel does not.
+impl<T> PartialEq<crate::errors::error> for Chan<T> {
+    fn eq(&self, other: &crate::errors::error) -> bool {
+        self.is_nil() && other.is_nil()
+    }
+}
+impl<T> PartialEq<Chan<T>> for crate::errors::error {
+    fn eq(&self, other: &Chan<T>) -> bool {
+        other.is_nil() && self.is_nil()
+    }
+}
+
 impl<T> Chan<T> {
     /// Construct a buffered channel with capacity `cap`. Use 0 for rendezvous.
     pub fn new(cap: usize) -> Self {
