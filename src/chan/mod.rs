@@ -20,30 +20,43 @@ pub const ENGINE: &str = engine::ENGINE_NAME;
 
 #[derive(Clone)]
 pub struct Chan<T> {
-    inner: engine::Inner<T>,
+    inner: Option<engine::Inner<T>>,
+}
+
+/// Go's zero-value `chan T` is nil ��� send/recv block forever, close panics.
+/// In goish, a nil channel panics on all operations (avoids silent deadlock).
+impl<T> Default for Chan<T> {
+    fn default() -> Self { Chan { inner: None } }
 }
 
 impl<T> Chan<T> {
     /// Construct a buffered channel with capacity `cap`. Use 0 for rendezvous.
     pub fn new(cap: usize) -> Self {
-        Chan { inner: engine::Inner::new(cap) }
+        Chan { inner: Some(engine::Inner::new(cap)) }
+    }
+
+    /// Returns true if the channel is nil (zero-value, never constructed).
+    pub fn is_nil(&self) -> bool { self.inner.is_none() }
+
+    /// Access the live inner, panicking on nil channel.
+    fn live(&self) -> &engine::Inner<T> {
+        self.inner.as_ref().expect("use of nil channel")
     }
 
     /// `ch <- v` — blocks until a receiver is ready or there's room.
     ///
-    /// Panics on a closed channel (matches Go's runtime panic
-    /// `"send on closed channel"`).
+    /// Panics on a closed or nil channel.
     pub fn Send(&self, v: T) {
-        if self.inner.send(v).is_err() {
+        if self.live().send(v).is_err() {
             panic!("send on closed channel");
         }
     }
 
     /// Async send — used by the `go!{}` macro inside async contexts.
     ///
-    /// Panics on a closed channel.
+    /// Panics on a closed or nil channel.
     pub async fn send(&self, v: T) {
-        if self.inner.send_async(v).await.is_err() {
+        if self.live().send_async(v).await.is_err() {
             panic!("send on closed channel");
         }
     }
@@ -52,7 +65,7 @@ impl<T> Chan<T> {
     /// channel is closed and drained.
     pub fn Recv(&self) -> (T, bool)
     where T: Default {
-        match self.inner.recv() {
+        match self.live().recv() {
             Some(v) => (v, true),
             None => (T::default(), false),
         }
@@ -61,7 +74,7 @@ impl<T> Chan<T> {
     /// Async recv — used inside `go!{}` macro expansion.
     pub async fn recv(&self) -> (T, bool)
     where T: Default {
-        match self.inner.recv_async().await {
+        match self.live().recv_async().await {
             Some(v) => (v, true),
             None => (T::default(), false),
         }
@@ -70,98 +83,83 @@ impl<T> Chan<T> {
     /// Non-blocking try-receive. Returns (value, true) on success.
     pub fn TryRecv(&self) -> (T, bool)
     where T: Default {
-        match self.inner.try_recv() {
+        match self.live().try_recv() {
             Some(v) => (v, true),
             None => (T::default(), false),
         }
     }
 
     /// Non-blocking try-send. Returns true on success, false on full buffer.
-    /// Panics on closed channel (same as blocking `Send`).
+    /// Panics on closed or nil channel.
     pub fn TrySend(&self, v: T) -> bool {
-        if self.inner.is_closed() {
+        let inner = self.live();
+        if inner.is_closed() {
             panic!("send on closed channel");
         }
-        self.inner.try_send(v).is_ok()
+        inner.try_send(v).is_ok()
     }
 
-    /// `select!`-internal: "is a recv case ready right now?"
-    ///
-    /// Go distinguishes three states visible to `select`:
-    ///   - value present         → case fires with (v, true)
-    ///   - channel closed+drained → case fires with (zero, false)
-    ///   - empty + still open    → case BLOCKS; default fires instead
-    ///
-    /// Plain `TryRecv` collapses the last two (both give `(zero, false)`).
-    /// This method returns `Some((v, ok))` when the case should fire, and
-    /// `None` when the case is blocked.
     #[doc(hidden)]
     pub fn __select_try_recv(&self) -> Option<(T, bool)>
     where T: Default {
-        if let Some(v) = self.inner.try_recv() {
+        let inner = self.live();
+        if let Some(v) = inner.try_recv() {
             return Some((v, true));
         }
-        if self.inner.is_closed() {
+        if inner.is_closed() {
             return Some((T::default(), false));
         }
         None
     }
 
-    /// `select!`-internal: "is a send case ready right now?" Returns Err(v)
-    /// if the buffer is full (or rendezvous has no partner). Matches the
-    /// semantic Go's `select { case c <- v: }` uses.
-    ///
-    /// Panics on closed (Go: `select { case c <- v: }` on closed c panics
-    /// identically to a bare `c <- v`).
     #[doc(hidden)]
     pub fn __select_try_send(&self, v: T) -> Result<(), T> {
-        if self.inner.is_closed() {
+        let inner = self.live();
+        if inner.is_closed() {
             panic!("send on closed channel");
         }
-        self.inner.try_send(v)
+        inner.try_send(v)
     }
 
-    /// close(ch) — mark the channel closed. Remaining buffered items still
-    /// recv; once drained, receivers return (zero, false).
-    ///
-    /// Panics if the channel is already closed (matches Go's runtime panic
-    /// `"close of closed channel"`).
+    /// close(ch) — panics on nil or already-closed channel.
     #[allow(non_snake_case)]
     pub fn Close(&self) {
-        if !self.inner.close() {
+        if !self.live().close() {
             panic!("close of closed channel");
         }
     }
 
     pub fn Len(&self) -> crate::types::int {
-        self.inner.len() as crate::types::int
+        if self.is_nil() { return 0; }
+        self.live().len() as crate::types::int
     }
 
     pub fn Cap(&self) -> crate::types::int {
-        self.inner.cap() as crate::types::int
+        if self.is_nil() { return 0; }
+        self.live().cap() as crate::types::int
     }
 
-    /// Lowercase alias for the polymorphic `len!()` macro.
     pub fn len(&self) -> usize {
-        self.inner.len()
+        if self.is_nil() { return 0; }
+        self.live().len()
     }
 
-    // ── proc-macro-internal accessors ──────────────────────────────────
-    // The `select!` proc macro reaches through these to build a flume
-    // `Selector` that parks on every arm at once (see issue #119). Never
-    // call from user code.
+    #[doc(hidden)]
+    pub fn __flume_rx(&self) -> &flume::Receiver<T> { self.live().__flume_rx() }
 
     #[doc(hidden)]
-    pub fn __flume_rx(&self) -> &flume::Receiver<T> { self.inner.__flume_rx() }
+    pub fn __flume_tx(&self) -> &flume::Sender<T> { self.live().__flume_tx() }
 
     #[doc(hidden)]
-    pub fn __flume_tx(&self) -> &flume::Sender<T> { self.inner.__flume_tx() }
+    pub fn __flume_close_rx(&self) -> &flume::Receiver<()> { self.live().__flume_close_rx() }
 
     #[doc(hidden)]
-    pub fn __flume_close_rx(&self) -> &flume::Receiver<()> { self.inner.__flume_close_rx() }
-
-    #[doc(hidden)]
-    pub fn __is_closed(&self) -> bool { self.inner.is_closed() }
+    pub fn __is_closed(&self) -> bool {
+        match &self.inner {
+            Some(inner) => inner.is_closed(),
+            None => false, // nil channel is not "closed" — it was never opened
+        }
+    }
 }
 
 /// `chan!(T)`         → unbuffered channel (rendezvous)

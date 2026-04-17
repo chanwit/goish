@@ -47,6 +47,7 @@ impl<K: Eq + Hash, V: Clone + Default> map<K, V> {
             None => (V::default(), false),
         }
     }
+
 }
 
 // ── Index: m[&key] returns &V, zero-value on miss ─────────────────────
@@ -215,6 +216,38 @@ mod tests {
         m[&key] = 10;
         m[&key] += 5;  // Go: m["count"] += 5
         assert_eq!(m[&key], 15);
+    }
+
+    #[test]
+    fn get_works_with_chan_values() {
+        // Chan<()> now has Default (nil channel) — map.Get() works.
+        use crate::chan::Chan;
+        let mut m: map<String, Chan<()>> = map::new();
+        let ch = Chan::new(1);
+        m.insert("key".into(), ch.clone());
+        let (v, ok) = m.Get("key");
+        assert!(ok);
+        assert!(!v.is_nil());
+        let (v, ok) = m.Get("missing");
+        assert!(!ok);
+        assert!(v.is_nil()); // zero-value Chan is nil
+    }
+
+    #[test]
+    #[should_panic(expected = "use of nil channel")]
+    fn nil_chan_send_panics() {
+        use crate::chan::Chan;
+        let ch: Chan<i64> = Chan::default();
+        assert!(ch.is_nil());
+        ch.Send(42); // should panic
+    }
+
+    #[test]
+    #[should_panic(expected = "use of nil channel")]
+    fn nil_chan_close_panics() {
+        use crate::chan::Chan;
+        let ch: Chan<()> = Chan::default();
+        ch.Close(); // Go: panic("close of nil channel")
     }
 
     #[test]
