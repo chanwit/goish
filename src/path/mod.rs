@@ -21,9 +21,52 @@ pub mod filepath;
 
 const SEP: char = '/';
 
+/// Trait enabling `path::Join` / `filepath::Join` to accept both slices
+/// AND tuples of mixed stringish types (GoString + &str + String).
+///
+///   // Slice form (homogeneous):
+///   path::Join(&["a", "b", "c"])
+///
+///   // Tuple form (mixed types, inline temporaries):
+///   filepath::Join((ToSnapDir(d), "db"))
+pub trait Joinable {
+    #[doc(hidden)]
+    fn __join_parts(&self) -> Vec<&str>;
+}
+
+impl<T: AsRef<str>> Joinable for &[T] {
+    fn __join_parts(&self) -> Vec<&str> { self.iter().map(|s| s.as_ref()).collect() }
+}
+impl<T: AsRef<str>, const N: usize> Joinable for &[T; N] {
+    fn __join_parts(&self) -> Vec<&str> { self.iter().map(|s| s.as_ref()).collect() }
+}
+impl<T: AsRef<str>> Joinable for &Vec<T> {
+    fn __join_parts(&self) -> Vec<&str> { self.iter().map(|s| s.as_ref()).collect() }
+}
+impl<T: AsRef<str>> Joinable for &crate::_slice::slice<T> {
+    fn __join_parts(&self) -> Vec<&str> { self.iter().map(|s| s.as_ref()).collect() }
+}
+impl<A: AsRef<str>, B: AsRef<str>> Joinable for (A, B) {
+    fn __join_parts(&self) -> Vec<&str> { vec![self.0.as_ref(), self.1.as_ref()] }
+}
+impl<A: AsRef<str>, B: AsRef<str>, C: AsRef<str>> Joinable for (A, B, C) {
+    fn __join_parts(&self) -> Vec<&str> { vec![self.0.as_ref(), self.1.as_ref(), self.2.as_ref()] }
+}
+impl<A: AsRef<str>, B: AsRef<str>, C: AsRef<str>, D: AsRef<str>> Joinable for (A, B, C, D) {
+    fn __join_parts(&self) -> Vec<&str> { vec![self.0.as_ref(), self.1.as_ref(), self.2.as_ref(), self.3.as_ref()] }
+}
+impl<A: AsRef<str>, B: AsRef<str>, C: AsRef<str>, D: AsRef<str>, E: AsRef<str>> Joinable for (A, B, C, D, E) {
+    fn __join_parts(&self) -> Vec<&str> { vec![self.0.as_ref(), self.1.as_ref(), self.2.as_ref(), self.3.as_ref(), self.4.as_ref()] }
+}
+
+/// path.Join — joins components with `/`, cleaning the result.
+///
+/// Accepts slices or tuples of mixed stringish types:
+///   path::Join(&["a", "b"])
+///   path::Join((dir_gostring, "file.txt"))
 #[allow(non_snake_case)]
-pub fn Join(parts: &[impl AsRef<str>]) -> string {
-    let joined: Vec<&str> = parts.iter().map(|p| p.as_ref()).filter(|s| !s.is_empty()).collect();
+pub fn Join(parts: impl Joinable) -> string {
+    let joined: Vec<&str> = parts.__join_parts().into_iter().filter(|s| !s.is_empty()).collect();
     if joined.is_empty() {
         return "".into();
     }

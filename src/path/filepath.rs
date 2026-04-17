@@ -12,10 +12,22 @@ use crate::types::string;
 
 const SEP: char = std::path::MAIN_SEPARATOR;
 
-/// filepath.Join — joins components with the path separator, cleaning the result.
+use super::Joinable;
+
+/// filepath.Join — joins components with the path separator, cleaning
+/// the result.
+///
+/// Accepts both slices and tuples of mixed stringish types:
+///
+///   // Slice form (homogeneous types):
+///   filepath::Join(&["a", "b", "c"])
+///
+///   // Tuple form (mixed types, inline temporaries OK):
+///   filepath::Join((ToSnapDir(d), "db"))
+///   filepath::Join((base, sub_dir, "file.txt"))
 #[allow(non_snake_case)]
-pub fn Join(parts: &[impl AsRef<str>]) -> string {
-    let joined: Vec<&str> = parts.iter().map(|p| p.as_ref()).filter(|s| !s.is_empty()).collect();
+pub fn Join(parts: impl Joinable) -> string {
+    let joined: Vec<&str> = parts.__join_parts().into_iter().filter(|s| !s.is_empty()).collect();
     if joined.is_empty() {
         return "".into();
     }
