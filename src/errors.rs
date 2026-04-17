@@ -14,7 +14,38 @@
 // the message (or "<nil>" when nil), so `fmt.Println("error:", err)` works
 // the same as in Go without any unwrapping at the call site.
 
-use std::fmt::{self, Display};
+use std::any::Any;
+use std::fmt::{self, Debug, Display};
+use std::sync::Arc;
+
+// ── GoishError: user-implementable error interface ────────────────────
+//
+// Go's `error` is an interface `{ Error() string }`. Until v0.20.4 the
+// goish `error` was a single concrete newtype — great for Go → goish
+// ports of simple error-returning code, but no way to introduce a new
+// error *shape* (multierr's list-of-errors, errgroup, wrapped typed
+// errors with extra fields). v0.20.5 opens the hatch:
+//
+//   impl std::fmt::Display for MyErr { ... }
+//   impl std::fmt::Debug   for MyErr { ... }
+//   impl errors::GoishError for MyErr {
+//       fn as_any(&self) -> &dyn std::any::Any { self }
+//   }
+//
+//   let err = errors::FromDyn(MyErr { ... });   // → `error`
+//   if let Some(me) = err.downcast_ref::<MyErr>() { ... }   // recover
+//
+// Trait upcasting to `dyn Any` isn't stable on MSRV 1.70, so we require
+// an explicit `as_any` method — one line per impl.
+
+pub trait GoishError: Display + Debug + Send + Sync + 'static {
+    /// Go's `.Error()` interface method. Defaults to Display.
+    fn Error(&self) -> String { format!("{}", self) }
+    /// Go's `errors.Unwrap` contract — return the wrapped error, if any.
+    fn Unwrap(&self) -> error { nil }
+    /// Explicit upcast for `downcast_ref`. Required impl: `self`.
+    fn as_any(&self) -> &dyn Any;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GoError {
@@ -51,9 +82,32 @@ impl std::error::Error for GoError {
 }
 
 // ── error: the Go-style return type ────────────────────────────────────
+//
+// Holds either the built-in GoError (fast path, created by `errors::New`
+// and `Errorf!`) or an Arc'd user type (`errors::FromDyn`). PartialEq
+// distinguishes: Builtin/Builtin → msg equality; Custom/Custom → Arc
+// pointer identity (the Go `==` on pointer-receiver error values).
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct error(Option<GoError>);
+#[derive(Debug, Clone)]
+enum ErrorKind {
+    Builtin(GoError),
+    Custom(Arc<dyn GoishError>),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct error(Option<ErrorKind>);
+
+impl PartialEq for error {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (None, None) => true,
+            (Some(ErrorKind::Builtin(a)), Some(ErrorKind::Builtin(b))) => a == b,
+            (Some(ErrorKind::Custom(a)), Some(ErrorKind::Custom(b))) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+impl Eq for error {}
 
 impl error {
     pub fn is_nil(&self) -> bool { self.0.is_none() }
@@ -61,8 +115,18 @@ impl error {
     /// e.Error() — message string (panics if nil, matching Go).
     pub fn Error(&self) -> String {
         match &self.0 {
-            Some(e) => format!("{}", e),
+            Some(ErrorKind::Builtin(e)) => format!("{}", e),
+            Some(ErrorKind::Custom(a)) => a.Error(),
             None => panic!("runtime error: invalid memory address or nil pointer dereference"),
+        }
+    }
+
+    /// Recover the original user type from a `FromDyn`-constructed error.
+    /// Returns None for nil errors and for Builtin (message-based) errors.
+    pub fn downcast_ref<T: GoishError>(&self) -> Option<&T> {
+        match &self.0 {
+            Some(ErrorKind::Custom(a)) => a.as_any().downcast_ref::<T>(),
+            _ => None,
         }
     }
 }
@@ -70,7 +134,8 @@ impl error {
 impl Display for error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
-            Some(e) => Display::fmt(e, f),
+            Some(ErrorKind::Builtin(e)) => Display::fmt(e, f),
+            Some(ErrorKind::Custom(a)) => Display::fmt(&**a, f),
             None => write!(f, "<nil>"),
         }
     }
@@ -181,7 +246,15 @@ macro_rules! static_err {
 // ── errors.{New, Wrap, Is, Unwrap} ─────────────────────────────────────
 
 pub fn New(msg: &str) -> error {
-    error(Some(GoError::new(msg)))
+    error(Some(ErrorKind::Builtin(GoError::new(msg))))
+}
+
+/// Lift any user-defined `GoishError` into an `error`. The value is
+/// Arc-wrapped so the resulting `error` is still cheap to clone.
+/// Recover via `err.downcast_ref::<T>()`.
+#[allow(non_snake_case)]
+pub fn FromDyn<T: GoishError>(e: T) -> error {
+    error(Some(ErrorKind::Custom(Arc::new(e))))
 }
 
 /// Internal helper — build an error with a specific source chain. Used
@@ -192,12 +265,22 @@ pub fn New(msg: &str) -> error {
 #[doc(hidden)]
 #[allow(non_snake_case)]
 pub fn New_with_source(msg: &str, source: error) -> error {
-    match source.0 {
-        Some(inner) => error(Some(GoError {
+    // %w only carries builtin chains. If the source is a Custom, capture
+    // its message at wrap time (losing type identity — this matches Go's
+    // `Errorf("%w", custom)` which returns a fresh *wrapError that walks
+    // to the original via Unwrap, so chain-walk semantics still hold for
+    // message-based matchers).
+    let source_builtin = match source.0 {
+        Some(ErrorKind::Builtin(g)) => Some(g),
+        Some(ErrorKind::Custom(a)) => Some(GoError::new(a.Error())),
+        None => None,
+    };
+    match source_builtin {
+        Some(inner) => error(Some(ErrorKind::Builtin(GoError {
             msg: msg.to_string(),
             source: Some(Box::new(inner)),
             msg_includes_source: true,
-        })),
+        }))),
         None => New(msg),
     }
 }
@@ -205,39 +288,51 @@ pub fn New_with_source(msg: &str, source: error) -> error {
 /// errors.Wrap(err, "context")  →  closest to Go's fmt.Errorf("ctx: %w", err).
 /// Returns nil if err is nil (matches Go's typical wrap helpers).
 pub fn Wrap(err: error, msg: &str) -> error {
-    match err.0 {
-        Some(inner) => error(Some(GoError {
-            msg: msg.to_string(),
-            source: Some(Box::new(inner)),
-            msg_includes_source: false,
-        })),
-        None => nil,
-    }
+    let inner = match err.0 {
+        Some(ErrorKind::Builtin(g)) => g,
+        Some(ErrorKind::Custom(a)) => GoError::new(a.Error()),
+        None => return nil,
+    };
+    error(Some(ErrorKind::Builtin(GoError {
+        msg: msg.to_string(),
+        source: Some(Box::new(inner)),
+        msg_includes_source: false,
+    })))
 }
 
 /// errors.Is(err, target) — walks the wrap chain looking for a match.
+///
+/// Matching rules mirror Go:
+///   - target nil        → true iff err is nil
+///   - target Builtin    → walk err's chain, match by message equality
+///   - target Custom     → walk err's chain, match when cur == target
+///                         (Arc pointer identity or .Unwrap() deep-equal)
 pub fn Is(err: &error, target: &error) -> bool {
-    let target_msg = match &target.0 {
-        Some(t) => &t.msg,
-        None => return err.0.is_none(),
-    };
-    let mut cur = err.0.as_ref();
-    while let Some(e) = cur {
-        if &e.msg == target_msg {
-            return true;
+    if target.0.is_none() { return err.0.is_none(); }
+    let mut cur = err.clone();
+    loop {
+        if cur == *target { return true; }
+        // Message match for Builtin targets — Go's `errors.Is` considers
+        // a sentinel error equal if the chain contains the same value.
+        if let (Some(ErrorKind::Builtin(c)), Some(ErrorKind::Builtin(t))) =
+            (&cur.0, &target.0)
+        {
+            if c.msg == t.msg { return true; }
         }
-        cur = e.source.as_deref();
+        let next = Unwrap(cur.clone());
+        if next == nil { return false; }
+        cur = next;
     }
-    false
 }
 
 /// errors.Unwrap(err) — returns the next error in the chain, or nil.
 pub fn Unwrap(err: error) -> error {
     match err.0 {
-        Some(e) => match e.source {
-            Some(src) => error(Some(*src)),
+        Some(ErrorKind::Builtin(g)) => match g.source {
+            Some(src) => error(Some(ErrorKind::Builtin(*src))),
             None => nil,
         },
+        Some(ErrorKind::Custom(a)) => a.Unwrap(),
         None => nil,
     }
 }
@@ -246,19 +341,19 @@ pub fn Unwrap(err: error) -> error {
 /// string joins the individual messages with newlines. nil errors are
 /// skipped; if the resulting list is empty, returns nil.
 pub fn Join(errs: &[error]) -> error {
-    let msgs: Vec<&String> = errs
+    let msgs: Vec<String> = errs
         .iter()
-        .filter_map(|e| e.0.as_ref().map(|g| &g.msg))
+        .filter_map(|e| match &e.0 {
+            Some(ErrorKind::Builtin(g)) => Some(g.msg.clone()),
+            Some(ErrorKind::Custom(a)) => Some(a.Error()),
+            None => None,
+        })
         .collect();
     if msgs.is_empty() {
         return nil;
     }
-    let joined: String = msgs
-        .iter()
-        .map(|s| s.as_str())
-        .collect::<Vec<_>>()
-        .join("\n");
-    error(Some(GoError::new(joined)))
+    let joined = msgs.join("\n");
+    error(Some(ErrorKind::Builtin(GoError::new(joined))))
 }
 
 /// errors.Append(err, more) — idiomatic pairwise append, mirroring uber's
@@ -281,16 +376,22 @@ pub fn Append(err: error, more: error) -> error {
 /// is a single concrete GoError.
 pub fn As(err: &error, target: &mut error) -> bool {
     let target_msg = match &target.0 {
-        Some(t) => t.msg.clone(),
+        Some(ErrorKind::Builtin(g)) => g.msg.clone(),
+        Some(ErrorKind::Custom(a)) => a.Error(),
         None => return false,
     };
-    let mut cur = err.0.as_ref();
-    while let Some(e) = cur {
+    // Walk the builtin chain (custom errors don't expose a source internal).
+    let mut cur_opt = match &err.0 {
+        Some(ErrorKind::Builtin(g)) => Some(g.clone()),
+        Some(ErrorKind::Custom(a)) => Some(GoError::new(a.Error())),
+        None => None,
+    };
+    while let Some(e) = cur_opt {
         if e.msg == target_msg {
-            *target = error(Some(e.clone()));
+            *target = error(Some(ErrorKind::Builtin(e)));
             return true;
         }
-        cur = e.source.as_deref();
+        cur_opt = e.source.map(|b| *b);
     }
     false
 }

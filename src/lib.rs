@@ -150,7 +150,7 @@ pub mod prelude {
     pub use crate::context;
     pub use crate::crypto;
     pub use crate::encoding;
-    pub use crate::errors::{self, error, nil, IsNil};
+    pub use crate::errors::{self, error, nil, GoishError, IsNil};
     pub use crate::flag;
     pub use crate::fmt;
     pub use crate::hash;
