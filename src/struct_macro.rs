@@ -98,6 +98,22 @@ macro_rules! __goish_struct_parse {
             [$($ord)* ($f $ty)]);
     };
 
+    // Fallback: any Rust type (generics, tuples, arrays, refs).
+    // Matched AFTER the single-tt arm so string/int/bool/etc. still flow
+    // through __goish_type! for goish-type mapping. Paren-wraps the type
+    // into a single tt so downstream ctor dispatch works.
+    (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident $ty:ty ; $($rest:tt)*) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* ($f : ($ty) ,)]
+            [$($ord)* ($f ($ty))]
+            $($rest)*);
+    };
+    (@start [$name:ident] [$($fd:tt)*] [$($ord:tt)*] $f:ident $ty:ty) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* ($f : ($ty) ,)]
+            [$($ord)* ($f ($ty))]);
+    };
+
     // Gather more names in a multi-name group
     (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $next:ident , $($rest:tt)*) => {
         $crate::__goish_struct_parse!(@collect [$name] [$($fd)*] [$($ord)*] [$($names)+ $next] $($rest)*);
@@ -142,6 +158,19 @@ macro_rules! __goish_struct_parse {
         $crate::__goish_struct_parse!(@start [$name]
             [$($fd)* $( ($names : $ty ,) )+ ($last : $ty ,)]
             [$($ord)* $( ($names $ty) )+ ($last $ty)]);
+    };
+
+    // Multi-name group with any-ty fallback — handles generics, tuples, etc.
+    (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident $ty:ty ; $($rest:tt)*) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* $( ($names : ($ty) ,) )+ ($last : ($ty) ,)]
+            [$($ord)* $( ($names ($ty)) )+ ($last ($ty))]
+            $($rest)*);
+    };
+    (@collect [$name:ident] [$($fd:tt)*] [$($ord:tt)*] [$($names:ident)+] $last:ident $ty:ty) => {
+        $crate::__goish_struct_parse!(@start [$name]
+            [$($fd)* $( ($names : ($ty) ,) )+ ($last : ($ty) ,)]
+            [$($ord)* $( ($names ($ty)) )+ ($last ($ty))]);
     };
 }
 
@@ -356,6 +385,20 @@ mod tests {
         let p = Parts!(empty.clone(), empty);
         assert_eq!(p.head.len(), 0);
         assert_eq!(p.tail.len(), 0);
+    }
+
+    Struct!{ type OptHolder struct {
+        name string;
+        maybe Option<bool>;
+        items Vec<i64>
+    } }
+
+    #[test]
+    fn generic_field_types() {
+        let h = OptHolder!("test", Some(true), vec![1, 2, 3]);
+        assert_eq!(h.name, "test");
+        assert_eq!(h.maybe, Some(true));
+        assert_eq!(h.items, vec![1, 2, 3]);
     }
 
     #[test]
