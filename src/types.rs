@@ -374,6 +374,35 @@ macro_rules! len {
     };
 }
 
+/// `cap!(x)` — Go's polymorphic `cap()` builtin.
+///
+/// Works on `slice<T>` (Arc-backed, returns capacity beyond `start`)
+/// and `Chan<T>` (channel buffer capacity). Returns Go's `int`.
+///
+///   let c = cap!(my_slice);   // slice<T>::capacity()
+///   let c = cap!(ch);         // Chan<T>::Cap()
+#[macro_export]
+macro_rules! cap {
+    ($x:expr) => {
+        $crate::__goish_cap(&$x) as $crate::types::int
+    };
+}
+
+/// Internal trait for the polymorphic `cap!()` macro. Mirrors the Go
+/// builtin's dispatch over slices and channels.
+pub trait Cap {
+    fn __goish_cap(&self) -> usize;
+}
+impl<T> Cap for crate::_slice::slice<T> {
+    fn __goish_cap(&self) -> usize { self.capacity() }
+}
+impl<T> Cap for crate::chan::Chan<T> {
+    fn __goish_cap(&self) -> usize { self.Cap() as usize }
+}
+
+#[doc(hidden)]
+pub fn __goish_cap<T: Cap + ?Sized>(x: &T) -> usize { x.__goish_cap() }
+
 /// `append!(s, x, y, z)` — Go's `append(s, ...)` for slices.
 ///
 /// Consumes `s`, pushes each element (with `.into()` for widening), and
@@ -737,6 +766,27 @@ mod tests {
         let c: UserIds = vec![UserId(1), UserId(3)].into();
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn len_and_cap_macros_on_slice() {
+        let s = crate::make!([]int, 3, 10);  // len=3, cap=10
+        assert_eq!(crate::len!(s), 3);
+        assert_eq!(crate::cap!(s), 10);
+    }
+
+    #[test]
+    fn cap_macro_on_chan() {
+        let ch = crate::chan!(int, 8);
+        assert_eq!(crate::cap!(ch), 8);
+    }
+
+    #[test]
+    fn len_on_arc_slice_returns_view_length() {
+        // Go: len(s[i:]) returns j-i, not backing array length.
+        let s: crate::types::slice<int> = crate::slice!([]int{1, 2, 3, 4, 5});
+        let sub = s.SliceFrom(2);
+        assert_eq!(crate::len!(sub), 3);  // view length, not 5
     }
 
     #[test]
