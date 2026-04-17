@@ -83,6 +83,12 @@ pub(crate) fn canonicalize(k: &str) -> string {
 
 /// `http.Request` — represents an incoming server request or an outgoing
 /// client request.
+///
+/// All fields are `pub` (including `ctx`) so Rust struct-update syntax
+/// works: `Request { Host: "x".into(), ..Default::default() }`. Go keeps
+/// `ctx` private for `WithContext`-only mutation, but that idiom doesn't
+/// enforce well in Rust without extra methods — convention is: use
+/// `WithContext()` rather than assigning `ctx` directly.
 #[derive(Default)]
 pub struct Request {
     pub Method: string,
@@ -93,7 +99,7 @@ pub struct Request {
     pub Host: string,
     pub RemoteAddr: string,
     pub ContentLength: crate::types::int64,
-    ctx: crate::context::Context,
+    pub ctx: crate::context::Context, /* go private */
 }
 
 /// Argument-converter for request bodies. Lets `NewRequest(method, url, body)`
