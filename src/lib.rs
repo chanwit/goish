@@ -109,6 +109,9 @@ pub mod __goish_inventory {
 }
 
 pub mod chan;
+#[doc(hidden)]
+pub mod clone_dyn;
+pub use clone_dyn::DynClone;
 pub mod consts;
 pub mod defer;
 pub mod gostring;
@@ -151,6 +154,7 @@ pub mod prelude {
     pub use crate::crypto;
     pub use crate::encoding;
     pub use crate::errors::{self, error, nil, GoishError, IsNil};
+    pub use crate::clone_dyn::DynClone;
     pub use crate::flag;
     pub use crate::fmt;
     pub use crate::hash;
@@ -196,9 +200,9 @@ pub mod prelude {
     pub use crate::goroutine::Goroutine;
     pub use crate::{
         Const, Cookie, Enum, Errorf, Fprintf, IntNewtype, MailAddress, Printf, Println,
-        SliceNewtype, copy, Sprintf, Type, append, benchmark, cap, cat, chan, close, const_block,
-        defer, delete, go, len, make, map, range, recover, select, slice, static_err, string,
-        stringer, Struct, test, test_h, test_main, var,
+        SliceNewtype, clone_trait_object, copy, Sprintf, Type, append, benchmark, cap, cat, chan,
+        close, const_block, defer, delete, go, len, make, map, range, recover, select, slice,
+        static_err, string, stringer, Struct, test, test_h, test_main, var,
     };
 
     // Trait re-exports — required in scope for trait-method resolution like
