@@ -165,6 +165,64 @@ fn parse_send(input: ParseStream) -> syn::Result<Arm> {
     Ok(Arm::Send { ch, val, body })
 }
 
+/// `select!` — Go's select statement with Go-faithful semantics.
+///
+/// # Syntax
+///
+/// ```ignore
+/// select! {
+///     recv(ch) => { body },            // receive, discard value
+///     recv(ch) |v| => { body },        // bind value
+///     recv(ch) |v, ok| => { body },    // bind value and open flag
+///     send(ch, expr) => { body },      // send expr, run body on success
+///     default => { body },             // non-blocking fallback
+/// }
+/// ```
+///
+/// # Early return pattern (gotcha)
+///
+/// `return` inside an arm body WORKS at runtime — control leaves the
+/// enclosing function — but Rust's type checker can't see that. The
+/// macro expands to sequential `if` statements, each without `else`:
+///
+/// ```ignore
+/// if !__fired { if ready { body; __fired = true; } }
+/// if !__fired { default_body }
+/// ```
+///
+/// Rust infers the `if`-without-`else` as `()` even when `body` ends in
+/// `return`, so a function like
+///
+/// ```ignore
+/// fn try_send(ch: &Chan<()>) -> bool {
+///     select! {
+///         send(ch, ()) => { return true; },
+///         default => { return false; },
+///     }
+///     // error: expected bool, found ()
+/// }
+/// ```
+///
+/// fails to compile. Rust won't trace `return` through the expansion
+/// back to the function boundary.
+///
+/// **Idiomatic Rust workaround** — use an outer mutable, then return:
+///
+/// ```ignore
+/// fn try_send(ch: &Chan<()>) -> bool {
+///     let mut taken = false;
+///     select! {
+///         send(ch, ()) => { taken = true; },
+///         default => {},
+///     }
+///     taken
+/// }
+/// ```
+///
+/// This is a fundamental Rust/Go difference: Go's `case` bodies are
+/// statement sequences that can `return` directly; Rust needs a unified
+/// expression type across all arms, and the macro can't distinguish
+/// at expansion time whether a body diverges or flows through.
 #[proc_macro]
 pub fn select(input: TokenStream) -> TokenStream {
     let SelectInput { arms } = parse_macro_input!(input as SelectInput);

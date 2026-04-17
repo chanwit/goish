@@ -178,7 +178,12 @@ macro_rules! __goish_struct_parse {
 #[doc(hidden)]
 macro_rules! __goish_struct_emit {
     ([$name:ident] [$( ($fn:ident : $ft:tt ,) )*] [$( ($on:ident $ot:tt) )*]) => {
-        #[derive(Clone, Debug, Default)]
+        // Derives match Go's "struct is comparable iff all fields are
+        // comparable" — PartialEq/Eq/Hash fail to compile for structs
+        // containing non-hashable fields (like map<K,V>), which is the
+        // correct Go-like signal. If a user needs fewer derives, they
+        // should fall back to a plain Rust struct.
+        #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
         #[allow(non_snake_case)]
         pub struct $name {
             $( pub $fn: $crate::__goish_type!($ft), )*
@@ -354,7 +359,7 @@ mod tests {
     // Nested module for the qualified-path test.
     mod semver {
         #[allow(non_snake_case)]
-        #[derive(Clone, Debug, Default, PartialEq)]
+        #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
         pub struct Version { pub Major: i64, pub Minor: i64, pub Patch: i64 }
     }
     Struct!{ type tcase struct {
@@ -363,6 +368,21 @@ mod tests {
         ver2 semver::Version;
         expected int
     } }
+
+    Struct!{ type Row struct { Method, Pattern, Args string } }
+
+    #[test]
+    fn struct_usable_as_map_key_and_in_hashset() {
+        // Go ports commonly key maps/sets by struct value — needs
+        // PartialEq + Eq + Hash derived.
+        use std::collections::HashSet;
+        let a = Row!("GET", "/users", "id=1");
+        let b = Row!("GET", "/users", "id=1");
+        assert_eq!(a, b);
+        let mut s: HashSet<Row> = HashSet::new();
+        s.insert(a);
+        assert!(s.contains(&b));
+    }
 
     Struct!{ type Bag struct { name string; items []string } }
 
