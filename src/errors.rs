@@ -82,6 +82,30 @@ impl Display for error {
 #[allow(non_upper_case_globals)]
 pub const nil: error = error(None);
 
+/// `static_err!(Name = "message")` — Go's `var Name = fmt.Errorf("message")`.
+///
+/// `error` holds a heap-allocated message so it can't be a `const`; this
+/// macro wraps a `OnceLock<error>` behind a zero-arg function, so
+/// `Name()` always returns the same cached sentinel. Pair with
+/// `errors::Is` for identity-style comparison:
+///
+/// ```ignore
+/// static_err!(ErrShortRead = "ioutil: short read");
+/// static_err!(ErrExpectEOF = "ioutil: expect EOF");
+/// if errors::Is(&err, &ErrShortRead()) { /* … */ }
+/// ```
+#[macro_export]
+macro_rules! static_err {
+    ($name:ident = $msg:expr) => {
+        #[allow(non_snake_case)]
+        pub fn $name() -> $crate::errors::error {
+            static __ONCE: ::std::sync::OnceLock<$crate::errors::error>
+                = ::std::sync::OnceLock::new();
+            __ONCE.get_or_init(|| $crate::errors::New($msg)).clone()
+        }
+    };
+}
+
 // ── errors.{New, Wrap, Is, Unwrap} ─────────────────────────────────────
 
 pub fn New(msg: &str) -> error {
@@ -188,6 +212,16 @@ pub fn As(err: &error, target: &mut error) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn static_err_macro_caches_and_matches() {
+        crate::static_err!(ErrMockSentinel = "mock: short read");
+        let a = ErrMockSentinel();
+        let b = ErrMockSentinel();
+        assert_eq!(format!("{}", a), "mock: short read");
+        // Same message on every call — equality via errors::Is works.
+        assert!(crate::errors::Is(&a, &b));
+    }
 
     #[test]
     fn new_displays_message() {

@@ -63,6 +63,40 @@ pub trait WriterAt {
     fn WriteAt(&mut self, p: &[byte], off: int64) -> (int, error);
 }
 
+// ─── Combined interfaces (Go embedding) ───────────────────────────────
+//
+// Go composes io interfaces via struct embedding, e.g.:
+//
+//   type ReadCloser interface { Reader; Closer }
+//
+// In Rust we express each combination as a supertrait with a blanket
+// impl, so any type implementing the constituent traits automatically
+// implements the combined one. No Box-gymnastics at the impl site.
+
+pub trait ReadCloser: Reader + Closer {}
+impl<T: Reader + Closer + ?Sized> ReadCloser for T {}
+
+pub trait WriteCloser: Writer + Closer {}
+impl<T: Writer + Closer + ?Sized> WriteCloser for T {}
+
+pub trait ReadWriter: Reader + Writer {}
+impl<T: Reader + Writer + ?Sized> ReadWriter for T {}
+
+pub trait ReadWriteCloser: Reader + Writer + Closer {}
+impl<T: Reader + Writer + Closer + ?Sized> ReadWriteCloser for T {}
+
+pub trait ReadSeeker: Reader + Seeker {}
+impl<T: Reader + Seeker + ?Sized> ReadSeeker for T {}
+
+pub trait WriteSeeker: Writer + Seeker {}
+impl<T: Writer + Seeker + ?Sized> WriteSeeker for T {}
+
+pub trait ReadWriteSeeker: Reader + Writer + Seeker {}
+impl<T: Reader + Writer + Seeker + ?Sized> ReadWriteSeeker for T {}
+
+pub trait ReadSeekCloser: Reader + Seeker + Closer {}
+impl<T: Reader + Seeker + Closer + ?Sized> ReadSeekCloser for T {}
+
 // ─── Seek whence constants ────────────────────────────────────────────
 
 #[allow(non_upper_case_globals)] pub const SeekStart: int = 0;
@@ -85,6 +119,23 @@ impl<W: std::io::Write + ?Sized> Writer for W {
     fn Write(&mut self, p: &[byte]) -> (int, error) {
         match std::io::Write::write(self, p) {
             Ok(n) => (n as int, nil),
+            Err(e) => (0, New(&format!("{}", e))),
+        }
+    }
+}
+
+// Seeker blanket over std::io::Seek — lets Cursor, File, etc. flow into
+// the combined interfaces (ReadSeeker, ReadWriteSeeker, ...).
+impl<S: std::io::Seek + ?Sized> Seeker for S {
+    fn Seek(&mut self, offset: int64, whence: int) -> (int64, error) {
+        let pos = match whence {
+            0 => std::io::SeekFrom::Start(offset as u64),
+            1 => std::io::SeekFrom::Current(offset),
+            2 => std::io::SeekFrom::End(offset),
+            _ => return (0, New(&format!("seek: invalid whence {}", whence))),
+        };
+        match std::io::Seek::seek(self, pos) {
+            Ok(n) => (n as int64, nil),
             Err(e) => (0, New(&format!("{}", e))),
         }
     }
@@ -469,6 +520,16 @@ impl ReaderAt for &[byte] {
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn combined_interfaces_blanket_impl() {
+        // Cursor<Vec<u8>> gets Read+Seek+Write via std, and from our blanket
+        // impls Reader+Writer+Seeker — so ReadWriteSeeker (combined trait)
+        // also applies automatically.
+        fn takes_rws<T: ReadWriteSeeker>(_: &mut T) {}
+        let mut cur = Cursor::new(vec![0u8; 8]);
+        takes_rws(&mut cur);
+    }
 
     #[test]
     fn reader_read_from_cursor() {
