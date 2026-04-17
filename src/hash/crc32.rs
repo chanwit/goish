@@ -140,8 +140,8 @@ mod tests {
         let seed: Vec<u8> = b"prefix:".to_vec();
         let out = h.Sum(&seed);
         // first 7 bytes = seed, next 4 = big-endian CRC.
-        assert_eq!(&out.as_vec()[..7], b"prefix:");
-        let crc_bytes = &out.as_vec()[7..];
+        assert_eq!(&out.as_slice()[..7], b"prefix:");
+        let crc_bytes = &out.as_slice()[7..];
         assert_eq!(crc_bytes, &[0x0d, 0x4a, 0x11, 0x85]);
     }
 }

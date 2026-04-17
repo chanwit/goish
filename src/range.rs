@@ -47,7 +47,7 @@ impl<'a, T> RangeIter for &'a crate::_slice::slice<T> {
     type Item = (usize, &'a T);
     type Iter = std::iter::Enumerate<std::slice::Iter<'a, T>>;
     fn range(self) -> Self::Iter {
-        self.as_vec().iter().enumerate()
+        self.as_slice().iter().enumerate()
     }
 }
 

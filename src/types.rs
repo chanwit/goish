@@ -213,12 +213,12 @@ macro_rules! SliceNewtype {
         impl<'a> ::std::iter::IntoIterator for &'a $name {
             type Item = &'a $elem;
             type IntoIter = ::std::slice::Iter<'a, $elem>;
-            fn into_iter(self) -> Self::IntoIter { self.0.as_vec().iter() }
+            fn into_iter(self) -> Self::IntoIter { self.0.iter() }
         }
         impl<'a> ::std::iter::IntoIterator for &'a mut $name {
             type Item = &'a mut $elem;
             type IntoIter = ::std::slice::IterMut<'a, $elem>;
-            fn into_iter(self) -> Self::IntoIter { self.0.as_vec_mut().iter_mut() }
+            fn into_iter(self) -> Self::IntoIter { self.0.iter_mut() }
         }
     };
 }
@@ -388,6 +388,9 @@ macro_rules! append {
     ($s:expr $(, $x:expr)+ $(,)?) => {
         {
             let mut __s = $s;
+            // Fork the Arc if shared — matches Go's `append` always-succeeds
+            // semantics. Requires T: Clone (true for all Go-portable types).
+            __s.cow();
             $( __s.push(($x).into()); )+
             __s
         }

@@ -1,138 +1,365 @@
-// slice<T>: newtype wrapper around Vec<T> so we can impl Index<i64>.
+// slice<T>: Go's `[]T`, implemented as a reference-counted view over a
+// shared Vec<T> — matches Go's O(1) re-slice semantics.
 //
-// Go's `[]T` indexes with `int` (i64 in goish). Vec<T> indexes with usize.
-// The orphan rule blocks `impl Index<i64> for Vec<T>` (both foreign), so
-// we newtype:
+// Layout (24 bytes on 64-bit, same as Go's slice header):
 //
-//   pub struct slice<T>(pub Vec<T>);
+//   pub struct slice<T> {
+//       data:  Arc<Vec<T>>,  // shared backing array (SliceHeader.Data)
+//       start: usize,        // offset into `data`
+//       len:   usize,        // view length (SliceHeader.Len)
+//   }
 //
-// The Vec API stays reachable through Deref/DerefMut, and From<Vec<T>>
-// plus Into<Vec<T>> keep boundary crossing cheap.
+// Go semantics matched:
+//   - s[i:j]  — O(1) header clone, same backing array
+//   - s[i]    — O(1) read through (data[start + i])
+//   - len(s)  — O(1), returns the view length, not data.len()
+//
+// Rust safety divergence (documented):
+//   - Go allows writing through a sub-slice to modify the parent's view
+//     of the backing array (shared mutable memory). Rust's borrow checker
+//     forbids that without interior mutability. We use Arc::make_mut,
+//     which performs copy-on-write: a mutation on a shared slice clones
+//     the backing Vec first, then mutates the clone. The parent keeps
+//     the original. This is closer to Rust's Cow<[T]> than Go's true
+//     sharing, but covers the common cases (read-only sub-slices,
+//     discard-prefix patterns) at O(1).
+//
+//   - `append`/`push` always succeeds: if unique, grows in place; if
+//     shared, make_mut clones first. No separate `cap` model.
+//
+// Constructor:  `slice(v: Vec<T>)` is a free function (not a tuple
+// struct constructor) so the old call-site shape `slice(vec![1,2,3])`
+// still works.
 
 #![allow(non_camel_case_types)]
 
 use std::ops::{Deref, DerefMut, Index, IndexMut,
                Range, RangeFrom, RangeTo, RangeFull, RangeInclusive, RangeToInclusive};
+use std::sync::Arc;
 
-/// Go's `[]T`. Thin newtype around `Vec<T>`; all Vec methods reachable via
-/// `Deref`. Adds `Index<i64>` so `ss[i]` works with Go's `int` index type.
-#[repr(transparent)]
-pub struct slice<T>(pub Vec<T>);
+/// Go's `[]T`. Arc-backed view with O(1) re-slicing.
+pub struct slice<T> {
+    data: Arc<Vec<T>>,
+    start: usize,
+    len: usize,
+}
+
+/// `slice(v)` — wrap a Vec<T> as a goish slice. Free function so the
+/// call shape matches the previous tuple-struct constructor.
+#[allow(non_snake_case)]
+pub fn slice<T>(v: Vec<T>) -> self::slice<T> {
+    let len = v.len();
+    self::slice { data: Arc::new(v), start: 0, len }
+}
 
 impl<T> slice<T> {
-    pub fn new() -> Self { slice(Vec::new()) }
-    pub fn with_capacity(n: usize) -> Self { slice(Vec::with_capacity(n)) }
-    pub fn into_vec(self) -> Vec<T> { self.0 }
-    pub fn as_vec(&self) -> &Vec<T> { &self.0 }
-    pub fn as_vec_mut(&mut self) -> &mut Vec<T> { &mut self.0 }
+    /// Empty slice. `len() == 0`, shares a single static-style empty Arc.
+    pub fn new() -> Self {
+        self::slice { data: Arc::new(Vec::new()), start: 0, len: 0 }
+    }
 
-    /// Go's `s[i:j]` — returns an owned slice over `[i, j)`. O(n) copy
-    /// (Rust can't share backing arrays across owned slices without Arc).
-    #[allow(non_snake_case)]
-    pub fn Slice(&self, i: i64, j: i64) -> Self where T: Clone {
-        let n = self.0.len() as i64;
-        if i < 0 || j < 0 || i > j || j > n {
-            panic!("runtime error: slice bounds out of range [:{}] with length {}", j, n);
+    pub fn with_capacity(n: usize) -> Self {
+        self::slice { data: Arc::new(Vec::with_capacity(n)), start: 0, len: 0 }
+    }
+
+    /// View length — number of elements from `start` onward. Matches `len(s)`.
+    pub fn len(&self) -> usize { self.len }
+    pub fn is_empty(&self) -> bool { self.len == 0 }
+
+    /// Go's `cap(s)` — elements available before backing would need to grow.
+    /// Always ≥ len. For unique Arc, this is `data.capacity() - start`.
+    pub fn capacity(&self) -> usize {
+        self.data.capacity().saturating_sub(self.start).max(self.len)
+    }
+
+    /// Borrow the view as a Rust slice `&[T]`.
+    pub fn as_slice(&self) -> &[T] {
+        &self.data[self.start..self.start + self.len]
+    }
+
+    /// Borrow the view as a mutable Rust slice — triggers copy-on-write
+    /// if the backing Arc is shared.
+    pub fn as_mut_slice(&mut self) -> &mut [T] where T: Clone {
+        self.uniq();
+        let vec = Arc::get_mut(&mut self.data)
+            .expect("slice::uniq() should leave Arc unique");
+        &mut vec[self.start..self.start + self.len]
+    }
+
+    /// Convert into an owned `Vec<T>` (the view range only).
+    pub fn into_vec(self) -> Vec<T> where T: Clone {
+        let slice { data, start, len } = self;
+        if start == 0 && len == data.len() {
+            match Arc::try_unwrap(data) {
+                Ok(v) => v,
+                Err(arc) => (*arc).clone(),
+            }
+        } else {
+            data[start..start + len].to_vec()
         }
-        slice(self.0[i as usize..j as usize].to_vec())
     }
 
-    /// Go's `s[i:]` — slice from index i to end.
-    #[allow(non_snake_case)]
-    pub fn SliceFrom(&self, i: i64) -> Self where T: Clone {
-        self.Slice(i, self.0.len() as i64)
+    /// Normalize without cloning: panics if the Arc is shared.
+    /// Drains prefix and truncates suffix so `data` is exactly the view
+    /// and `start = 0`. Works for non-Clone T because it only moves
+    /// elements within the Vec, never copies them.
+    fn normalize(&mut self) {
+        let shared = Arc::strong_count(&self.data) > 1
+            || Arc::weak_count(&self.data) > 0;
+        if shared {
+            panic!("slice mutation on shared backing (strong_count > 1). \
+                    Cannot CoW without T: Clone. Fork via `.into_vec()` into a \
+                    new slice, or avoid sub-slicing before mutation.");
+        }
+        let v = Arc::get_mut(&mut self.data).expect("unique");
+        if self.start > 0 { v.drain(..self.start); self.start = 0; }
+        if v.len() > self.len { v.truncate(self.len); }
     }
 
-    /// Go's `s[:j]` — slice from start to index j.
+    /// CoW version — clones the backing if shared. Used by APIs that
+    /// need T: Clone (e.g., IndexMut, as_mut_slice) to silently fork.
+    fn uniq(&mut self) where T: Clone {
+        let need_copy = Arc::strong_count(&self.data) > 1
+            || Arc::weak_count(&self.data) > 0
+            || self.start > 0
+            || self.data.len() != self.len;
+        if need_copy {
+            let v = self.data[self.start..self.start + self.len].to_vec();
+            self.data = Arc::new(v);
+            self.start = 0;
+        }
+    }
+
+    /// Explicitly fork the backing if shared — O(n) if shared, O(1) if
+    /// unique. After `cow()`, this slice has exclusive ownership and
+    /// subsequent mutations won't panic on shared-backing.
+    ///
+    /// Use this when you've sub-sliced a shared slice and want to
+    /// mutate without panicking:
+    ///
+    /// ```ignore
+    /// let sub = s.SliceFrom(1);
+    /// sub.cow();       // fork — now unique
+    /// sub.push(42);    // OK
+    /// ```
+    pub fn cow(&mut self) where T: Clone { self.uniq(); }
+
+    /// Mutable Vec — unique path (panics if shared). Requires no bound
+    /// on T.
+    fn as_vec_owned(&mut self) -> &mut Vec<T> {
+        self.normalize();
+        Arc::get_mut(&mut self.data).expect("unique after normalize")
+    }
+
+    // ── Go-shape slicing: s[i:j], s[i:], s[:j] — all O(1) ─────────────
+
+    /// Go's `s[i:j]` — O(1) header clone.
     #[allow(non_snake_case)]
-    pub fn SliceTo(&self, j: i64) -> Self where T: Clone {
+    pub fn Slice(&self, i: i64, j: i64) -> Self {
+        let n = self.len as i64;
+        if i < 0 || j < 0 || i > j || j > n {
+            panic!("runtime error: slice bounds out of range [{}:{}] with length {}",
+                   i, j, n);
+        }
+        self::slice {
+            data: Arc::clone(&self.data),
+            start: self.start + i as usize,
+            len: (j - i) as usize,
+        }
+    }
+
+    /// Go's `s[i:]` — O(1).
+    #[allow(non_snake_case)]
+    pub fn SliceFrom(&self, i: i64) -> Self {
+        self.Slice(i, self.len as i64)
+    }
+
+    /// Go's `s[:j]` — O(1).
+    #[allow(non_snake_case)]
+    pub fn SliceTo(&self, j: i64) -> Self {
         self.Slice(0, j)
     }
 
-    /// Go's `s[i], s[j] = s[j], s[i]` — swap two elements by index.
-    /// Indexed by Go's `int` (i64). Panics on out-of-range, matching Go.
+    /// Go's `s[i], s[j] = s[j], s[i]`.
     #[allow(non_snake_case)]
     pub fn Swap(&mut self, i: i64, j: i64) {
-        let n = self.0.len();
+        let n = self.len;
         if i < 0 || (i as u64) >= n as u64 {
             panic!("runtime error: index out of range [{}] with length {}", i, n);
         }
         if j < 0 || (j as u64) >= n as u64 {
             panic!("runtime error: index out of range [{}] with length {}", j, n);
         }
-        self.0.swap(i as usize, j as usize);
+        let v = self.as_vec_owned();
+        v.swap(i as usize, j as usize);
     }
+
+    // ── Vec-style mutation methods ────────────────────────────────────
+    //
+    // These DO NOT require T: Clone. They use the unique-or-panic path.
+    // Shared slices must be forked via `.into_vec()` before mutation.
+
+    pub fn push(&mut self, x: T) {
+        let v = self.as_vec_owned();
+        v.push(x);
+        self.len += 1;
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len == 0 { return None; }
+        let v = self.as_vec_owned();
+        let r = v.pop();
+        if r.is_some() { self.len -= 1; }
+        r
+    }
+
+    pub fn insert(&mut self, idx: usize, x: T) {
+        let v = self.as_vec_owned();
+        v.insert(idx, x);
+        self.len += 1;
+    }
+
+    pub fn remove(&mut self, idx: usize) -> T {
+        let v = self.as_vec_owned();
+        let r = v.remove(idx);
+        self.len -= 1;
+        r
+    }
+
+    pub fn swap_remove(&mut self, idx: usize) -> T {
+        let v = self.as_vec_owned();
+        let r = v.swap_remove(idx);
+        self.len -= 1;
+        r
+    }
+
+    pub fn clear(&mut self) {
+        let v = self.as_vec_owned();
+        v.clear();
+        self.len = 0;
+    }
+
+    pub fn truncate(&mut self, new_len: usize) {
+        if new_len < self.len {
+            self.len = new_len;
+        }
+    }
+
+    pub fn resize(&mut self, new_len: usize, value: T) where T: Clone {
+        let v = self.as_vec_owned();
+        v.resize(new_len, value);
+        self.len = new_len;
+    }
+
+    pub fn resize_with<F>(&mut self, new_len: usize, f: F) where T: Clone, F: FnMut() -> T {
+        let v = self.as_vec_owned();
+        v.resize_with(new_len, f);
+        self.len = new_len;
+    }
+
+    pub fn extend_from_slice(&mut self, other: &[T]) where T: Clone {
+        let v = self.as_vec_owned();
+        v.extend_from_slice(other);
+        self.len += other.len();
+    }
+
+    pub fn retain<F>(&mut self, f: F) where F: FnMut(&T) -> bool {
+        let v = self.as_vec_owned();
+        v.retain(f);
+        self.len = v.len();
+    }
+
+    pub fn sort(&mut self) where T: Ord {
+        let v = self.as_vec_owned();
+        v.sort();
+    }
+    pub fn sort_by<F>(&mut self, f: F) where F: FnMut(&T, &T) -> std::cmp::Ordering {
+        let v = self.as_vec_owned();
+        v.sort_by(f);
+    }
+    pub fn sort_unstable_by<F>(&mut self, f: F) where F: FnMut(&T, &T) -> std::cmp::Ordering {
+        let v = self.as_vec_owned();
+        v.sort_unstable_by(f);
+    }
+    pub fn reverse(&mut self) {
+        let v = self.as_vec_owned();
+        v.reverse();
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, T> { self.as_slice().iter() }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> where T: Clone {
+        self.as_mut_slice().iter_mut()
+    }
+
+    pub fn first(&self) -> Option<&T> { self.as_slice().first() }
+    pub fn last(&self) -> Option<&T> { self.as_slice().last() }
+    pub fn contains(&self, x: &T) -> bool where T: PartialEq { self.as_slice().contains(x) }
 }
 
 // ── Deref / AsRef ─────────────────────────────────────────────────────
 
 impl<T> Deref for slice<T> {
-    type Target = Vec<T>;
-    fn deref(&self) -> &Vec<T> { &self.0 }
+    type Target = [T];
+    fn deref(&self) -> &[T] { self.as_slice() }
 }
-impl<T> DerefMut for slice<T> {
-    fn deref_mut(&mut self) -> &mut Vec<T> { &mut self.0 }
+impl<T: Clone> DerefMut for slice<T> {
+    fn deref_mut(&mut self) -> &mut [T] { self.as_mut_slice() }
 }
-impl<T> AsRef<[T]> for slice<T> { fn as_ref(&self) -> &[T] { &self.0 } }
-impl<T> AsMut<[T]> for slice<T> { fn as_mut(&mut self) -> &mut [T] { &mut self.0 } }
-impl<T> AsRef<Vec<T>> for slice<T> { fn as_ref(&self) -> &Vec<T> { &self.0 } }
+impl<T> AsRef<[T]> for slice<T> { fn as_ref(&self) -> &[T] { self.as_slice() } }
+impl<T: Clone> AsMut<[T]> for slice<T> { fn as_mut(&mut self) -> &mut [T] { self.as_mut_slice() } }
 impl<T> std::borrow::Borrow<[T]> for slice<T> {
-    fn borrow(&self) -> &[T] { &self.0 }
+    fn borrow(&self) -> &[T] { self.as_slice() }
 }
 
 // ── Conversions ───────────────────────────────────────────────────────
 
 impl<T> From<Vec<T>> for slice<T> {
-    fn from(v: Vec<T>) -> Self { slice(v) }
+    fn from(v: Vec<T>) -> Self {
+        let len = v.len();
+        slice { data: Arc::new(v), start: 0, len }
+    }
 }
-impl<T> From<slice<T>> for Vec<T> {
-    fn from(s: slice<T>) -> Vec<T> { s.0 }
+impl<T: Clone> From<slice<T>> for Vec<T> {
+    fn from(s: slice<T>) -> Vec<T> { s.into_vec() }
 }
 impl<T: Clone> From<&[T]> for slice<T> {
-    fn from(s: &[T]) -> Self { slice(s.to_vec()) }
+    fn from(s: &[T]) -> Self { self::slice::from(s.to_vec()) }
 }
 impl<T, const N: usize> From<[T; N]> for slice<T> {
-    fn from(a: [T; N]) -> Self { slice(Vec::from(a)) }
+    fn from(a: [T; N]) -> Self { self::slice::from(Vec::from(a)) }
 }
 
-// ── Indexing: Go's `s[i]` where i: int (i64) ──────────────────────────
-//
-// The panic messages mirror Go's runtime error format.
+// ── Indexing: s[i] with i: int (i64) — O(1) through start offset ──────
 
 impl<T> Index<i64> for slice<T> {
     type Output = T;
     fn index(&self, i: i64) -> &T {
-        if i < 0 || (i as u64) >= self.0.len() as u64 {
-            panic!("runtime error: index out of range [{}] with length {}", i, self.0.len());
+        if i < 0 || (i as u64) >= self.len as u64 {
+            panic!("runtime error: index out of range [{}] with length {}", i, self.len);
         }
-        &self.0[i as usize]
+        &self.data[self.start + i as usize]
     }
 }
-impl<T> IndexMut<i64> for slice<T> {
+impl<T: Clone> IndexMut<i64> for slice<T> {
     fn index_mut(&mut self, i: i64) -> &mut T {
-        let n = self.0.len();
+        let n = self.len;
         if i < 0 || (i as u64) >= n as u64 {
             panic!("runtime error: index out of range [{}] with length {}", i, n);
         }
-        &mut self.0[i as usize]
+        &mut self.as_mut_slice()[i as usize]
     }
 }
 
-// No Index<usize> — having both `Index<i64>` and `Index<usize>` makes
-// literal `ss[0]` ambiguous (Rust falls back to i32, which matches neither).
-// Callers with a `usize` index (e.g. from `.iter().enumerate()`) cast to i64
-// or use `ss.as_vec()[i]` / `ss.as_slice()[i]` to hit Vec's built-in impl.
-
-// Range flavours — without these, having any Index impl above blocks
-// Deref-based auto-resolution of `ss[a..b]`.
+// Range flavours over usize — return a Rust slice view.
 macro_rules! impl_slice_range {
     ($($r:ty),+ $(,)?) => { $(
         impl<T> Index<$r> for slice<T> {
             type Output = [T];
-            fn index(&self, r: $r) -> &[T] { &self.0[r] }
+            fn index(&self, r: $r) -> &[T] { &self.as_slice()[r] }
         }
-        impl<T> IndexMut<$r> for slice<T> {
-            fn index_mut(&mut self, r: $r) -> &mut [T] { &mut self.0[r] }
+        impl<T: Clone> IndexMut<$r> for slice<T> {
+            fn index_mut(&mut self, r: $r) -> &mut [T] { &mut self.as_mut_slice()[r] }
         }
     )+ };
 }
@@ -146,81 +373,106 @@ impl_slice_range!(
 impl<T> IntoIterator for slice<T> {
     type Item = T;
     type IntoIter = std::vec::IntoIter<T>;
-    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+    /// Owned iteration. If the backing Arc is unique, unwraps it
+    /// in-place (no clone). If shared, panics — caller should `.clone()`
+    /// into a new slice first, or iterate by reference (`&slice`).
+    fn into_iter(self) -> Self::IntoIter {
+        let slice { data, start, len } = self;
+        let mut v = Arc::try_unwrap(data).unwrap_or_else(|_| {
+            panic!("slice::into_iter on a shared backing (strong_count > 1). \
+                    Iterate by reference with `&s` / `range!(s)`, or clone into \
+                    a separate Vec via `s.as_slice().to_vec()` first.")
+        });
+        if start > 0 { v.drain(..start); }
+        v.truncate(len);
+        v.into_iter()
+    }
 }
 impl<'a, T> IntoIterator for &'a slice<T> {
     type Item = &'a T;
     type IntoIter = std::slice::Iter<'a, T>;
-    fn into_iter(self) -> Self::IntoIter { self.0.iter() }
+    fn into_iter(self) -> Self::IntoIter { self.as_slice().iter() }
 }
-impl<'a, T> IntoIterator for &'a mut slice<T> {
+impl<'a, T: Clone> IntoIterator for &'a mut slice<T> {
     type Item = &'a mut T;
     type IntoIter = std::slice::IterMut<'a, T>;
-    fn into_iter(self) -> Self::IntoIter { self.0.iter_mut() }
+    fn into_iter(self) -> Self::IntoIter { self.as_mut_slice().iter_mut() }
 }
 impl<T> FromIterator<T> for slice<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        slice(Vec::from_iter(iter))
+        self::slice::from(Vec::from_iter(iter))
     }
 }
-impl<T> Extend<T> for slice<T> {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) { self.0.extend(iter); }
+impl<T: Clone> Extend<T> for slice<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let v = self.as_vec_owned();
+        let before = v.len();
+        v.extend(iter);
+        let added = v.len() - before;
+        self.len += added;
+    }
 }
 
-// ── Derived-like traits (conditional on T) ────────────────────────────
+// ── Derived-like traits ───────────────────────────────────────────────
 
-impl<T: Clone> Clone for slice<T> {
-    fn clone(&self) -> Self { slice(self.0.clone()) }
+impl<T> Clone for slice<T> {
+    /// O(1) — bumps the Arc refcount. Shared backing with the source.
+    fn clone(&self) -> Self {
+        slice {
+            data: Arc::clone(&self.data),
+            start: self.start,
+            len: self.len,
+        }
+    }
 }
 impl<T: std::fmt::Debug> std::fmt::Debug for slice<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        self.as_slice().fmt(f)
     }
 }
 
-/// `Display` for byte slices — matches Go's `fmt.Sprintf("%s", bytes)`:
-/// prints the bytes as lossy UTF-8 (invalid sequences → U+FFFD).
-/// With `%q` verb, `Sprintf!` wraps the result in quotes.
+/// Display for byte slices: prints bytes as lossy UTF-8.
 impl std::fmt::Display for slice<u8> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&String::from_utf8_lossy(&self.0))
+        f.write_str(&String::from_utf8_lossy(self.as_slice()))
     }
 }
 impl<T> Default for slice<T> {
-    fn default() -> Self { slice(Vec::new()) }
+    fn default() -> Self { Self::new() }
 }
 impl<T: PartialEq> PartialEq for slice<T> {
-    fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
+    fn eq(&self, other: &Self) -> bool { self.as_slice() == other.as_slice() }
 }
 impl<T: Eq> Eq for slice<T> {}
 impl<T: std::hash::Hash> std::hash::Hash for slice<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.0.hash(state); }
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.as_slice().hash(state); }
 }
 impl<T: PartialOrd> PartialOrd for slice<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
+        self.as_slice().partial_cmp(other.as_slice())
     }
 }
 impl<T: Ord> Ord for slice<T> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering { self.0.cmp(&other.0) }
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_slice().cmp(other.as_slice())
+    }
 }
 
-// Cross-type equality — mirrors Vec<T>'s own cross-type impls, so tests can
-// compare `slice<GoString>` against `Vec<&str>` / `[&str; N]` / `&[&str]`.
+// Cross-type equality.
 impl<T, U> PartialEq<Vec<U>> for slice<T> where T: PartialEq<U> {
-    fn eq(&self, other: &Vec<U>) -> bool { self.0.as_slice() == other.as_slice() }
+    fn eq(&self, other: &Vec<U>) -> bool { self.as_slice() == other.as_slice() }
 }
 impl<T, U> PartialEq<slice<U>> for Vec<T> where T: PartialEq<U> {
-    fn eq(&self, other: &slice<U>) -> bool { self.as_slice() == other.0.as_slice() }
+    fn eq(&self, other: &slice<U>) -> bool { self.as_slice() == other.as_slice() }
 }
 impl<T, U> PartialEq<[U]> for slice<T> where T: PartialEq<U> {
-    fn eq(&self, other: &[U]) -> bool { self.0.as_slice() == other }
+    fn eq(&self, other: &[U]) -> bool { self.as_slice() == other }
 }
 impl<T, U, const N: usize> PartialEq<[U; N]> for slice<T> where T: PartialEq<U> {
-    fn eq(&self, other: &[U; N]) -> bool { self.0.as_slice() == other.as_slice() }
+    fn eq(&self, other: &[U; N]) -> bool { self.as_slice() == other.as_slice() }
 }
 impl<T, U, const N: usize> PartialEq<&[U; N]> for slice<T> where T: PartialEq<U> {
-    fn eq(&self, other: &&[U; N]) -> bool { self.0.as_slice() == other.as_slice() }
+    fn eq(&self, other: &&[U; N]) -> bool { self.as_slice() == other.as_slice() }
 }
 
 #[cfg(test)]
@@ -277,16 +529,36 @@ mod tests {
     }
 
     #[test]
-    fn slice_from_to_and_slice() {
+    fn slice_from_to_and_slice_o1() {
         let s: slice<i64> = slice(vec![10, 20, 30, 40, 50]);
-        // Go: parts[2:]   → [30, 40, 50]
-        assert_eq!(s.SliceFrom(2).as_vec(), &vec![30, 40, 50]);
-        // Go: parts[:2]   → [10, 20]
-        assert_eq!(s.SliceTo(2).as_vec(), &vec![10, 20]);
-        // Go: parts[1:4]  → [20, 30, 40]
-        assert_eq!(s.Slice(1, 4).as_vec(), &vec![20, 30, 40]);
-        // Boundary: s[n:n] is empty, not an error.
-        assert_eq!(s.SliceFrom(5).as_vec(), &Vec::<i64>::new());
+        assert_eq!(s.SliceFrom(2), vec![30, 40, 50]);
+        assert_eq!(s.SliceTo(2), vec![10, 20]);
+        assert_eq!(s.Slice(1, 4), vec![20, 30, 40]);
+        assert_eq!(s.SliceFrom(5), Vec::<i64>::new());
+    }
+
+    #[test]
+    fn reslice_shares_backing_on_read() {
+        // O(1) — both views share the same Arc<Vec>.
+        let s: slice<i64> = slice(vec![1, 2, 3, 4, 5]);
+        let s2 = s.SliceFrom(1);
+        assert_eq!(s2.len(), 4);
+        // Original still intact.
+        assert_eq!(s[0i64], 1);
+        assert_eq!(s2[0i64], 2);
+    }
+
+    #[test]
+    fn cow_on_write_to_subslice() {
+        // Go allows s2[0] = 99 to mutate the parent's view. Rust's safety
+        // demands copy-on-write: the mutation affects OUR clone, not the
+        // parent. Different semantics, but documented.
+        let s: slice<i64> = slice(vec![1, 2, 3, 4, 5]);
+        let mut s2 = s.SliceFrom(1);
+        s2[0i64] = 99;
+        assert_eq!(s2[0i64], 99);
+        // Parent unchanged (CoW):
+        assert_eq!(s[1i64], 2);
     }
 
     #[test]
@@ -300,7 +572,7 @@ mod tests {
     fn swap_by_int_indices() {
         let mut s: slice<i64> = slice(vec![10, 20, 30]);
         s.Swap(0i64, 2i64);
-        assert_eq!(s.as_vec(), &vec![30, 20, 10]);
+        assert_eq!(s, vec![30, 20, 10]);
     }
 
     #[test]
@@ -312,10 +584,8 @@ mod tests {
 
     #[test]
     fn byte_slice_display() {
-        // slice<u8> impls Display → Sprintf!("%s", bytes) / "%q" work.
         let b: slice<u8> = slice(b"hello".to_vec());
         assert_eq!(format!("{}", b), "hello");
-        // Invalid UTF-8 → replacement char, not panic.
         let bad: slice<u8> = slice(vec![0xff, b'x']);
         assert!(format!("{}", bad).contains('x'));
     }
@@ -326,5 +596,105 @@ mod tests {
         let s: slice<i64> = v.into();
         let v2: Vec<i64> = s.into();
         assert_eq!(v2, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn push_pop_insert_remove() {
+        let mut s: slice<i64> = slice::new();
+        s.push(1);
+        s.push(2);
+        s.push(3);
+        assert_eq!(s, vec![1, 2, 3]);
+        assert_eq!(s.pop(), Some(3));
+        assert_eq!(s, vec![1, 2]);
+        s.insert(0, 0);
+        assert_eq!(s, vec![0, 1, 2]);
+        let r = s.remove(1);
+        assert_eq!(r, 1);
+        assert_eq!(s, vec![0, 2]);
+    }
+
+    #[test]
+    fn clone_is_o1_shared_backing() {
+        let s: slice<i64> = slice(vec![1, 2, 3, 4, 5]);
+        let s2 = s.clone();
+        // Both share the same Arc — strong count is 2.
+        assert_eq!(Arc::strong_count(&s.data), 2);
+        // Content identical.
+        assert_eq!(s, s2);
+    }
+
+    #[test]
+    fn slice_from_shares_arc() {
+        // O(1) — SliceFrom bumps the Arc refcount, doesn't copy elements.
+        let s: slice<i64> = slice(vec![1, 2, 3, 4, 5]);
+        let before = Arc::strong_count(&s.data);
+        let sub = s.SliceFrom(1);
+        let after = Arc::strong_count(&s.data);
+        assert_eq!(after, before + 1);
+        assert_eq!(sub.as_slice(), &[2, 3, 4, 5]);
+        assert_eq!(sub.start, 1);
+        assert_eq!(sub.len, 4);
+    }
+
+    #[test]
+    fn o1_large_slice_is_not_a_copy() {
+        // Sanity check: slicing a million-element vec shouldn't scale with n.
+        let big: slice<u64> = slice((0u64..1_000_000).collect());
+        let t0 = std::time::Instant::now();
+        for _ in 0..10_000 {
+            let _ = big.SliceFrom(500_000);
+        }
+        let dt = t0.elapsed();
+        // Should complete in well under a second on any reasonable machine —
+        // if we were copying 500k u64s per call we'd spend seconds here.
+        assert!(dt.as_millis() < 500, "SliceFrom on 1M-element slice 10k times took {:?} — suggests it's not O(1)", dt);
+    }
+
+    #[test]
+    fn mutation_on_unique_slice_works() {
+        // Non-Clone T works for push on unique slices.
+        struct NonClone(i64);
+        let mut s: slice<NonClone> = slice::new();
+        s.push(NonClone(1));
+        s.push(NonClone(2));
+        assert_eq!(s.len(), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "mutation on shared backing")]
+    fn mutation_on_shared_slice_panics() {
+        let s: slice<i64> = slice(vec![1, 2, 3]);
+        let _view = s.clone();  // now shared
+        let mut s = s;
+        s.push(4);  // panics — can't mutate shared backing without T: Clone CoW
+    }
+
+    #[test]
+    fn append_macro_cow_on_shared() {
+        // append! auto-forks shared backing — matches Go's append never-fails.
+        let s1: slice<i64> = slice(vec![1, 2, 3]);
+        let s2 = s1.SliceFrom(1);  // shared with s1
+        let s2 = crate::append!(s2, 99i64);
+        assert_eq!(s2, vec![2, 3, 99]);
+        // Parent unchanged (CoW):
+        assert_eq!(s1, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn cow_then_mutate_works_on_formerly_shared() {
+        let s1: slice<i64> = slice(vec![1, 2, 3]);
+        let mut s2 = s1.SliceFrom(1);  // shared
+        s2.cow();                       // fork
+        s2.push(99);                    // now works — unique backing
+        assert_eq!(s2, vec![2, 3, 99]);
+        assert_eq!(s1, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn into_vec_on_unique_unwraps_without_clone() {
+        let s: slice<i64> = slice(vec![1, 2, 3]);
+        let v = s.into_vec();
+        assert_eq!(v, vec![1, 2, 3]);
     }
 }

@@ -469,7 +469,7 @@ mod tests {
         let s: GoString = bytes.into();
         assert_eq!(s, "hello");
         let back = s.to_bytes();
-        assert_eq!(back.as_vec(), &vec![b'h', b'e', b'l', b'l', b'o']);
+        assert_eq!(back, vec![b'h', b'e', b'l', b'l', b'o']);
     }
 
     #[test]

@@ -35,7 +35,7 @@ fn main() {
     // v0.17.3: bare numeric literals in slice!([]uint64{...}) — no `u64` suffix.
     let mut g = Uint64Slice(slice!([]uint64{10, 500, 5, 1, 100, 25}));
     sort::Sort(&mut g);
-    println!("sorted: {:?}", g.0.as_vec());
+    println!("sorted: {:?}", g.0.as_slice());
 
     println!("rand: {}", rand_string(12));
     println!("done");

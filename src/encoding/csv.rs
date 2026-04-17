@@ -312,6 +312,6 @@ mod tests {
         let mut r = NewReader(s.as_str());
         let (all, err) = r.ReadAll();
         assert_eq!(err, nil);
-        assert_eq!(all.as_vec(), &records);
+        assert_eq!(all.as_slice(), records.as_slice());
     }
 }

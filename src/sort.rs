@@ -439,7 +439,7 @@ mod tests {
         let mut g = Uint64Slice(crate::slice!([]uint64{10, 500, 5, 1, 100, 25}));
         Sort(&mut g);
         let want = crate::slice!([]uint64{1, 5, 10, 25, 100, 500});
-        assert_eq!(g.0.as_vec(), want.as_vec());
+        assert_eq!(g.0.as_slice(), want.as_slice());
     }
 
     #[test]
@@ -454,7 +454,7 @@ mod tests {
         }
         let mut it = Items(SliceNew(vec![(2i64, 0i64), (1, 1), (2, 2), (1, 3)]));
         Stable(&mut it);
-        assert_eq!(it.0.as_vec(), &vec![(1i64, 1i64), (1, 3), (2, 0), (2, 2)]);
+        assert_eq!(it.0.as_slice(), &[(1i64, 1i64), (1, 3), (2, 0), (2, 2)][..]);
     }
 
     #[test]
