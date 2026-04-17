@@ -47,7 +47,7 @@ pub type string = crate::gostring::GoString;
 pub use crate::_slice::slice;
 
 // Go: map[K]V  →  goish: map<K, V>
-pub type map<K, V> = std::collections::HashMap<K, V>;
+pub use crate::_map::map;
 
 /// Three forms — pick the one closest to your Go original:
 ///
@@ -433,7 +433,7 @@ macro_rules! make {
     // make(map[K]V)
     (map [$k:ty] $v:ty) => {
         {
-            let m: $crate::types::map<$k, $v> = ::std::collections::HashMap::new();
+            let m: $crate::types::map<$k, $v> = $crate::types::map::new();
             m
         }
     };
@@ -488,19 +488,21 @@ macro_rules! map {
     // Go-shaped:  map!([K]V{k => v, ...})
     ([$k:ty] $v:ty { $($key:expr => $val:expr),* $(,)? }) => {
         {
-            let mut m: $crate::types::map<$k, $v> = ::std::collections::HashMap::new();
-            $( m.insert(
+            let mut __hm = ::std::collections::HashMap::new();
+            $( __hm.insert(
                 <$k as ::std::convert::From<_>>::from($key),
                 <$v as ::std::convert::From<_>>::from($val),
             ); )*
+            let m: $crate::types::map<$k, $v> = __hm.into();
             m
         }
     };
     // Inferred form
     ($($key:expr => $val:expr),* $(,)?) => {
         {
-            let mut m = ::std::collections::HashMap::new();
-            $( m.insert($key, $val); )*
+            let mut __hm = ::std::collections::HashMap::new();
+            $( __hm.insert($key, $val); )*
+            let m: $crate::types::map<_, _> = __hm.into();
             m
         }
     };

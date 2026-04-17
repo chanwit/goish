@@ -80,11 +80,10 @@ pub fn DeleteFunc<K: Eq + Hash, V, F: FnMut(&K, &V) -> bool>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     #[test]
     fn keys_and_values() {
-        let mut m: HashMap<&str, i64> = HashMap::new();
+        let mut m: map<&str, i64> = map::new();
         m.insert("a", 1);
         m.insert("b", 2);
         let mut ks = Keys(&m);
@@ -97,7 +96,7 @@ mod tests {
 
     #[test]
     fn equal_and_clone() {
-        let mut a: HashMap<i64, i64> = HashMap::new();
+        let mut a: map<i64, i64> = map::new();
         a.insert(1, 10);
         a.insert(2, 20);
         let b = Clone(&a);
@@ -109,9 +108,9 @@ mod tests {
 
     #[test]
     fn copy_merges() {
-        let mut dst: HashMap<i64, i64> = HashMap::new();
+        let mut dst: map<i64, i64> = map::new();
         dst.insert(1, 10);
-        let mut src: HashMap<i64, i64> = HashMap::new();
+        let mut src: map<i64, i64> = map::new();
         src.insert(2, 20);
         src.insert(1, 99);  // should overwrite
         Copy(&mut dst, &src);
@@ -121,8 +120,8 @@ mod tests {
 
     #[test]
     fn delete_func_removes() {
-        let mut m: HashMap<i64, i64> = HashMap::new();
-        for i in 1..=5 { m.insert(i, i * 10); }
+        let mut m: map<i64, i64> = map::new();
+        for i in 1..=5i64 { m.insert(i, i * 10); }
         DeleteFunc(&mut m, |k, _| *k % 2 == 0);
         assert_eq!(m.len(), 3);
         assert!(m.contains_key(&1));

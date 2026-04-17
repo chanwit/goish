@@ -3,10 +3,10 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use std::collections::HashMap;
+use goish::_map::map;
 
 test!{ fn TestKeys(t) {
-    let mut m: HashMap<i64, String> = HashMap::new();
+    let mut m: map<i64, String> = map::new();
     m.insert(1, "a".into());
     m.insert(2, "b".into());
     m.insert(3, "c".into());
@@ -18,7 +18,7 @@ test!{ fn TestKeys(t) {
 }}
 
 test!{ fn TestValues(t) {
-    let mut m: HashMap<&str, i64> = HashMap::new();
+    let mut m: map<&str, i64> = map::new();
     m.insert("x", 10);
     m.insert("y", 20);
     m.insert("z", 30);
@@ -30,7 +30,7 @@ test!{ fn TestValues(t) {
 }}
 
 test!{ fn TestEqual(t) {
-    let mut a: HashMap<i64, i64> = HashMap::new();
+    let mut a: map<i64, i64> = map::new();
     a.insert(1, 10);
     a.insert(2, 20);
     let b = maps::Clone(&a);
@@ -50,9 +50,9 @@ test!{ fn TestEqual(t) {
 }}
 
 test!{ fn TestCopy(t) {
-    let mut dst: HashMap<i64, i64> = HashMap::new();
+    let mut dst: map<i64, i64> = map::new();
     dst.insert(1, 100);
-    let mut src: HashMap<i64, i64> = HashMap::new();
+    let mut src: map<i64, i64> = map::new();
     src.insert(1, 999);  // overwrites
     src.insert(2, 200);
     maps::Copy(&mut dst, &src);
@@ -62,7 +62,7 @@ test!{ fn TestCopy(t) {
 }}
 
 test!{ fn TestDeleteFunc(t) {
-    let mut m: HashMap<i64, i64> = HashMap::new();
+    let mut m: map<i64, i64> = map::new();
     for i in 1..=10 { m.insert(i, i * 10); }
     maps::DeleteFunc(&mut m, |k, _v| *k > 5);
     if m.len() != 5 { t.Errorf(Sprintf!("DeleteFunc len = %d, want 5", m.len() as i64)); }
@@ -74,7 +74,7 @@ test!{ fn TestDeleteFunc(t) {
 }}
 
 test!{ fn TestClone(t) {
-    let mut a: HashMap<String, i64> = HashMap::new();
+    let mut a: map<String, i64> = map::new();
     a.insert("one".into(), 1);
     a.insert("two".into(), 2);
     let b = maps::Clone(&a);

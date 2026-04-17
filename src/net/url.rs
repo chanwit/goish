@@ -241,7 +241,7 @@ pub struct Values {
 }
 
 impl Values {
-    pub fn new() -> Self { Values { inner: HashMap::new() } }
+    pub fn new() -> Self { Values { inner: map::new() } }
 
     pub fn Get(&self, key: impl AsRef<str>) -> string {
         self.inner.get(key.as_ref())

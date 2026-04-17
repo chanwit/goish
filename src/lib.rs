@@ -115,6 +115,8 @@ pub mod gostring;
 pub mod goroutine;
 pub mod range;
 #[doc(hidden)]
+pub mod _map;
+#[doc(hidden)]
 pub mod _slice;
 pub mod types;
 #[doc(hidden)]
