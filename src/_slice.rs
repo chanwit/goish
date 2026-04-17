@@ -26,6 +26,29 @@ impl<T> slice<T> {
     pub fn as_vec(&self) -> &Vec<T> { &self.0 }
     pub fn as_vec_mut(&mut self) -> &mut Vec<T> { &mut self.0 }
 
+    /// Go's `s[i:j]` — returns an owned slice over `[i, j)`. O(n) copy
+    /// (Rust can't share backing arrays across owned slices without Arc).
+    #[allow(non_snake_case)]
+    pub fn Slice(&self, i: i64, j: i64) -> Self where T: Clone {
+        let n = self.0.len() as i64;
+        if i < 0 || j < 0 || i > j || j > n {
+            panic!("runtime error: slice bounds out of range [:{}] with length {}", j, n);
+        }
+        slice(self.0[i as usize..j as usize].to_vec())
+    }
+
+    /// Go's `s[i:]` — slice from index i to end.
+    #[allow(non_snake_case)]
+    pub fn SliceFrom(&self, i: i64) -> Self where T: Clone {
+        self.Slice(i, self.0.len() as i64)
+    }
+
+    /// Go's `s[:j]` — slice from start to index j.
+    #[allow(non_snake_case)]
+    pub fn SliceTo(&self, j: i64) -> Self where T: Clone {
+        self.Slice(0, j)
+    }
+
     /// Go's `s[i], s[j] = s[j], s[i]` — swap two elements by index.
     /// Indexed by Go's `int` (i64). Panics on out-of-range, matching Go.
     #[allow(non_snake_case)]
@@ -251,6 +274,26 @@ mod tests {
         assert_eq!(borrowed, 6);
         let owned: i64 = s.into_iter().sum();
         assert_eq!(owned, 6);
+    }
+
+    #[test]
+    fn slice_from_to_and_slice() {
+        let s: slice<i64> = slice(vec![10, 20, 30, 40, 50]);
+        // Go: parts[2:]   → [30, 40, 50]
+        assert_eq!(s.SliceFrom(2).as_vec(), &vec![30, 40, 50]);
+        // Go: parts[:2]   → [10, 20]
+        assert_eq!(s.SliceTo(2).as_vec(), &vec![10, 20]);
+        // Go: parts[1:4]  → [20, 30, 40]
+        assert_eq!(s.Slice(1, 4).as_vec(), &vec![20, 30, 40]);
+        // Boundary: s[n:n] is empty, not an error.
+        assert_eq!(s.SliceFrom(5).as_vec(), &Vec::<i64>::new());
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_out_of_range_panics() {
+        let s: slice<i64> = slice(vec![1, 2, 3]);
+        let _ = s.SliceFrom(10);
     }
 
     #[test]
