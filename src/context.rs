@@ -24,6 +24,11 @@ pub struct Context {
     inner: Arc<ContextInner>,
 }
 
+/// Default = `context.Background()`. Matches Go's zero-value context.
+impl Default for Context {
+    fn default() -> Self { Background() }
+}
+
 struct ContextInner {
     cancelled: AtomicBool,
     err_mu: Mutex<Option<crate::errors::error>>,

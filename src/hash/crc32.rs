@@ -36,11 +36,19 @@ pub fn IEEETable() -> &'static Table {
 
 #[allow(non_snake_case)]
 pub fn Checksum(data: &[byte], tab: &Table) -> u32 {
-    let mut crc: u32 = 0xffff_ffff;
-    for &b in data {
-        crc = tab.0[((crc ^ b as u32) & 0xff) as usize] ^ (crc >> 8);
+    Update(0, tab, data)
+}
+
+/// `crc32.Update(crc, tab, p)` — continue a CRC-32 computation with more
+/// bytes. The running `crc` is the *final* CRC from a previous call (i.e.
+/// already `^ 0xffff_ffff`); pass `0` to start fresh.
+#[allow(non_snake_case)]
+pub fn Update(crc: u32, tab: &Table, p: &[byte]) -> u32 {
+    let mut c = crc ^ 0xffff_ffff;
+    for &b in p {
+        c = tab.0[((c ^ b as u32) & 0xff) as usize] ^ (c >> 8);
     }
-    crc ^ 0xffff_ffff
+    c ^ 0xffff_ffff
 }
 
 #[allow(non_snake_case)]
@@ -62,6 +70,20 @@ impl Hash32 {
         (p.len() as int, crate::errors::nil)
     }
     pub fn Sum32(&self) -> u32 { self.crc ^ 0xffff_ffff }
+
+    /// `h.Sum(b)` — append the big-endian 32-bit CRC to `b` and return
+    /// the result. Matches Go's `hash.Hash.Sum(in []byte) []byte`.
+    pub fn Sum(&self, b: &[byte]) -> crate::types::slice<byte> {
+        let s = self.Sum32();
+        let mut out = crate::types::slice::with_capacity(b.len() + 4);
+        out.extend_from_slice(b);
+        out.push((s >> 24) as byte);
+        out.push((s >> 16) as byte);
+        out.push((s >> 8) as byte);
+        out.push(s as byte);
+        out
+    }
+
     pub fn Reset(&mut self) { self.crc = 0xffff_ffff; }
     pub fn Size(&self) -> int { 4 }
     pub fn BlockSize(&self) -> int { 1 }
@@ -99,5 +121,27 @@ mod tests {
         assert_eq!(h.Sum32(), 0x0d4a1185);
         h.Reset();
         assert_eq!(h.Sum32(), 0);
+    }
+
+    #[test]
+    fn update_is_chainable() {
+        // Go: crc := crc32.Update(0, tab, []byte("hello "));
+        //     crc  = crc32.Update(crc, tab, []byte("world"))
+        let tab = IEEETable();
+        let crc = Update(0, tab, b"hello ");
+        let crc = Update(crc, tab, b"world");
+        assert_eq!(crc, 0x0d4a1185);
+    }
+
+    #[test]
+    fn sum_appends_big_endian_crc() {
+        let mut h = NewIEEE();
+        h.Write(b"hello world");
+        let seed: Vec<u8> = b"prefix:".to_vec();
+        let out = h.Sum(&seed);
+        // first 7 bytes = seed, next 4 = big-endian CRC.
+        assert_eq!(&out.as_vec()[..7], b"prefix:");
+        let crc_bytes = &out.as_vec()[7..];
+        assert_eq!(crc_bytes, &[0x0d, 0x4a, 0x11, 0x85]);
     }
 }

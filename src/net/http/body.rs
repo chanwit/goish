@@ -14,6 +14,10 @@ pub struct Body {
     inner: Mutex<BodyInner>,
 }
 
+impl Default for Body {
+    fn default() -> Self { Body::empty() }
+}
+
 enum BodyInner {
     /// Fully-buffered body. We read the whole response up-front (simpler,
     /// matches the way most Go code uses `http.Get` → `io.ReadAll`).

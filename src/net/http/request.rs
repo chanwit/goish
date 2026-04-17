@@ -83,6 +83,7 @@ pub(crate) fn canonicalize(k: &str) -> string {
 
 /// `http.Request` — represents an incoming server request or an outgoing
 /// client request.
+#[derive(Default)]
 pub struct Request {
     pub Method: string,
     pub URL: URL,
