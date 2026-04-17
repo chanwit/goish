@@ -196,7 +196,7 @@ pub mod prelude {
         Cookie, Errorf, Fprintf, IntNewtype, MailAddress, Printf, Println, SliceNewtype,
         Sprintf, Type, append, benchmark, cat, chan, close, const_block, defer, delete, go,
         len, make, map, range, recover, select, slice, static_err, string, stringer, Struct,
-        test, test_h, test_main,
+        test, test_h, test_main, var,
     };
 
     // Trait re-exports — required in scope for trait-method resolution like

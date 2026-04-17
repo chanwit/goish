@@ -82,27 +82,66 @@ impl Display for error {
 #[allow(non_upper_case_globals)]
 pub const nil: error = error(None);
 
-/// `static_err!(Name = "message")` — Go's `var Name = fmt.Errorf("message")`.
+/// `var!` — Go's `var` keyword for lazy-initialized module-level values.
 ///
-/// `error` holds a heap-allocated message so it can't be a `const`; this
-/// macro wraps a `OnceLock<error>` behind a zero-arg function, so
-/// `Name()` always returns the same cached sentinel. Pair with
-/// `errors::Is` for identity-style comparison:
+/// Three forms:
 ///
 /// ```ignore
-/// static_err!(ErrShortRead = "ioutil: short read");
-/// static_err!(ErrExpectEOF = "ioutil: expect EOF");
-/// if errors::Is(&err, &ErrShortRead()) { /* … */ }
+/// // Error sentinel (90% case) — RHS is any expr returning `error`.
+/// // Type defaults to `error`, preserving the Go source expression:
+/// var!(ErrShortRead = Errorf!("ioutil: short read"));
+/// var!(ErrExpectEOF = errors::New("ioutil: expect EOF"));
+///
+/// // Typed lazy value — explicit type for non-error values:
+/// var!(DefaultTimeout time::Duration = time::Second * 30i64);
+///
+/// // Block form — Go's `var ( ... )`:
+/// var! {
+///     ErrShortRead = Errorf!("ioutil: short read");
+///     ErrExpectEOF = errors::New("ioutil: expect EOF");
+/// }
 /// ```
+///
+/// Each expands to a zero-arg `pub fn` backed by `OnceLock` — one
+/// allocation per process lifetime. Call-site: `ErrShortRead()`.
 #[macro_export]
-macro_rules! static_err {
-    ($name:ident = $msg:expr) => {
+macro_rules! var {
+    // Block form: var! { Name = expr; Name2 = expr2; ... }
+    ({ $( $name:ident = $expr:expr );+ $(;)? }) => {
+        $( $crate::var!($name = $expr); )+
+    };
+    // Block form (typed): var! { Name Type = expr; ... }
+    ({ $( $name:ident $t:ty = $expr:expr );+ $(;)? }) => {
+        $( $crate::var!($name $t = $expr); )+
+    };
+
+    // Error sentinel: var!(Name = expr) — return type defaults to `error`
+    ($name:ident = $expr:expr) => {
         #[allow(non_snake_case)]
         pub fn $name() -> $crate::errors::error {
             static __ONCE: ::std::sync::OnceLock<$crate::errors::error>
                 = ::std::sync::OnceLock::new();
-            __ONCE.get_or_init(|| $crate::errors::New($msg)).clone()
+            __ONCE.get_or_init(|| $expr).clone()
         }
+    };
+
+    // Typed lazy value: var!(Name Type = expr)
+    ($name:ident $t:ty = $expr:expr) => {
+        #[allow(non_snake_case)]
+        pub fn $name() -> $t {
+            static __ONCE: ::std::sync::OnceLock<$t>
+                = ::std::sync::OnceLock::new();
+            __ONCE.get_or_init(|| $expr).clone()
+        }
+    };
+}
+
+/// Backwards-compat alias — prefer `var!` in new code.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! static_err {
+    ($name:ident = $msg:expr) => {
+        $crate::var!($name = $crate::errors::New($msg));
     };
 }
 
@@ -214,13 +253,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn static_err_macro_caches_and_matches() {
-        crate::static_err!(ErrMockSentinel = "mock: short read");
+    fn var_macro_error_sentinel() {
+        // var!(Name = expr) — default return type `error`.
+        crate::var!(ErrMockSentinel = crate::errors::New("mock: short read"));
         let a = ErrMockSentinel();
         let b = ErrMockSentinel();
         assert_eq!(format!("{}", a), "mock: short read");
-        // Same message on every call — equality via errors::Is works.
         assert!(crate::errors::Is(&a, &b));
+    }
+
+    #[test]
+    fn var_macro_typed() {
+        // var!(Name Type = expr) — explicit type.
+        crate::var!(TheAnswer i64 = 42i64);
+        assert_eq!(TheAnswer(), 42);
+        // Same value on every call (cached).
+        assert_eq!(TheAnswer(), TheAnswer());
+    }
+
+    #[test]
+    fn static_err_compat() {
+        // Backwards-compat alias still works.
+        crate::static_err!(ErrOldStyle = "old style");
+        assert_eq!(format!("{}", ErrOldStyle()), "old style");
     }
 
     #[test]
