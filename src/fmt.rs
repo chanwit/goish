@@ -141,6 +141,74 @@ pub fn go_format_errorf(fmt_str: &str, args: &[FmtArg]) -> (String, Option<crate
     (out, wrap_target)
 }
 
+// ── Autoref specialization: Display-or-Debug per arg ─────────────────
+//
+// The Sprintf!/Printf!/etc. macros add `&&$arg` at the call site. Rust's
+// method resolution then prefers the Display-bounded impl (one deref
+// needed) over the Debug-only impl (two derefs). This gives:
+//   - T: Display  → uses Display (Go-faithful for string verbs)
+//   - T: Debug    → falls back to Debug (works for slice<T>, map, Struct!)
+//   - Neither     → compile error with missing-trait message
+
+// Autoref specialization via inherent-vs-trait method resolution.
+//
+// `Wrap(&x).__go_fmt_str()`:
+//   - Inherent method on Wrap<T> where T: Display → wins if T has Display
+//   - Trait method from FallbackDebug → runs if T only has Debug
+//
+// Rust prefers inherent methods over trait methods, so Display is
+// preferred; Debug is the fallback. Every Go-portable type has at
+// least Debug (derivable), so this covers slice<T>, map<K,V>, Vec<T>,
+// Struct!-generated types, and any custom user struct with #[derive(Debug)].
+
+pub struct __GoFmtWrap<'a, T: ?Sized>(pub &'a T);
+
+impl<T: Display + ?Sized> __GoFmtWrap<'_, T> {
+    pub fn __go_fmt_str(&self) -> String { format!("{}", self.0) }
+}
+
+pub trait __GoFmtFallback { fn __go_fmt_str(&self) -> String; }
+impl<T: std::fmt::Debug + ?Sized> __GoFmtFallback for __GoFmtWrap<'_, T> {
+    fn __go_fmt_str(&self) -> String { format!("{:?}", self.0) }
+}
+
+/// Pre-rendered-strings form of go_format. Used by the autoref path.
+pub fn go_format_strs(fmt_str: &str, args: &[String]) -> String {
+    let bytes = fmt_str.as_bytes();
+    let mut out = String::with_capacity(fmt_str.len() * 2);
+    let mut arg_idx = 0usize;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] != b'%' { out.push(bytes[i] as char); i += 1; continue; }
+        i += 1;
+        if i >= bytes.len() { out.push('%'); break; }
+        if bytes[i] == b'%' { out.push('%'); i += 1; continue; }
+        let mut flags = String::new();
+        while i < bytes.len() && matches!(bytes[i], b'-' | b'+' | b' ' | b'0' | b'#') {
+            flags.push(bytes[i] as char); i += 1;
+        }
+        let mut width: Option<usize> = None;
+        { let start = i;
+          while i < bytes.len() && bytes[i].is_ascii_digit() { i += 1; }
+          if i > start { width = fmt_str[start..i].parse().ok(); } }
+        let mut precision: Option<usize> = None;
+        if i < bytes.len() && bytes[i] == b'.' {
+            i += 1; let start = i;
+            while i < bytes.len() && bytes[i].is_ascii_digit() { i += 1; }
+            precision = fmt_str[start..i].parse().ok();
+        }
+        if i >= bytes.len() { out.push('%'); break; }
+        let verb = bytes[i] as char; i += 1;
+        if arg_idx >= args.len() {
+            out.push_str(&format!("%!{}(MISSING)", verb)); continue;
+        }
+        let raw = &args[arg_idx];
+        arg_idx += 1;
+        out.push_str(&apply_verb(raw, verb, width, precision, &flags));
+    }
+    out
+}
+
 pub fn go_format(fmt_str: &str, args: &[&dyn Display]) -> String {
     let bytes = fmt_str.as_bytes();
     let mut out = String::with_capacity(fmt_str.len() * 2);
@@ -383,7 +451,11 @@ macro_rules! Println {
 #[macro_export]
 macro_rules! Printf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
-        let out = $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ]);
+        use $crate::fmt::__GoFmtFallback as _;
+        let out = $crate::fmt::go_format_strs(
+            $fmt,
+            &[ $( $crate::fmt::__GoFmtWrap(&$arg).__go_fmt_str() ),* ],
+        );
         print!("{}", out);
         (out.len() as $crate::int, $crate::errors::nil)
     }};
@@ -393,8 +465,11 @@ macro_rules! Printf {
 #[macro_export]
 macro_rules! Sprintf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
-        let _s: $crate::types::string =
-            $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ]).into();
+        use $crate::fmt::__GoFmtFallback as _;
+        let _s: $crate::types::string = $crate::fmt::go_format_strs(
+            $fmt,
+            &[ $( $crate::fmt::__GoFmtWrap(&$arg).__go_fmt_str() ),* ],
+        ).into();
         _s
     }};
 }
@@ -404,7 +479,11 @@ macro_rules! Sprintf {
 #[macro_export]
 macro_rules! Fprintf {
     ($w:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
-        let out = $crate::fmt::go_format($fmt, &[ $( &$arg as &dyn ::std::fmt::Display ),* ]);
+        use $crate::fmt::__GoFmtFallback as _;
+        let out = $crate::fmt::go_format_strs(
+            $fmt,
+            &[ $( $crate::fmt::__GoFmtWrap(&$arg).__go_fmt_str() ),* ],
+        );
         use ::std::io::Write as _;
         match write!($w, "{}", out) {
             Ok(()) => (out.len() as $crate::int, $crate::errors::nil),
