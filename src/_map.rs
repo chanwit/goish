@@ -12,7 +12,7 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 
 /// Go's `map[K]V`. Thin wrapper around `HashMap<K, V>` adding
 /// zero-value-on-miss indexing and `.Get()` → `(V, bool)`.
@@ -61,6 +61,21 @@ where
     fn index(&self, key: &Q) -> &V {
         self.inner.get(key)
             .unwrap_or_else(|| self.zero.get_or_init(V::default))
+    }
+}
+
+// ── IndexMut: m[&key] = value (insert-on-miss, like Go) ───────────────
+
+impl<K, V> IndexMut<&K> for map<K, V>
+where
+    K: Eq + Hash + Clone,
+    V: Default + Send + Sync,
+{
+    fn index_mut(&mut self, key: &K) -> &mut V {
+        if !self.inner.contains_key(key) {
+            self.inner.insert(key.clone(), V::default());
+        }
+        self.inner.get_mut(key).unwrap()
     }
 }
 
@@ -179,6 +194,27 @@ mod tests {
         let (v, ok) = m.Get("missing");
         assert_eq!(v, 0); // zero value
         assert!(!ok);
+    }
+
+    #[test]
+    fn index_mut_inserts_on_miss() {
+        let mut m: map<String, i64> = map::new();
+        // Go: m["key"] = 42
+        m[&String::from("key")] = 42;
+        assert_eq!(m[&String::from("key")], 42);
+        // Overwrite existing
+        m[&String::from("key")] = 99;
+        assert_eq!(m[&String::from("key")], 99);
+    }
+
+    #[test]
+    fn index_mut_with_gostring_key() {
+        use crate::gostring::GoString;
+        let mut m: map<GoString, i64> = map::new();
+        let key: GoString = "count".into();
+        m[&key] = 10;
+        m[&key] += 5;  // Go: m["count"] += 5
+        assert_eq!(m[&key], 15);
     }
 
     #[test]
