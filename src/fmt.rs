@@ -210,6 +210,38 @@ pub fn go_format(fmt_str: &str, args: &[&dyn Display]) -> String {
     out
 }
 
+/// Go's `%q` — double-quoted string with Go-escape sequences for
+/// non-printable and non-ASCII characters. Matches `strconv.Quote`.
+fn go_quote(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len() + 2);
+    out.push('"');
+    for c in raw.chars() {
+        match c {
+            '"'  => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\x07' => out.push_str("\\a"),
+            '\x08' => out.push_str("\\b"),
+            '\x0c' => out.push_str("\\f"),
+            '\x0b' => out.push_str("\\v"),
+            c if c.is_ascii() && (c as u32) >= 0x20 && (c as u32) < 0x7f => out.push(c),
+            c if (c as u32) < 0x80 => {
+                out.push_str(&format!("\\x{:02x}", c as u32));
+            }
+            c if (c as u32) < 0x10000 => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
+            c => {
+                out.push_str(&format!("\\U{:08x}", c as u32));
+            }
+        }
+    }
+    out.push('"');
+    out
+}
+
 fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usize>, flags: &str) -> String {
     fn fmt_float_go(f: f64, prec: usize, upper: bool) -> String {
         if f.is_nan()       { return "NaN".into(); }
@@ -218,7 +250,7 @@ fn apply_verb(raw: &str, verb: char, width: Option<usize>, precision: Option<usi
     }
 
     let mut value: std::string::String = match verb {
-        'q' => format!("\"{}\"", raw),
+        'q' => go_quote(raw),
         'f' | 'F' => {
             let p = precision.unwrap_or(6);
             raw.parse::<f64>().map(|f| fmt_float_go(f, p, verb == 'F')).unwrap_or_else(|_| raw.into())
@@ -402,6 +434,19 @@ pub use crate::{Errorf, Fprintf, Printf, Println, Sprintf, stringer};
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn sprintf_quote_escapes() {
+        // Go: fmt.Sprintf("%q", "hello") → "hello"
+        assert_eq!(crate::Sprintf!("%q", "hello"), "\"hello\"");
+        // Go: newline → \n, tab → \t, quote → \", backslash → \\
+        assert_eq!(crate::Sprintf!("%q", "a\nb"), "\"a\\nb\"");
+        assert_eq!(crate::Sprintf!("%q", "a\tb"), "\"a\\tb\"");
+        assert_eq!(crate::Sprintf!("%q", "a\"b"), "\"a\\\"b\"");
+        assert_eq!(crate::Sprintf!("%q", "a\\b"), "\"a\\\\b\"");
+        // Non-printable ASCII → \xHH
+        assert_eq!(crate::Sprintf!("%q", "\x01x"), "\"\\x01x\"");
+    }
+
     #[test]
     fn sprintf_basic_verbs() {
         let s = crate::Sprintf!("%s is %d", "x", 42);

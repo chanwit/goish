@@ -154,6 +154,15 @@ impl<T: std::fmt::Debug> std::fmt::Debug for slice<T> {
         self.0.fmt(f)
     }
 }
+
+/// `Display` for byte slices — matches Go's `fmt.Sprintf("%s", bytes)`:
+/// prints the bytes as lossy UTF-8 (invalid sequences → U+FFFD).
+/// With `%q` verb, `Sprintf!` wraps the result in quotes.
+impl std::fmt::Display for slice<u8> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&String::from_utf8_lossy(&self.0))
+    }
+}
 impl<T> Default for slice<T> {
     fn default() -> Self { slice(Vec::new()) }
 }
@@ -256,6 +265,16 @@ mod tests {
     fn swap_out_of_range_panics() {
         let mut s: slice<i64> = slice(vec![1, 2]);
         s.Swap(0, 5);
+    }
+
+    #[test]
+    fn byte_slice_display() {
+        // slice<u8> impls Display → Sprintf!("%s", bytes) / "%q" work.
+        let b: slice<u8> = slice(b"hello".to_vec());
+        assert_eq!(format!("{}", b), "hello");
+        // Invalid UTF-8 → replacement char, not panic.
+        let bad: slice<u8> = slice(vec![0xff, b'x']);
+        assert!(format!("{}", bad).contains('x'));
     }
 
     #[test]

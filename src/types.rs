@@ -335,6 +335,29 @@ macro_rules! Enum {
     ($name:ident = rune)    => { $crate::__goish_int_enum!($name, $crate::types::rune); };
 }
 
+/// `copy!(dst, src)` — Go's `copy(dst, src) int` builtin.
+///
+/// Copies `min(len(dst), len(src))` elements from src into dst, returning
+/// the number copied as `int`. Works with any `&mut [T]` / `&[T]` pair
+/// where `T: Copy` (bytes, ints, copy structs, etc.):
+///
+///   let mut buf = make!([]byte, 32);
+///   let n = copy!(&mut buf, &src);      // byte copy, n = bytes written
+///   let n = copy!(&mut buf[off..], data); // copy into offset
+///
+/// Note: Rust requires explicit `&mut` / `&` at the call site — there's
+/// no equivalent to Go's implicit slice-header-by-value semantics.
+#[macro_export]
+macro_rules! copy {
+    ($dst:expr, $src:expr) => {{
+        let __dst: &mut [_] = $dst;
+        let __src: &[_] = $src;
+        let __n = __dst.len().min(__src.len());
+        __dst[..__n].copy_from_slice(&__src[..__n]);
+        __n as $crate::types::int
+    }};
+}
+
 /// `len!(x)` — Go's polymorphic `len()` builtin.
 ///
 /// Works on `string`, `&str`, `slice<T>`, `map<K,V>`, `Chan<T>`, and anything
@@ -711,6 +734,38 @@ mod tests {
         let c: UserIds = vec![UserId(1), UserId(3)].into();
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn copy_macro_returns_count() {
+        let mut dst = [0u8; 5];
+        let src = b"hello world";
+        // Go: n := copy(dst, src)  → 5 (dst is full)
+        let n = crate::copy!(&mut dst, src);
+        assert_eq!(n, 5);
+        assert_eq!(&dst, b"hello");
+    }
+
+    #[test]
+    fn copy_macro_min_len_wins() {
+        let mut dst = [0u8; 10];
+        let src = b"hi";
+        let n = crate::copy!(&mut dst, src);
+        assert_eq!(n, 2);
+        assert_eq!(&dst[..2], b"hi");
+    }
+
+    #[test]
+    fn copy_macro_with_offset_slice() {
+        // Go: copy(buf[n:], more)
+        let mut buf = [0u8; 10];
+        let first = b"foo";
+        let more = b"bar";
+        let a = crate::copy!(&mut buf, first);
+        let b = crate::copy!(&mut buf[a as usize..], more);
+        assert_eq!(a, 3);
+        assert_eq!(b, 3);
+        assert_eq!(&buf[..6], b"foobar");
     }
 
     #[test]
