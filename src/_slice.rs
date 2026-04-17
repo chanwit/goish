@@ -431,10 +431,19 @@ impl<T: std::fmt::Debug> std::fmt::Debug for slice<T> {
     }
 }
 
-/// Display for byte slices: prints bytes as lossy UTF-8.
-impl std::fmt::Display for slice<u8> {
+/// Generic Display for slice<T> — matches Go's `%v` format on slices:
+/// `[elem1 elem2 elem3]` with single-space separators. Works for any
+/// `T: Display`, including `u8` (which prints numerically, matching Go's
+/// `%v` on `[]byte`). For byte→string conversion, use
+/// `string::from(bytes)` or `String::from_utf8_lossy(bytes.as_slice())`.
+impl<T: std::fmt::Display> std::fmt::Display for slice<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&String::from_utf8_lossy(self.as_slice()))
+        f.write_str("[")?;
+        for (i, elem) in self.as_slice().iter().enumerate() {
+            if i > 0 { f.write_str(" ")?; }
+            <T as std::fmt::Display>::fmt(elem, f)?;
+        }
+        f.write_str("]")
     }
 }
 impl<T> Default for slice<T> {
@@ -583,11 +592,18 @@ mod tests {
     }
 
     #[test]
-    fn byte_slice_display() {
-        let b: slice<u8> = slice(b"hello".to_vec());
-        assert_eq!(format!("{}", b), "hello");
-        let bad: slice<u8> = slice(vec![0xff, b'x']);
-        assert!(format!("{}", bad).contains('x'));
+    fn display_is_go_v_format() {
+        // Go: fmt.Sprintf("%v", []byte{104,101}) → "[104 101]"
+        // Not "he" — that's only for %s (type-aware verb).
+        let b: slice<u8> = slice(b"he".to_vec());
+        assert_eq!(format!("{}", b), "[104 101]");
+
+        // Generic slice — same shape, any T: Display.
+        let v: slice<i64> = slice(vec![1, 2, 3]);
+        assert_eq!(format!("{}", v), "[1 2 3]");
+
+        let s: slice<String> = slice(vec!["a".into(), "b".into()]);
+        assert_eq!(format!("{}", s), "[a b]");
     }
 
     #[test]
