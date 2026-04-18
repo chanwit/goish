@@ -210,11 +210,17 @@ pub fn Parse(raw: impl AsRef<str>) -> (URL, error) {
         return (u, nil);
     }
 
-    u.RawPath = rest.into();
     let (decoded, err) = PathUnescape(rest);
     if err != nil {
         return (u, New(&format!("parse {:?}: invalid URL escape", s)));
     }
+    // Go's net/url invariant: RawPath is set only when the escaped form
+    // differs from the default encoding of Path. If PathEscape(decoded)
+    // round-trips to the original bytes, there were no percent-escapes
+    // to preserve and RawPath stays empty — this is what keeps
+    // `reflect.DeepEqual`-style URL equality working on parsed URLs.
+    let reencoded = PathEscape(&*decoded);
+    u.RawPath = if &*reencoded == rest { "".into() } else { rest.into() };
     u.Path = decoded;
     (u, nil)
 }
@@ -484,6 +490,27 @@ mod tests {
         assert_eq!(err, nil);
         assert_eq!(u.Scheme, "mailto");
         assert_eq!(u.Opaque, "alice@example.com");
+    }
+
+    #[test]
+    fn parse_raw_path_empty_when_clean() {
+        // Go invariant: RawPath is "" when Path re-encodes back to the
+        // original bytes. Keeps reflect.DeepEqual-style URL equality
+        // stable for the common no-escape case.
+        let (u, err) = Parse("https://x.com/abc");
+        assert_eq!(err, nil);
+        assert_eq!(u.Path, "/abc");
+        assert_eq!(u.RawPath, "");
+    }
+
+    #[test]
+    fn parse_raw_path_kept_when_escapes() {
+        // With escapes, RawPath preserves the original so round-trip
+        // encoding can distinguish "/a%2Fb" from "/a/b".
+        let (u, err) = Parse("https://x.com/a%2Fb");
+        assert_eq!(err, nil);
+        assert_eq!(u.Path, "/a/b");
+        assert_eq!(u.RawPath, "/a%2Fb");
     }
 
     #[test]

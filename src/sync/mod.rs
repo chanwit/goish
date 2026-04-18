@@ -36,13 +36,24 @@ impl<T> Mutex<T> {
 
     /// mu.Lock() — blocks until the mutex is free. Returns a guard that
     /// drops the lock when it goes out of scope.
+    ///
+    /// Absorbs Rust's poisoning: if a previous holder panicked, the next
+    /// Lock() still succeeds and observes the post-panic state. Matches
+    /// Go's `sync.Mutex`, which has no poison concept.
     pub fn Lock(&self) -> StdMutexGuard<'_, T> {
-        self.inner.lock().unwrap()
+        self.inner.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    /// mu.TryLock() — non-blocking. (value, ok).
+    /// mu.TryLock() — non-blocking. Returns the guard when the lock is
+    /// available (including the poisoned case, matching Go semantics),
+    /// None only when the lock is currently held by another thread.
     pub fn TryLock(&self) -> Option<StdMutexGuard<'_, T>> {
-        self.inner.try_lock().ok()
+        use std::sync::TryLockError;
+        match self.inner.try_lock() {
+            Ok(g) => Some(g),
+            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Err(TryLockError::WouldBlock) => None,
+        }
     }
 }
 
@@ -70,12 +81,37 @@ impl<T> RWMutex<T> {
         RWMutex { inner: Arc::new(StdRwLock::new(v)) }
     }
 
+    /// RWMutex.Lock() / RLock() absorb Rust poisoning the same way
+    /// `Mutex::Lock` does — Go's `sync.RWMutex` never poisons.
     pub fn Lock(&self) -> std::sync::RwLockWriteGuard<'_, T> {
-        self.inner.write().unwrap()
+        self.inner.write().unwrap_or_else(|p| p.into_inner())
     }
 
     pub fn RLock(&self) -> std::sync::RwLockReadGuard<'_, T> {
-        self.inner.read().unwrap()
+        self.inner.read().unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Non-blocking write lock. Treats a poisoned lock as available
+    /// (matches Go), returns None only when another thread holds it.
+    #[allow(non_snake_case)]
+    pub fn TryLock(&self) -> Option<std::sync::RwLockWriteGuard<'_, T>> {
+        use std::sync::TryLockError;
+        match self.inner.try_write() {
+            Ok(g) => Some(g),
+            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Err(TryLockError::WouldBlock) => None,
+        }
+    }
+
+    /// Non-blocking read lock. Same poison semantics as `TryLock`.
+    #[allow(non_snake_case)]
+    pub fn TryRLock(&self) -> Option<std::sync::RwLockReadGuard<'_, T>> {
+        use std::sync::TryLockError;
+        match self.inner.try_read() {
+            Ok(g) => Some(g),
+            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Err(TryLockError::WouldBlock) => None,
+        }
     }
 }
 
@@ -112,17 +148,18 @@ impl WaitGroup {
     pub fn Done(&self) {
         let prev = self.inner.count.fetch_sub(1, Ordering::SeqCst);
         if prev == 1 {
-            // Counter reached zero — wake all waiters.
-            let _g = self.inner.mu.lock().unwrap();
+            // Counter reached zero — wake all waiters. Poison absorbed
+            // to keep Go's panic-transparent semantics (see Mutex::Lock).
+            let _g = self.inner.mu.lock().unwrap_or_else(|p| p.into_inner());
             self.inner.cv.notify_all();
         }
     }
 
     /// wg.Wait() — block until counter reaches zero.
     pub fn Wait(&self) {
-        let mut g = self.inner.mu.lock().unwrap();
+        let mut g = self.inner.mu.lock().unwrap_or_else(|p| p.into_inner());
         while self.inner.count.load(Ordering::SeqCst) > 0 {
-            g = self.inner.cv.wait(g).unwrap();
+            g = self.inner.cv.wait(g).unwrap_or_else(|p| p.into_inner());
         }
     }
 }
@@ -209,6 +246,48 @@ mod tests {
             });
         }
         wg.Wait();
+    }
+
+    #[test]
+    fn mutex_absorbs_poison_after_panic() {
+        // Go's sync.Mutex never poisons. If a holder panics, a later
+        // Lock()/TryLock() on another thread must still succeed and
+        // observe the mid-panic state, not propagate a poison panic.
+        let mu = Mutex::new(0i64);
+        let m2 = mu.clone();
+        let _ = std::thread::spawn(move || {
+            let mut g = m2.Lock();
+            *g = 42;
+            panic!("deliberate panic while holding lock");
+        }).join();
+
+        // Blocking Lock — must not panic, must see the 42 written
+        // before the poisoning panic.
+        {
+            let g = mu.Lock();
+            assert_eq!(*g, 42);
+        }
+        // TryLock — same story; Poisoned must be treated as available.
+        {
+            let g = mu.TryLock().expect("TryLock after poison must succeed");
+            assert_eq!(*g, 42);
+        }
+    }
+
+    #[test]
+    fn rwmutex_absorbs_poison_after_panic() {
+        let rw = RWMutex::new(0i64);
+        let r2 = rw.clone();
+        let _ = std::thread::spawn(move || {
+            let mut g = r2.Lock();
+            *g = 7;
+            panic!("deliberate panic while holding write lock");
+        }).join();
+
+        assert_eq!(*rw.Lock(), 7);
+        assert_eq!(*rw.RLock(), 7);
+        assert_eq!(*rw.TryLock().expect("TryLock after poison"), 7);
+        assert_eq!(*rw.TryRLock().expect("TryRLock after poison"), 7);
     }
 
     #[test]
