@@ -107,9 +107,9 @@ impl<T> slice<T> {
         let shared = Arc::strong_count(&self.data) > 1
             || Arc::weak_count(&self.data) > 0;
         if shared {
-            panic!("slice mutation on shared backing (strong_count > 1). \
-                    Cannot CoW without T: Clone. Fork via `.into_vec()` into a \
-                    new slice, or avoid sub-slicing before mutation.");
+            panic!("slice mutation on shared backing. Call `.cow()` first \
+                    to fork (requires `T: Clone`), or use `append!` which \
+                    auto-forks.");
         }
         let v = Arc::get_mut(&mut self.data).expect("unique");
         if self.start > 0 { v.drain(..self.start); self.start = 0; }

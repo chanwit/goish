@@ -63,6 +63,18 @@ pub trait WriterAt {
     fn WriteAt(&mut self, p: &[byte], off: int64) -> (int, error);
 }
 
+// Forwarding impls for `Box<dyn Reader/Writer + Send>` so MultiReader /
+// MultiWriter accept pre-boxed trait objects as well as bare concrete
+// readers/writers. Bare `Box<T>` (with `T` concrete) already works via
+// the `impl<R: std::io::Read> Reader for R` blanket.
+
+impl Reader for Box<dyn Reader + Send> {
+    fn Read(&mut self, p: &mut [byte]) -> (int, error) { (**self).Read(p) }
+}
+impl Writer for Box<dyn Writer + Send> {
+    fn Write(&mut self, p: &[byte]) -> (int, error) { (**self).Write(p) }
+}
+
 // ─── Combined interfaces (Go embedding) ───────────────────────────────
 //
 // Go composes io interfaces via struct embedding, e.g.:
@@ -294,8 +306,17 @@ impl Reader for MultiReaderT {
 }
 
 #[allow(non_snake_case)]
-pub fn MultiReader(readers: Vec<Box<dyn Reader + Send>>) -> MultiReaderT {
-    MultiReaderT { readers }
+pub fn MultiReader<I, R>(readers: I) -> MultiReaderT
+where
+    I: IntoIterator<Item = R>,
+    R: Reader + Send + 'static,
+{
+    MultiReaderT {
+        readers: readers
+            .into_iter()
+            .map(|r| Box::new(r) as Box<dyn Reader + Send>)
+            .collect(),
+    }
 }
 
 // ─── MultiWriter ──────────────────────────────────────────────────────
@@ -316,8 +337,17 @@ impl Writer for MultiWriterT {
 }
 
 #[allow(non_snake_case)]
-pub fn MultiWriter(writers: Vec<Box<dyn Writer + Send>>) -> MultiWriterT {
-    MultiWriterT { writers }
+pub fn MultiWriter<I, W>(writers: I) -> MultiWriterT
+where
+    I: IntoIterator<Item = W>,
+    W: Writer + Send + 'static,
+{
+    MultiWriterT {
+        writers: writers
+            .into_iter()
+            .map(|w| Box::new(w) as Box<dyn Writer + Send>)
+            .collect(),
+    }
 }
 
 // ─── TeeReader ────────────────────────────────────────────────────────

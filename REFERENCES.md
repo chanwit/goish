@@ -106,7 +106,7 @@ to the declared element type via `as`.
 | `make(map[K]V)` | `make!(map[K]V)` |
 | `make(chan T)` | `make!(chan T)` *or* `chan!(T)` |
 | `make(chan T, n)` | `make!(chan T, n)` *or* `chan!(T, n)` |
-| `new(T)` | `Box::new(T::default())` or `Arc::new(T::default())` |
+| `new(T)` | `T::default()` (heap allocation is rarely what you actually want; reach for `Arc<T>` / `Rc<T>` at the module boundary if needed) |
 
 ---
 

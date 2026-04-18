@@ -136,3 +136,43 @@ test!{ fn TestInterface_SupertraitBound(t) {
         t.Errorf(Sprintf!("first line wrong: %v", out));
     }
 }}
+
+// Friction #58 regression: Interface! declared in one module, impl'd in
+// another. The impl arm accepts the qualified path `decl_mod::Logger`,
+// from which the macro derives `decl_mod::__LoggerTrait`. The outer
+// module (test body) never names `__LoggerTrait`.
+mod decl_mod {
+    use super::*;
+    Interface!{
+        type Logger interface {
+            fn Log(&self, msg: &str);
+        }
+    }
+}
+
+mod impl_mod {
+    use super::*;
+    #[derive(Clone)]
+    pub struct Capture { pub sink: Arc<Mutex<Vec<String>>> }
+
+    // Path form — user never types `__LoggerTrait`.
+    Interface!{
+        impl super::decl_mod::Logger for Capture {
+            fn Log(&self, msg: &str) {
+                self.sink.lock().unwrap().push(msg.to_string());
+            }
+        }
+    }
+}
+
+test!{ fn TestInterface_CrossModuleImpl(t) {
+    let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let lg: decl_mod::Logger = impl_mod::Capture { sink: sink.clone() }.into();
+    lg.Log("hello");
+    lg.Log("world");
+
+    let out = sink.lock().unwrap().clone();
+    if len!(out) != 2 {
+        t.Errorf(Sprintf!("cross-module Interface! impl: want 2 lines, got %d", len!(out)));
+    }
+}}

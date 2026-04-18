@@ -153,9 +153,10 @@ test!{ fn TestSectionReader_Seek(t) {
 }}
 
 test!{ fn TestMultiReader(t) {
-    let a: Box<dyn gio::Reader + Send> = Box::new(Cursor::new(b"hello ".to_vec()));
-    let b: Box<dyn gio::Reader + Send> = Box::new(Cursor::new(b"world".to_vec()));
-    let mut mr = gio::MultiReader(vec![a, b]);
+    let mut mr = gio::MultiReader(vec![
+        Cursor::new(b"hello ".to_vec()),
+        Cursor::new(b"world".to_vec()),
+    ]);
     let (out, err) = gio::ReadAll(&mut mr);
     if err != nil { t.Errorf(Sprintf!("ReadAll err: %s", err)); }
     if out != b"hello world" {
@@ -164,9 +165,10 @@ test!{ fn TestMultiReader(t) {
 }}
 
 test!{ fn TestMultiReaderCopy(t) {
-    let a: Box<dyn gio::Reader + Send> = Box::new(Cursor::new(b"abc".to_vec()));
-    let b: Box<dyn gio::Reader + Send> = Box::new(Cursor::new(b"def".to_vec()));
-    let mut mr = gio::MultiReader(vec![a, b]);
+    let mut mr = gio::MultiReader(vec![
+        Cursor::new(b"abc".to_vec()),
+        Cursor::new(b"def".to_vec()),
+    ]);
     let mut dst: Vec<u8> = Vec::new();
     let (n, err) = gio::Copy(&mut dst, &mut mr);
     if err != nil { t.Errorf(Sprintf!("Copy err: %s", err)); }
@@ -178,7 +180,7 @@ test!{ fn TestMultiReaderCopy(t) {
 
 test!{ fn TestMultiReaderFinalEOF(t) {
     // Empty MultiReader returns EOF immediately.
-    let mut mr = gio::MultiReader(vec![]);
+    let mut mr = gio::MultiReader(Vec::<Cursor<Vec<u8>>>::new());
     let mut buf = [0u8; 4];
     let (n, err) = mr.Read(&mut buf);
     if n != 0 || err == nil {
@@ -187,6 +189,8 @@ test!{ fn TestMultiReaderFinalEOF(t) {
 }}
 
 test!{ fn TestMultiWriter(t) {
+    // Heterogeneous sinks: pre-boxed trait objects still work thanks to
+    // the Reader/Writer blanket impls for Box<T>.
     let dst1: Vec<u8> = Vec::new();
     let dst2: Vec<u8> = Vec::new();
     let boxed1: Box<dyn gio::Writer + Send> = Box::new(dst1);

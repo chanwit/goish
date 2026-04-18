@@ -520,7 +520,7 @@ struct InterfaceDecl {
 }
 
 struct InterfaceImpl {
-    iface: Ident,
+    iface: syn::Path,
     target: Type,
     methods: Vec<syn::ImplItemFn>,
 }
@@ -565,7 +565,11 @@ impl Parse for InterfaceInput {
             Ok(InterfaceInput::Decl(InterfaceDecl { name, supers, methods }))
         } else if lookahead.peek(Token![impl]) {
             input.parse::<Token![impl]>()?;
-            let iface: Ident = input.parse()?;
+            // Accept a full path (`mymod::Core`) or bare ident (`Core`).
+            // The trait name is derived by mangling only the last segment,
+            // preserving module qualification so cross-module impls don't
+            // leak `__XTrait` into user scope (friction #58).
+            let iface: syn::Path = input.parse()?;
             input.parse::<Token![for]>()?;
             let target: Type = input.parse()?;
             let body;
@@ -695,11 +699,14 @@ fn emit_forward(sig: &Signature) -> TokenStream2 {
 }
 
 fn interface_impl_emit(i: InterfaceImpl) -> TokenStream2 {
-    let trait_name = format_ident!("__{}Trait", i.iface);
+    let mut trait_path = i.iface.clone();
+    if let Some(last) = trait_path.segments.last_mut() {
+        last.ident = format_ident!("__{}Trait", last.ident);
+    }
     let target = &i.target;
     let methods = &i.methods;
     quote! {
-        impl #trait_name for #target {
+        impl #trait_path for #target {
             #( #methods )*
         }
     }

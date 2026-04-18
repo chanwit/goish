@@ -2,7 +2,7 @@
 //!
 //!   Go                                  goish
 //!   ─────────────────────────────────   ──────────────────────────────────
-//!   iter.Seq[V]                         iter::Seq<V>     (impl FnMut(&mut dyn FnMut(V) -> bool))
+//!   iter.Seq[V]                         iter::Seq<V>     (trait; use FromIter<T> for the wrapper)
 //!   iter.Seq2[K, V]                     iter::Seq2<K, V>
 //!   for v := range seq { ... }          seq.for_each(|v| -> bool { ...; true })
 //!
@@ -38,20 +38,38 @@ impl<K, V, T: FnMut(&mut dyn FnMut(K, V) -> bool)> Seq2<K, V> for T {
     }
 }
 
+/// Opaque `Seq<T>` returned by `FromIterator`. Implements `Seq<T>` so it
+/// drops straight into `Collect(…)`, `for_each(…)`, and any other Seq
+/// consumer. The `impl FnMut(&mut dyn FnMut(T) -> bool)` plumbing is
+/// sealed inside the struct — call sites never name it.
+#[allow(non_snake_case)]
+pub struct FromIter<T: 'static> {
+    #[doc(hidden)]
+    run: Box<dyn FnMut(&mut dyn FnMut(T) -> bool)>,
+}
+
+impl<T: 'static> Seq<T> for FromIter<T> {
+    fn for_each<F: FnMut(T) -> bool>(&mut self, mut yield_: F) {
+        (self.run)(&mut |v| yield_(v));
+    }
+}
+
 /// Build a `Seq<V>` from a Rust `IntoIterator`.
 #[allow(non_snake_case)]
-pub fn FromIterator<I: IntoIterator>(iter: I) -> impl FnMut(&mut dyn FnMut(I::Item) -> bool)
+pub fn FromIterator<I: IntoIterator>(iter: I) -> FromIter<I::Item>
 where
     I::IntoIter: 'static,
     I::Item: 'static,
 {
     let mut it = Some(iter.into_iter());
-    move |yield_| {
-        if let Some(mut iter) = it.take() {
-            for v in &mut iter {
-                if !yield_(v) { break; }
+    FromIter {
+        run: Box::new(move |yield_: &mut dyn FnMut(I::Item) -> bool| {
+            if let Some(mut iter) = it.take() {
+                for v in &mut iter {
+                    if !yield_(v) { break; }
+                }
             }
-        }
+        }),
     }
 }
 
