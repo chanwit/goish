@@ -223,18 +223,75 @@ macro_rules! SliceNewtype {
     };
 }
 
+/// `MapNewtype!(Headers = string, string)` — Go's `type Headers map[K]V`.
+///
+/// Generates `pub struct Headers(pub map<K, V>)` with Deref/DerefMut to
+/// `map<K, V>` (so Go-shape indexing and `.Get()` flow through),
+/// From<map<K,V>> / From<HashMap<K,V>> / From<Headers> for map<K,V>,
+/// IntoIterator, and the usual derives (Clone/Debug/Default;
+/// PartialEq/Eq when V supports them — the `map<K,V>` impls require
+/// `K: Eq + Hash` anyway, so usage constrains the derives implicitly).
+#[macro_export]
+macro_rules! MapNewtype {
+    ($name:ident = $k:ty, $v:ty) => {
+        #[allow(non_camel_case_types)]
+        #[derive(Clone, Debug, Default, PartialEq, Eq)]
+        pub struct $name(pub $crate::types::map<$k, $v>);
+
+        impl ::std::ops::Deref for $name {
+            type Target = $crate::types::map<$k, $v>;
+            fn deref(&self) -> &Self::Target { &self.0 }
+        }
+        impl ::std::ops::DerefMut for $name {
+            fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+        }
+
+        impl ::std::convert::From<$crate::types::map<$k, $v>> for $name {
+            fn from(m: $crate::types::map<$k, $v>) -> Self { $name(m) }
+        }
+        impl ::std::convert::From<::std::collections::HashMap<$k, $v>> for $name {
+            fn from(m: ::std::collections::HashMap<$k, $v>) -> Self { $name(m.into()) }
+        }
+        impl ::std::convert::From<$name> for $crate::types::map<$k, $v> {
+            fn from(x: $name) -> $crate::types::map<$k, $v> { x.0 }
+        }
+
+        impl ::std::iter::IntoIterator for $name {
+            type Item = ($k, $v);
+            type IntoIter = ::std::collections::hash_map::IntoIter<$k, $v>;
+            fn into_iter(self) -> Self::IntoIter {
+                ::std::collections::HashMap::<$k, $v>::from(self.0).into_iter()
+            }
+        }
+        impl<'a> ::std::iter::IntoIterator for &'a $name {
+            type Item = (&'a $k, &'a $v);
+            type IntoIter = ::std::collections::hash_map::Iter<'a, $k, $v>;
+            fn into_iter(self) -> Self::IntoIter { self.0.iter() }
+        }
+        impl<'a> ::std::iter::IntoIterator for &'a mut $name {
+            type Item = (&'a $k, &'a mut $v);
+            type IntoIter = ::std::collections::hash_map::IterMut<'a, $k, $v>;
+            fn into_iter(self) -> Self::IntoIter { (&mut self.0).into_iter() }
+        }
+    };
+}
+
 /// `Type!(Name = <shape>)` — Go's `type Name <shape>` decl.
 ///
 /// Dispatches on the shape of the RHS:
 ///
-///   Type!(ID = uint64)         // int newtype  → IntNewtype!
-///   Type!(IDSlice = []ID)      // slice newtype → SliceNewtype!
-///   Type!(X = SomeStruct)      // generic newtype fallback
+///   Type!(ID = uint64)                 // int newtype   → IntNewtype!
+///   Type!(IDSlice = []ID)              // slice newtype → SliceNewtype!
+///   Type!(Headers = map[string]string) // map newtype   → MapNewtype!
+///   Type!(X = SomeStruct)              // generic newtype fallback
 ///
 /// Compose with `stringer!` to layer on `String()` + `Display`. See
 /// examples/id_newtype_demo.rs for the full Go → goish port pattern.
 #[macro_export]
 macro_rules! Type {
+    // Map: `type Headers map[K]V`
+    ($name:ident = map [ $k:ty ] $v:ty) => { $crate::MapNewtype!($name = $k, $v); };
+
     // Slice: `type IDSlice []ID`
     ($name:ident = [ ] $elem:ty) => { $crate::SliceNewtype!($name = $elem); };
 
@@ -766,6 +823,36 @@ mod tests {
         let c: UserIds = vec![UserId(1), UserId(3)].into();
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn type_macro_map() {
+        use crate as goish;
+        goish::Type!(Headers = map[string]string);
+
+        // Default constructs an empty map via the derive.
+        let mut h = Headers::default();
+
+        // DerefMut lets HashMap methods flow through.
+        h.insert("content-type".into(), "text/plain".into());
+        h.insert("host".into(), "example.com".into());
+        assert_eq!(h.len(), 2);
+
+        // Deref lets the Go-shape .Get() / index flow through `map`.
+        let (v, ok) = h.Get("content-type");
+        assert!(ok);
+        assert_eq!(v, "text/plain");
+
+        // From<map<K,V>> and From<HashMap<K,V>> round-trip.
+        let raw: crate::types::map<string, string> = h.clone().into();
+        assert_eq!(raw.len(), 2);
+        let h2: Headers = raw.into();
+        assert_eq!(h, h2);
+
+        // IntoIterator by reference.
+        let mut keys: Vec<String> = (&h).into_iter().map(|(k, _)| k.to_string()).collect();
+        keys.sort();
+        assert_eq!(keys, vec!["content-type".to_string(), "host".into()]);
     }
 
     #[test]

@@ -76,6 +76,19 @@ impl T {
         self.skipped.load(Ordering::SeqCst)
     }
 
+    /// t.Context() — returns a Context scoped to this test.
+    ///
+    /// Mirrors Go 1.24+ `*testing.T.Context()`. Today we return a fresh
+    /// `Background()` on every call, which is sufficient for the common
+    /// port use-case (passing a context to code under test). The Go
+    /// contract additionally cancels the returned context just before
+    /// cleanups run; that wiring is tracked for a follow-up once T owns
+    /// a lifetime-bound CancelFunc.
+    #[allow(non_snake_case)]
+    pub fn Context(&self) -> crate::context::Context {
+        crate::context::Background()
+    }
+
     /// t.Log(msg) — append msg to the test's log buffer. Only printed on failure.
     #[allow(non_snake_case)]
     pub fn Log(&self, msg: impl AsRef<str>) {

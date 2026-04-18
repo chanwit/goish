@@ -126,6 +126,20 @@ pub fn Background() -> Context {
     Context { inner: new_inner(None) }
 }
 
+// ── Sentinel errors: context.DeadlineExceeded / context.Canceled ──────
+//
+// Mirrors Go's `context.DeadlineExceeded` / `context.Canceled` package-
+// level values. Call-site shape:
+//
+//   if errors::Is(&ctx.Err(), &context::DeadlineExceeded()) { ... }
+//
+// Match is by message equality (`errors::Is` for Builtin errors walks
+// the chain comparing `.msg`). `fire_cancel` produces the same message
+// strings, so the sentinels match the errors it emits without us having
+// to thread a shared Arc through the cancel path.
+crate::var!(DeadlineExceeded = crate::errors::New("context deadline exceeded"));
+crate::var!(Canceled = crate::errors::New("context canceled"));
+
 /// A cancellation function produced by WithCancel / WithTimeout.
 pub struct CancelFunc {
     inner: Arc<ContextInner>,
@@ -274,6 +288,22 @@ mod tests {
         assert_eq!(role.as_deref(), Some("admin"));
         let missing: Option<i64> = ctx.Value("missing");
         assert_eq!(missing, None);
+    }
+
+    #[test]
+    fn sentinel_matches_cancel_error() {
+        let (ctx, cancel) = WithCancel(Background());
+        cancel.call();
+        assert!(crate::errors::Is(&ctx.Err(), &Canceled()));
+        assert!(!crate::errors::Is(&ctx.Err(), &DeadlineExceeded()));
+    }
+
+    #[test]
+    fn sentinel_matches_timeout_error() {
+        let (ctx, _c) = WithTimeout(Background(), crate::time::Millisecond * 30i64);
+        ctx.Wait();
+        assert!(crate::errors::Is(&ctx.Err(), &DeadlineExceeded()));
+        assert!(!crate::errors::Is(&ctx.Err(), &Canceled()));
     }
 
     #[test]

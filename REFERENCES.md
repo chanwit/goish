@@ -312,6 +312,7 @@ Go:
 ```go
 type ID uint64
 type IDSlice []ID
+type Headers map[string]string
 type Status string
 type Priority int
 ```
@@ -319,20 +320,25 @@ type Priority int
 Goish Rust — use `Type!` (dispatches on shape):
 
 ```rust
-Type!(ID = uint64);           // → IntNewtype!(ID = uint64)
-Type!(IDSlice = []ID);        // → SliceNewtype!(IDSlice = ID)
-Enum!(Status);                // string enum (const-constructible)
-Enum!(Priority = int);        // int enum
+Type!(ID = uint64);                    // → IntNewtype!(ID = uint64)
+Type!(IDSlice = []ID);                 // → SliceNewtype!(IDSlice = ID)
+Type!(Headers = map[string]string);    // → MapNewtype!(Headers = string, string)
+Enum!(Status);                         // string enum (const-constructible)
+Enum!(Priority = int);                 // int enum
 
 // Lower-level (also public):
 IntNewtype!(ID = uint64);
 SliceNewtype!(IDSlice = ID);
+MapNewtype!(Headers = string, string);
 ```
 
 `IntNewtype!` gives derives + `From<i32/i64/u32/u64/usize>` so
 `slice!([]ID{10, 20})` accepts bare literals.
 `SliceNewtype!` derefs to `slice<T>`, so all slice methods flow through.
-Neither emits `Display` — layer with `stringer!`.
+`MapNewtype!` derefs to `map<K, V>`, so `.Get()`, `[&key]`, and the full
+`HashMap` API flow through; it also adds `From<HashMap<K,V>>` and
+`IntoIterator` for `(&name)` / `(&mut name)` / by-value.
+None emit `Display` — layer with `stringer!`.
 
 ### Error-typed declarations — `ErrorType!`
 
@@ -746,6 +752,11 @@ Arc-backed mutation: a shared slice forks on write via copy-on-write
 (`.cow()`). For tight loops you can pre-fork once:
 `s.cow(); for ... { s[i] = v; }`.
 
+**Integer indexing.** `slice<T>` accepts `int` (Go's default integer) and
+`usize` directly — `s[i as int]` / `s[i as usize]`. Use `as int` at the
+call site when the index starts as a Rust `i32` or an arithmetic result,
+so the Go `s[i]` shape ports verbatim.
+
 ---
 
 ## 17. Maps
@@ -763,6 +774,12 @@ Arc-backed mutation: a shared slice forks on write via copy-on-write
 
 Missing-key behavior matches Go: `m[k]` returns the zero value of `V`
 (any `V: Default`).
+
+**Deref to `HashMap`.** `map<K, V>` is a thin newtype that derefs to
+`std::collections::HashMap<K, V>`, so the full std API (`insert`,
+`remove`, `contains_key`, `iter`, `entry`, …) is available on any `map`
+value — including map newtypes emitted by `MapNewtype!` / `Type!(Name =
+map[K]V)`, which themselves deref to `map<K, V>`.
 
 ---
 
