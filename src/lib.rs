@@ -100,6 +100,16 @@ pub use flume as __flume;
 /// defined in the `goish-macros` proc-macro crate.
 pub use goish_macros::select;
 
+/// `Interface!{ ... }` — Go's `type X interface { ... }` with optional
+/// supertrait clause plus `Interface!{ impl X for T { ... } }` for
+/// impl blocks. See REFERENCES.md §11.
+pub use goish_macros::Interface;
+
+/// `ErrorType!{ ... }` — Go's `type E struct { ... }` + `func (e *E) Error() string`
+/// packaged into one declaration. Emits struct + Display + GoishError +
+/// `From<E> for error`. See REFERENCES.md §12.
+pub use goish_macros::ErrorType;
+
 /// Re-export of the `inventory` crate so the `test!` macro in user crates
 /// can submit registrations without the user depending on `inventory`
 /// directly. Not a public API.
@@ -111,6 +121,7 @@ pub mod __goish_inventory {
 pub mod chan;
 #[doc(hidden)]
 pub mod clone_dyn;
+#[doc(hidden)]
 pub use clone_dyn::DynClone;
 pub mod consts;
 pub mod defer;
@@ -154,7 +165,9 @@ pub mod prelude {
     pub use crate::crypto;
     pub use crate::encoding;
     pub use crate::errors::{self, error, nil, GoishError, IsNil};
+    #[doc(hidden)]
     pub use crate::clone_dyn::DynClone;
+    pub use crate::{Interface, ErrorType};
     pub use crate::flag;
     pub use crate::fmt;
     pub use crate::hash;

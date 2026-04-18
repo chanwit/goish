@@ -334,6 +334,44 @@ SliceNewtype!(IDSlice = ID);
 `SliceNewtype!` derefs to `slice<T>`, so all slice methods flow through.
 Neither emits `Display` — layer with `stringer!`.
 
+### Error-typed declarations — `ErrorType!`
+
+Go:
+
+```go
+type MultiError struct { errs []error }
+func (m *MultiError) Error() string { /* ... */ }
+
+// Call site:
+var err error = &MultiError{errs: es}
+```
+
+Goish Rust:
+
+```rust
+ErrorType!{
+    type MultiError struct {
+        errs: slice<error>,
+    }
+    fn Error(&self) -> string {
+        let mut buf = strings::Builder::new();
+        for (i, e) in self.errs.iter().enumerate() {
+            if i > 0 { buf.WriteString("; "); }
+            buf.WriteString(&Sprintf!("%s", e));
+        }
+        buf.String()
+    }
+}
+
+// Call site — `.into()` lifts into `error`:
+let err: error = MultiError { errs: es }.into();
+```
+
+`ErrorType!` emits the struct (derives `Clone, Debug`), an inherent
+`Error()` method, `Display`, the hidden `GoishError` impl, and
+`From<T> for error`. Recovery at the call site is `errors::As::<T>` —
+see §12.
+
 ---
 
 ## 10. Structs — decl + literal + methods
@@ -440,6 +478,90 @@ impl sort::Interface for ByLen {
 let mut names: ByLen = /* ... */;
 sort::Sort(&mut names);
 ```
+
+### User interfaces — `Interface!`
+
+Go:
+
+```go
+type Core interface {
+    Write(msg string)
+    With(tag string) Core
+    Tags() []string
+}
+
+// Composition via embedding:
+type LevelEnabler interface { Enabled(lvl int) bool }
+type TraceCore interface {
+    LevelEnabler
+    Emit(lvl int, msg string)
+}
+```
+
+Goish Rust:
+
+```rust
+Interface!{
+    type Core interface {
+        fn Write(&self, msg: &str);
+        fn With(&self, tag: &'static str) -> Core;
+        fn Tags(&self) -> Vec<&'static str>;
+    }
+}
+
+Interface!{
+    type LevelEnabler interface {
+        fn Enabled(&self, lvl: i32) -> bool;
+    }
+}
+
+// Supertrait clause — `type Name: Super[+Super]* interface { … }`:
+Interface!{
+    type TraceCore: LevelEnabler interface {
+        fn Emit(&self, lvl: i32, msg: &str);
+    }
+}
+```
+
+Implementing an interface:
+
+```rust
+#[derive(Clone)]
+struct InMem { tags: Vec<&'static str>, sink: Arc<Mutex<Vec<String>>> }
+
+Interface!{
+    impl Core for InMem {
+        fn Write(&self, msg: &str) { /* ... */ }
+        fn With(&self, tag: &'static str) -> Core {
+            let mut tags = self.tags.clone();
+            tags.push(tag);
+            InMem { tags, sink: self.sink.clone() }.into()  // .into() lifts into Core
+        }
+        fn Tags(&self) -> Vec<&'static str> { self.tags.clone() }
+    }
+}
+```
+
+Call site — transparent cloning, no `Box<dyn …>` or `clone_trait_object!`
+at user surface:
+
+```rust
+let base: Core = InMem { /* ... */ }.into();
+let child = base.clone();                 // interface values clone
+let worker = base.With("worker");         // With returns Core
+worker.Write("hello");
+```
+
+Notes:
+
+- Method signatures use Rust shape (`fn <name>(&self[, …]) [-> T];`,
+  trailing `;`) — parameter/return types can be Go-shaped (`string`,
+  `slice<T>`, `int`, `error`) or Rust-shaped.
+- Any concrete type implementing the interface must `#[derive(Clone)]`.
+- `.into()` lifts a concrete impl into the interface newtype.
+- Supertrait clause: bare idents are name-mangled to the hidden trait;
+  path forms (e.g. `io::Writer`) pass through verbatim. Bound-only in
+  v0.21 — parent methods aren't auto-forwarded on the child newtype.
 
 ---
 

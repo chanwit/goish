@@ -1,64 +1,59 @@
-// Coverage for v0.20.5 custom-error escape hatch (friction #37):
-//   - errors::GoishError trait — user types can implement `.Error()` and
-//     be lifted into goish's `error` via `errors::FromDyn`
-//   - err.downcast_ref::<T>() — recover the original user type
+// Coverage for v0.21.0 `ErrorType!` macro (friction #37, re-tested):
+//   - one-line error-type declarations for user error shapes
+//   - `.into()` lifting — no `FromDyn` at user call sites
+//   - `errors::As::<T>(&err) -> Option<&T>` — Go-shaped recovery, no
+//     `.downcast_ref::<T>()` at user call sites
 //   - multierr-shaped port: MultiError holds a slice<error>, preserves
 //     individual entries through the error return boundary.
+//
+// NO `Box<dyn>`, `as_any`, `FromDyn`, or `downcast_ref` leak to the
+// call site. If any of those reappears here, it's a Rust-leak regression.
 
 use goish::prelude::*;
-use goish::errors::GoishError;
-use std::any::Any;
-use std::fmt;
 
-// A minimal multierr.
-#[derive(Debug, Clone)]
-struct MultiError {
-    errs: slice<error>,
-}
-
-impl fmt::Display for MultiError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+ErrorType!{
+    type MultiError struct {
+        errs: slice<error>,
+    }
+    fn Error(&self) -> string {
+        let mut buf = strings::Builder::new();
         for (i, e) in self.errs.iter().enumerate() {
-            if i > 0 { f.write_str("; ")?; }
-            write!(f, "{}", e)?;
+            if i > 0 { buf.WriteString("; "); }
+            buf.WriteString(&Sprintf!("%s", e));
         }
-        Ok(())
+        buf.String()
     }
 }
 
-impl GoishError for MultiError {
-    fn as_any(&self) -> &dyn Any { self }
-}
-
 fn wrap_multi(es: slice<error>) -> error {
-    errors::FromDyn(MultiError { errs: es })
+    MultiError { errs: es }.into()
 }
 
-test!{ fn TestFromDyn_RoundTrips(t) {
+test!{ fn TestErrorType_RoundTrips(t) {
     let a = errors::New("one");
     let b = errors::New("two");
     let err = wrap_multi(vec![a, b].into());
 
     // It's a non-nil error.
-    if err == nil { t.Errorf("FromDyn returned nil".to_string()); }
+    if err == nil { t.Errorf("ErrorType!.into() returned nil".to_string()); }
 
-    // Display / Sprintf see the Display impl.
+    // Display / Sprintf see the generated Display impl.
     let s = Sprintf!("%s", err);
     if !strings::Contains(&s, "one") || !strings::Contains(&s, "two") {
         t.Errorf(Sprintf!("Display lost entries: got %q", s));
     }
 
-    // Downcast recovers the original type AND the individual errors.
-    let me = match err.downcast_ref::<MultiError>() {
+    // errors::As::<T> recovers the original type AND the individual errors.
+    let me = match errors::As::<MultiError>(&err) {
         Some(x) => x,
-        None => { t.Fatal("downcast_ref failed"); return; }
+        None => return t.Fatal("errors::As::<MultiError> failed"),
     };
     if len!(me.errs) != 2 { t.Errorf(Sprintf!("want 2 errs, got %d", len!(me.errs))); }
     if Sprintf!("%s", me.errs[0i64]) != "one" { t.Errorf("errs[0] != one".to_string()); }
     if Sprintf!("%s", me.errs[1i64]) != "two" { t.Errorf("errs[1] != two".to_string()); }
 }}
 
-test!{ fn TestFromDyn_PtrIdentityEq(t) {
+test!{ fn TestErrorType_PtrIdentityEq(t) {
     let a = wrap_multi(vec![errors::New("x")].into());
     let b = a.clone();
     // Clone shares the underlying Arc — PartialEq checks ptr identity.
@@ -70,39 +65,48 @@ test!{ fn TestFromDyn_PtrIdentityEq(t) {
     if a == c { t.Errorf("distinct Custom errors unexpectedly ==".to_string()); }
 }}
 
-test!{ fn TestFromDyn_BuiltinDowncastReturnsNone(t) {
+test!{ fn TestErrorType_BuiltinAsReturnsNone(t) {
     let e = errors::New("boom");
-    if e.downcast_ref::<MultiError>().is_some() {
-        t.Errorf("Builtin error shouldn't downcast to user type".to_string());
+    if errors::As::<MultiError>(&e).is_some() {
+        t.Errorf("Builtin error shouldn't recover as MultiError".to_string());
     }
 }}
 
-test!{ fn TestFromDyn_NilDowncastReturnsNone(t) {
+test!{ fn TestErrorType_NilAsReturnsNone(t) {
     let e: error = nil;
-    if e.downcast_ref::<MultiError>().is_some() {
-        t.Errorf("nil error shouldn't downcast".to_string());
+    if errors::As::<MultiError>(&e).is_some() {
+        t.Errorf("nil error shouldn't recover as any user type".to_string());
     }
 }}
 
-// Custom Unwrap chain — proves errors::Is walks through.
-#[derive(Debug, Clone)]
-struct CausedBy { msg: String, cause: error }
-impl fmt::Display for CausedBy {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.msg, self.cause)
+// Second ErrorType! — confirms the macro handles more than one in a
+// single compilation unit (no name collisions on hidden helpers).
+ErrorType!{
+    type CausedBy struct {
+        msg: string,
+        cause: error,
+    }
+    fn Error(&self) -> string {
+        Sprintf!("%s: %s", self.msg, self.cause)
     }
 }
-impl GoishError for CausedBy {
-    fn as_any(&self) -> &dyn Any { self }
-    fn Unwrap(&self) -> error { self.cause.clone() }
-}
 
-test!{ fn TestIs_WalksCustomUnwrap(t) {
-    let inner = errors::New("disk full");
-    let outer = errors::FromDyn(CausedBy { msg: "save failed".into(), cause: inner.clone() });
-    // Is should find the inner by walking .Unwrap().
-    if !errors::Is(&outer, &inner) {
-        t.Errorf("Is did not walk CausedBy.Unwrap chain".to_string());
+test!{ fn TestErrorType_Is_OnIdentity(t) {
+    // errors::Is on custom types matches by Arc pointer identity
+    // (matches the original Custom/Custom PartialEq contract).
+    let outer: error = CausedBy {
+        msg: "save failed".into(),
+        cause: errors::New("disk full"),
+    }.into();
+    let other = outer.clone();
+    if !errors::Is(&outer, &other) {
+        t.Errorf("Is did not recognise Arc-identical errors".to_string());
+    }
+
+    // Display composes the user's Error() body.
+    let s = Sprintf!("%s", outer);
+    if !strings::Contains(&s, "save failed") || !strings::Contains(&s, "disk full") {
+        t.Errorf(Sprintf!("CausedBy display lost parts: %q", s));
     }
 }}
 

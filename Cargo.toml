@@ -3,7 +3,7 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.20.7"
+version = "0.21.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
@@ -38,7 +38,7 @@ exclude = [
 #   - flume backs Chan<T>: winner of v0.4 channel bake-off (see commit
 #     b996384 — 2× faster rendezvous, 3.5× less RSS vs async-channel).
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
-goish-macros = { version = "0.6", path = "goish-macros" }
+goish-macros = { version = "0.7", path = "goish-macros" }
 flume = { version = "0.11", default-features = false, features = ["async", "select", "eventual-fairness"] }
 serde = "1"
 serde_json = "1"

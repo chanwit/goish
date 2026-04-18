@@ -17,8 +17,12 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
-use syn::{parenthesized, parse_macro_input, parse_quote, Block, Expr, ExprAwait, Ident, Token};
+use syn::{
+    braced, parenthesized, parse_macro_input, parse_quote, Block, Expr, ExprAwait, Field, Ident,
+    Signature, Token, TraitItemFn, Type,
+};
 
 /// Walks the AST, rewriting known goish sync calls into async form.
 struct GoRewriter;
@@ -468,4 +472,344 @@ fn emit_no_default(arms: &[Arm]) -> TokenStream2 {
             _ => ::std::unreachable!("select! wait() returned without firing any arm"),
         }
     }}
+}
+
+// ── Interface! proc-macro ─────────────────────────────────────────────
+//
+// Go: type Core interface { With(fields []Field) Core; Write(msg string) }
+//
+// Goish (decl form):
+//
+//   Interface!{
+//       type Core interface {
+//           fn Write(&self, msg: &str);
+//           fn With(&self, tag: &'static str) -> Core;
+//       }
+//   }
+//
+// Emits:
+//   - `#[doc(hidden)] pub trait __CoreTrait: DynClone + Send + Sync { ... }`
+//   - `clone_trait_object!(__CoreTrait)`
+//   - `pub struct Core(Box<dyn __CoreTrait>)` with `impl Clone`
+//   - forwarding inherent methods on Core
+//   - `impl<T: __CoreTrait + 'static> From<T> for Core`
+//
+// Goish (impl form):
+//
+//   Interface!{
+//       impl Core for InMem {
+//           fn Write(&self, msg: &str) { ... }
+//           fn With(&self, tag: &'static str) -> Core { /* ... */ }
+//       }
+//   }
+//
+// Emits:  `impl __CoreTrait for InMem { <user methods> }`
+//
+// The hidden trait name is `__<Name>Trait`. Users never name it directly —
+// they always go through `Interface!{ impl Name for Type { ... } }`.
+
+enum InterfaceInput {
+    Decl(InterfaceDecl),
+    Impl(InterfaceImpl),
+}
+
+struct InterfaceDecl {
+    name: Ident,
+    supers: Vec<syn::TypeParamBound>,
+    methods: Vec<TraitItemFn>,
+}
+
+struct InterfaceImpl {
+    iface: Ident,
+    target: Type,
+    methods: Vec<syn::ImplItemFn>,
+}
+
+impl Parse for InterfaceInput {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let lookahead = input.lookahead1();
+        if lookahead.peek(Token![type]) {
+            input.parse::<Token![type]>()?;
+            let name: Ident = input.parse()?;
+
+            // Optional supertrait clause: `: Super1 + Super2 + …`
+            //   - bare ident  → mangled to `__<Ident>Trait`
+            //   - path/other  → verbatim (existing trait like `io::Writer`)
+            let mut supers: Vec<syn::TypeParamBound> = Vec::new();
+            if input.peek(Token![:]) {
+                input.parse::<Token![:]>()?;
+                loop {
+                    let bound = parse_super_bound(input)?;
+                    supers.push(bound);
+                    if input.peek(Token![+]) {
+                        input.parse::<Token![+]>()?;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            let kw: Ident = input.parse()?;
+            if kw != "interface" {
+                return Err(syn::Error::new(
+                    kw.span(),
+                    "Interface!: expected `interface` keyword",
+                ));
+            }
+            let body;
+            braced!(body in input);
+            let mut methods = Vec::new();
+            while !body.is_empty() {
+                methods.push(body.parse::<TraitItemFn>()?);
+            }
+            Ok(InterfaceInput::Decl(InterfaceDecl { name, supers, methods }))
+        } else if lookahead.peek(Token![impl]) {
+            input.parse::<Token![impl]>()?;
+            let iface: Ident = input.parse()?;
+            input.parse::<Token![for]>()?;
+            let target: Type = input.parse()?;
+            let body;
+            braced!(body in input);
+            let mut methods = Vec::new();
+            while !body.is_empty() {
+                methods.push(body.parse::<syn::ImplItemFn>()?);
+            }
+            Ok(InterfaceInput::Impl(InterfaceImpl { iface, target, methods }))
+        } else {
+            Err(lookahead.error())
+        }
+    }
+}
+
+/// Parse one supertrait in the `: A + B + …` clause. A bare `Ident` is
+/// rewritten to `__<Ident>Trait` (Interface!-declared). Any other path
+/// (`io::Writer`, `some::Trait<T>`) is kept verbatim.
+fn parse_super_bound(input: ParseStream) -> syn::Result<syn::TypeParamBound> {
+    // `syn::Path` greedily consumes a single ident OR a full path.
+    let path: syn::Path = input.parse()?;
+    let is_bare_ident = path.segments.len() == 1
+        && path.leading_colon.is_none()
+        && path.segments[0].arguments.is_none();
+    let resolved_path = if is_bare_ident {
+        let id = &path.segments[0].ident;
+        let mangled = format_ident!("__{}Trait", id);
+        syn::parse_quote!(#mangled)
+    } else {
+        path
+    };
+    Ok(syn::TypeParamBound::Trait(syn::TraitBound {
+        paren_token: None,
+        modifier: syn::TraitBoundModifier::None,
+        lifetimes: None,
+        path: resolved_path,
+    }))
+}
+
+/// `Interface!` — Go's `type X interface { ... }` plus `impl X for T`.
+///
+/// See `REFERENCES.md` §11 for Go → Goish side-by-side examples.
+#[proc_macro]
+#[allow(non_snake_case)]
+pub fn Interface(input: TokenStream) -> TokenStream {
+    let parsed = parse_macro_input!(input as InterfaceInput);
+    match parsed {
+        InterfaceInput::Decl(d) => interface_decl_emit(d).into(),
+        InterfaceInput::Impl(i) => interface_impl_emit(i).into(),
+    }
+}
+
+fn interface_decl_emit(d: InterfaceDecl) -> TokenStream2 {
+    let name = &d.name;
+    let trait_name = format_ident!("__{}Trait", name);
+
+    let mut trait_methods = TokenStream2::new();
+    let mut forwards = TokenStream2::new();
+    for m in &d.methods {
+        let sig = &m.sig;
+        trait_methods.extend(quote! { #sig ; });
+        forwards.extend(emit_forward(sig));
+    }
+
+    let supers = &d.supers;
+
+    quote! {
+        #[doc(hidden)]
+        #[allow(non_camel_case_types, non_snake_case)]
+        pub trait #trait_name:
+            #( #supers + )*
+            ::goish::DynClone + ::std::marker::Send + ::std::marker::Sync
+        {
+            #trait_methods
+        }
+        ::goish::clone_trait_object!(#trait_name);
+
+        #[allow(non_camel_case_types, non_snake_case)]
+        pub struct #name(
+            #[doc(hidden)]
+            pub ::std::boxed::Box<dyn #trait_name>,
+        );
+
+        impl ::std::clone::Clone for #name {
+            fn clone(&self) -> Self { #name(::std::clone::Clone::clone(&self.0)) }
+        }
+
+        #[allow(non_snake_case)]
+        impl #name {
+            #forwards
+        }
+
+        impl<__GoishT> ::std::convert::From<__GoishT> for #name
+        where __GoishT: #trait_name + 'static
+        {
+            fn from(t: __GoishT) -> Self { #name(::std::boxed::Box::new(t)) }
+        }
+    }
+}
+
+/// Emit `pub fn Name(&self, ...) -> Ret { self.0.Name(...) }` from a trait
+/// method signature. Each non-receiver param is forwarded by its ident.
+fn emit_forward(sig: &Signature) -> TokenStream2 {
+    let name = &sig.ident;
+    // Extract non-receiver parameter identifiers for the call site.
+    let mut call_args = TokenStream2::new();
+    let mut first = true;
+    for input in sig.inputs.iter() {
+        if let syn::FnArg::Typed(pt) = input {
+            if !first { call_args.extend(quote! { , }); }
+            first = false;
+            match &*pt.pat {
+                syn::Pat::Ident(pi) => {
+                    let id = &pi.ident;
+                    call_args.extend(quote! { #id });
+                }
+                other => {
+                    // Fallback: emit as-is (rare — macro users should pass simple idents).
+                    call_args.extend(quote! { #other });
+                }
+            }
+        }
+    }
+    quote! {
+        pub #sig { self.0.#name(#call_args) }
+    }
+}
+
+fn interface_impl_emit(i: InterfaceImpl) -> TokenStream2 {
+    let trait_name = format_ident!("__{}Trait", i.iface);
+    let target = &i.target;
+    let methods = &i.methods;
+    quote! {
+        impl #trait_name for #target {
+            #( #methods )*
+        }
+    }
+}
+
+// ── ErrorType! proc-macro ─────────────────────────────────────────────
+//
+// Go: type MultiError struct { errs []error }
+//     func (m *MultiError) Error() string { /* ... */ }
+//
+// Goish:
+//
+//   ErrorType!{
+//       type MultiError struct {
+//           errs: slice<error>,
+//       }
+//       fn Error(&self) -> string {
+//           /* user body */
+//       }
+//   }
+//
+// Emits:
+//   - `#[derive(Clone, Debug)] pub struct MultiError { pub errs: slice<error> }`
+//   - `impl MultiError { pub fn Error(&self) -> string { <user body> } }`
+//   - `impl Display for MultiError { fmt via self.Error() }`
+//   - `impl GoishError for MultiError { as_any -> self }`
+//   - `impl From<MultiError> for error { via errors::FromDyn }`
+//
+// User code then writes `return MultiError { ... }.into();` — no `FromDyn`
+// visible, no `as_any` visible, no Rust trait-object juggling.
+
+struct ErrorTypeInput {
+    name: Ident,
+    fields: Punctuated<Field, Token![,]>,
+    error_body: Block,
+    error_ret: Type,
+}
+
+impl Parse for ErrorTypeInput {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        input.parse::<Token![type]>()?;
+        let name: Ident = input.parse()?;
+        input.parse::<Token![struct]>()?;
+        let body;
+        braced!(body in input);
+        let fields = body.parse_terminated(Field::parse_named, Token![,])?;
+
+        // Now parse the `fn Error(&self) -> TYPE { body }`
+        input.parse::<Token![fn]>()?;
+        let err_ident: Ident = input.parse()?;
+        if err_ident != "Error" {
+            return Err(syn::Error::new(
+                err_ident.span(),
+                "ErrorType!: expected `fn Error(&self) -> <type> { ... }`",
+            ));
+        }
+        let args;
+        parenthesized!(args in input);
+        args.parse::<Token![&]>()?;
+        args.parse::<Token![self]>()?;
+        if !args.is_empty() {
+            return Err(syn::Error::new(
+                args.span(),
+                "ErrorType!: `fn Error` takes only `&self`",
+            ));
+        }
+        input.parse::<Token![->]>()?;
+        let error_ret: Type = input.parse()?;
+        let error_body: Block = input.parse()?;
+
+        Ok(ErrorTypeInput { name, fields, error_body, error_ret })
+    }
+}
+
+/// `ErrorType!` — declare a user error type with `Error() string`.
+///
+/// See `REFERENCES.md` §12 for Go → Goish side-by-side examples.
+#[proc_macro]
+#[allow(non_snake_case)]
+pub fn ErrorType(input: TokenStream) -> TokenStream {
+    let ErrorTypeInput { name, fields, error_body, error_ret } =
+        parse_macro_input!(input as ErrorTypeInput);
+
+    let field_iter = fields.iter();
+    quote! {
+        #[derive(::std::clone::Clone, ::std::fmt::Debug)]
+        pub struct #name {
+            #( pub #field_iter, )*
+        }
+
+        #[allow(non_snake_case)]
+        impl #name {
+            pub fn Error(&self) -> #error_ret #error_body
+        }
+
+        impl ::std::fmt::Display for #name {
+            fn fmt(&self, __f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                ::std::write!(__f, "{}", #name::Error(self))
+            }
+        }
+
+        impl ::goish::errors::GoishError for #name {
+            fn as_any(&self) -> &dyn ::std::any::Any { self }
+        }
+
+        impl ::std::convert::From<#name> for ::goish::errors::error {
+            fn from(__e: #name) -> ::goish::errors::error {
+                ::goish::errors::__FromDyn(__e)
+            }
+        }
+    }
+    .into()
 }
