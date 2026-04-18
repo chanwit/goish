@@ -53,6 +53,11 @@ type Transpiler struct {
 	// emittedAsError: names of structs emitted as `ErrorType!`. Used at
 	// emitFuncDecl time to suppress re-emission of the Error() method.
 	emittedAsError map[string]bool
+	// mutatedLocals: names of locals whose binding is reassigned, compound-
+	// assigned, inc/dec'd, or address-taken inside the current function body.
+	// Populated on entry to each function body via withFuncBody; consulted
+	// by emitLocalDecl and the `:=` path to pick `let` vs `let mut`.
+	mutatedLocals map[string]bool
 }
 
 // errorMethodInfo holds what pre-pass 3 needs to roll the Error method body
@@ -197,7 +202,7 @@ func (t *Transpiler) emitFile() {
 		case *ast.FuncDecl:
 			t.emitFuncDecl(d)
 		default:
-			t.todo(fmt.Sprintf("unknown top-level decl %T", d), d)
+			t.todo(fmt.Sprintf("unknown top-level declaration %T (report this)", d), d)
 			t.nl()
 		}
 	}
@@ -306,7 +311,7 @@ func (t *Transpiler) emitStructFields(s *ast.StructType) {
 			// the `Struct!` macro's `$ty:tt` slot rejects a leading reference.
 			fieldName := embeddedFieldName(f.Type)
 			msg := fmt.Sprintf("embedded %s — Goish has no method promotion; "+
-				"delegate by hand, or impl Deref<Target=%s> to reach embedded methods",
+				"delegate manually or re-export the embedded methods (underlying %s)",
 				fieldName, goTypeString(f.Type))
 			t.todo(msg, f)
 			t.write(fieldName)
@@ -369,7 +374,7 @@ func (t *Transpiler) emitInterfaceDecl(name string, iface *ast.InterfaceType) {
 				}
 			default:
 				todos = append(todos, todoEntry{
-					msg:  "embedded interface literal — hand-port as supertrait or separate decl",
+					msg:  "embedded interface literal — hand-port as supertrait (parent interface) or separate decl",
 					node: m,
 				})
 			}
@@ -443,7 +448,9 @@ func (t *Transpiler) emitErrorType(name string, s *ast.StructType, info errorMet
 		t.writef("let %s = self;\n", info.recvName)
 	}
 	if info.body != nil {
-		t.emitBlockBody(info.body)
+		t.withFuncBody(info.body, func() {
+			t.emitBlockBody(info.body)
+		})
 	}
 	t.out()
 	t.pad()
@@ -465,7 +472,7 @@ func (t *Transpiler) emitErrorTypeFields(s *ast.StructType) {
 		if len(f.Names) == 0 {
 			fieldName := embeddedFieldName(f.Type)
 			msg := fmt.Sprintf("embedded %s — Goish has no method promotion; "+
-				"delegate by hand, or impl Deref<Target=%s> to reach embedded methods",
+				"delegate manually or re-export the embedded methods (underlying %s)",
 				fieldName, goTypeString(f.Type))
 			t.todo(msg, f)
 			t.write(fieldName)
@@ -649,25 +656,26 @@ func (t *Transpiler) emitFuncDecl(d *ast.FuncDecl) {
 		if d.Name.Name == "Error" && t.emittedAsError[recvType] {
 			return
 		}
+		// Go pointer receivers (`*T`) are the default for most methods and
+		// carry no mutation semantics — Rust's `&mut self` would be too
+		// exclusive. Flow-analyze the body: only emit `&mut self` when we
+		// actually see the receiver being mutated. Value receivers stay `&self`.
+		isMut := false
+		if isPtr {
+			recvName := ""
+			if len(recv.Names) > 0 {
+				recvName = recv.Names[0].Name
+			}
+			isMut = receiverIsMutated(d.Body, recvName)
+		}
 		t.writef("impl %s {\n", recvType)
 		t.in()
 		t.pad()
 		t.writef("pub fn %s(", d.Name.Name)
-		if len(recv.Names) > 0 && recv.Names[0].Name != "_" {
-			// Caller sees `self` as the receiver name; the Go source used a different
-			// name — add a rebinding let so the body compiles without rewriting every
-			// occurrence. Cheap + keeps the port obvious.
-			if isPtr {
-				t.write("&mut self")
-			} else {
-				t.write("&self")
-			}
+		if isMut {
+			t.write("&mut self")
 		} else {
-			if isPtr {
-				t.write("&mut self")
-			} else {
-				t.write("&self")
-			}
+			t.write("&self")
 		}
 		t.emitParams(d.Type.Params, false)
 		t.write(")")
@@ -677,14 +685,12 @@ func (t *Transpiler) emitFuncDecl(d *ast.FuncDecl) {
 		// rebinding so user's `s.X` style (where `s` is Go's receiver name) still works
 		if len(recv.Names) > 0 && recv.Names[0].Name != "_" && recv.Names[0].Name != "self" {
 			t.pad()
-			if isPtr {
-				t.writef("let %s = self;\n", recv.Names[0].Name)
-			} else {
-				t.writef("let %s = self;\n", recv.Names[0].Name)
-			}
+			t.writef("let %s = self;\n", recv.Names[0].Name)
 		}
 		if d.Body != nil {
-			t.emitBlockBody(d.Body)
+			t.withFuncBody(d.Body, func() {
+				t.emitBlockBody(d.Body)
+			})
 		}
 		t.out()
 		t.pad()
@@ -706,7 +712,9 @@ func (t *Transpiler) emitFuncDecl(d *ast.FuncDecl) {
 	}
 	t.writeln(" {")
 	t.in()
-	t.emitBlockBody(d.Body)
+	t.withFuncBody(d.Body, func() {
+		t.emitBlockBody(d.Body)
+	})
 	t.out()
 	t.writeln("}")
 	t.nl()
@@ -746,7 +754,9 @@ func (t *Transpiler) emitTestMacro(macro string, d *ast.FuncDecl, paramName stri
 		t.benchLoopVar = paramName
 	}
 	if d.Body != nil {
-		t.emitBlockBody(d.Body)
+		t.withFuncBody(d.Body, func() {
+			t.emitBlockBody(d.Body)
+		})
 	}
 	t.benchLoopVar = save
 	t.out()
@@ -902,7 +912,7 @@ func (t *Transpiler) emitStmt(s ast.Stmt) {
 	case *ast.EmptyStmt:
 		t.write("// (empty)")
 	default:
-		t.todo(fmt.Sprintf("unknown stmt %T", s), s)
+		t.todo(fmt.Sprintf("unknown statement %T (report this)", s), s)
 	}
 }
 
@@ -1005,17 +1015,24 @@ func (t *Transpiler) emitLocalDecl(gd *ast.GenDecl) {
 			vs := sp.(*ast.ValueSpec)
 			for i, n := range vs.Names {
 				t.pad()
-				t.write("let mut ")
+				// Uninitialized `var x T` keeps `let mut` — callers typically
+				// assign before first read, and a bare zero-value binding is
+				// only useful when it's going to be mutated. Initialized vars
+				// get the normal mutatedLocals check.
+				uninit := i >= len(vs.Values)
+				if uninit || t.mutatedLocals[n.Name] {
+					t.write("let mut ")
+				} else {
+					t.write("let ")
+				}
 				t.write(n.Name)
 				if vs.Type != nil {
 					t.write(": ")
 					t.emitType(vs.Type)
 				}
 				t.write(" = ")
-				if i < len(vs.Values) {
+				if !uninit {
 					t.emitExpr(vs.Values[i])
-				} else if vs.Type != nil {
-					t.write("Default::default()")
 				} else {
 					t.write("Default::default()")
 				}
@@ -1071,6 +1088,11 @@ func (t *Transpiler) emitAssignStmt(s *ast.AssignStmt) {
 			if id, ok := l.(*ast.Ident); ok && id.Name == "_" {
 				t.write("_")
 			} else {
+				if isDefine {
+					if id, ok := l.(*ast.Ident); ok && t.mutatedLocals[id.Name] {
+						t.write("mut ")
+					}
+				}
 				t.emitExpr(l)
 			}
 		}
@@ -1097,7 +1119,11 @@ func (t *Transpiler) emitAssignStmt(s *ast.AssignStmt) {
 		if id, ok := lhs.(*ast.Ident); ok && id.Name == "_" {
 			t.write("let _ = ")
 		} else {
-			t.write("let mut ")
+			if id, ok := lhs.(*ast.Ident); ok && t.mutatedLocals[id.Name] {
+				t.write("let mut ")
+			} else {
+				t.write("let ")
+			}
 			t.emitExpr(lhs)
 			t.write(" = ")
 		}
@@ -1360,6 +1386,12 @@ func (t *Transpiler) emitRangeStmt(s *ast.RangeStmt) {
 	// is common. We emit a conservative two-value tuple — user can tweak.
 	keyIsBlank := s.Key == nil
 	valIsBlank := s.Value == nil
+	emitRangeBinding := func(e ast.Expr) {
+		if id, ok := e.(*ast.Ident); ok && t.mutatedLocals[id.Name] {
+			t.write("mut ")
+		}
+		t.emitExpr(e)
+	}
 	t.write("for ")
 	if keyIsBlank && valIsBlank {
 		t.write("_")
@@ -1368,7 +1400,7 @@ func (t *Transpiler) emitRangeStmt(s *ast.RangeStmt) {
 		if keyIsBlank {
 			t.write("_")
 		} else {
-			t.emitExpr(s.Key)
+			emitRangeBinding(s.Key)
 		}
 		t.write(", _)")
 	} else {
@@ -1376,10 +1408,10 @@ func (t *Transpiler) emitRangeStmt(s *ast.RangeStmt) {
 		if keyIsBlank {
 			t.write("_")
 		} else {
-			t.emitExpr(s.Key)
+			emitRangeBinding(s.Key)
 		}
 		t.write(", ")
-		t.emitExpr(s.Value)
+		emitRangeBinding(s.Value)
 		t.write(")")
 	}
 	t.write(" in range!(")
@@ -1539,7 +1571,7 @@ func (t *Transpiler) emitCommClause(cc *ast.CommClause) {
 			}
 		}
 	default:
-		t.todo(fmt.Sprintf("select comm %T", comm), cc)
+		t.todo(fmt.Sprintf("select communication clause %T (report this)", comm), cc)
 	}
 	t.nl()
 	t.in()
@@ -1612,7 +1644,7 @@ func (t *Transpiler) emitExpr(e ast.Expr) {
 		t.write(": ")
 		t.emitExpr(e.Value)
 	case *ast.TypeAssertExpr:
-		t.todo("type assertion — Rust requires match/as for this; hand-port", e)
+		t.todo("type assertion — port via explicit type-switch or downcast", e)
 		t.emitExpr(e.X)
 	case *ast.FuncLit:
 		t.emitFuncLit(e)
@@ -1620,7 +1652,7 @@ func (t *Transpiler) emitExpr(e ast.Expr) {
 		// Type used as value (e.g., in make([]int, ...)).
 		t.emitType(e)
 	default:
-		t.todo(fmt.Sprintf("expr %T", e), e)
+		t.todo(fmt.Sprintf("%s — hand-port", goShape(e)), e)
 	}
 }
 
@@ -1928,7 +1960,7 @@ func (t *Transpiler) emitCallExpr(e *ast.CallExpr) {
 	}
 	if e.Ellipsis.IsValid() {
 		// Go variadic splat — no direct Rust form. Flag.
-		t.todo("variadic splat f(xs...) — Rust has no splat; rewrite to explicit args or .extend", e)
+		t.todo("variadic expansion f(xs...) — no splat at the call site; rewrite with explicit args or a helper", e)
 		t.write("/* ... */")
 	}
 	t.write(")")
@@ -1979,7 +2011,7 @@ func (t *Transpiler) emitBuiltinCall(name string, e *ast.CallExpr) {
 			t.emitExpr(a)
 		}
 		if e.Ellipsis.IsValid() {
-			t.todo("append(s, xs...) — rewrite to explicit args or .extend_from_slice", e)
+			t.todo("append(s, xs...) — rewrite with variadic expansion or a helper", e)
 		}
 		t.write(")")
 	case "make":
@@ -2108,7 +2140,7 @@ func (t *Transpiler) emitCompositeLit(e *ast.CompositeLit) {
 		}
 		t.write(" }")
 	default:
-		t.todo(fmt.Sprintf("composite type %T", e.Type), e)
+		t.todo(fmt.Sprintf("composite with %s — hand-port", goShape(e.Type)), e)
 	}
 }
 
@@ -2253,7 +2285,7 @@ func (t *Transpiler) emitType(e ast.Expr) {
 		t.emitType(ty.Elt)
 		t.write("]")
 	default:
-		t.todo(fmt.Sprintf("type %T", e), e)
+		t.todo(fmt.Sprintf("%s — hand-port", goShape(e)), e)
 		t.write("()")
 	}
 }
@@ -2298,4 +2330,145 @@ func containsIdent(e ast.Expr, name string) bool {
 		return true
 	})
 	return found
+}
+
+// rootIdentName walks a chain like x, x.f, x.f.g, x[i], (x).y, *x, back to
+// the leftmost ident's Name. Returns "" if the chain doesn't bottom out at
+// a plain ident. Used by the mutability flow-analysis to pin an LHS / addr-
+// of / inc-dec expression to the binding it ultimately touches.
+func rootIdentName(e ast.Expr) string {
+	for {
+		switch x := e.(type) {
+		case *ast.Ident:
+			return x.Name
+		case *ast.SelectorExpr:
+			e = x.X
+		case *ast.IndexExpr:
+			e = x.X
+		case *ast.ParenExpr:
+			e = x.X
+		case *ast.StarExpr:
+			e = x.X
+		default:
+			return ""
+		}
+	}
+}
+
+// receiverIsMutated reports whether `body` mutates the receiver named
+// `recvName` — drives the `&self` vs `&mut self` choice for Go pointer
+// receivers. Conservative: returns true on any LHS assignment, compound
+// assign, inc/dec, or `&recv[.…]` expression rooted at the receiver.
+func receiverIsMutated(body *ast.BlockStmt, recvName string) bool {
+	if body == nil || recvName == "" {
+		return false
+	}
+	mutated := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if mutated {
+			return false
+		}
+		switch s := n.(type) {
+		case *ast.AssignStmt:
+			if s.Tok == token.DEFINE {
+				return true
+			}
+			for _, lhs := range s.Lhs {
+				if rootIdentName(lhs) == recvName {
+					mutated = true
+					return false
+				}
+			}
+		case *ast.IncDecStmt:
+			if rootIdentName(s.X) == recvName {
+				mutated = true
+				return false
+			}
+		case *ast.UnaryExpr:
+			if s.Op == token.AND && rootIdentName(s.X) == recvName {
+				mutated = true
+				return false
+			}
+		}
+		return true
+	})
+	return mutated
+}
+
+// collectMutatedLocals pre-computes the set of local names that are ever
+// reassigned, compound-assigned, inc/dec'd, or address-taken inside body.
+// Called once per function body; consulted by emitLocalDecl and the `:=`
+// path to emit `let` (default) or `let mut` (promoted on hit).
+func collectMutatedLocals(body *ast.BlockStmt) map[string]bool {
+	m := map[string]bool{}
+	if body == nil {
+		return m
+	}
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch s := n.(type) {
+		case *ast.AssignStmt:
+			if s.Tok == token.DEFINE {
+				return true
+			}
+			for _, lhs := range s.Lhs {
+				if name := rootIdentName(lhs); name != "" {
+					m[name] = true
+				}
+			}
+		case *ast.IncDecStmt:
+			if name := rootIdentName(s.X); name != "" {
+				m[name] = true
+			}
+		case *ast.UnaryExpr:
+			if s.Op == token.AND {
+				if name := rootIdentName(s.X); name != "" {
+					m[name] = true
+				}
+			}
+		}
+		return true
+	})
+	return m
+}
+
+// withFuncBody sets t.mutatedLocals from body for the duration of fn,
+// restoring the prior value afterward. Nested functions (closures) get
+// their own scope via the same helper.
+func (t *Transpiler) withFuncBody(body *ast.BlockStmt, fn func()) {
+	save := t.mutatedLocals
+	t.mutatedLocals = collectMutatedLocals(body)
+	fn()
+	t.mutatedLocals = save
+}
+
+// goShape maps a Go AST expression type to a Goish-vocabulary description
+// suitable for a user-facing TODO. Keeps the transpiler's internals out of
+// the emitted output. Unmapped shapes fall back to `%T` with a suffix so
+// users can report the gap.
+func goShape(e ast.Expr) string {
+	switch e.(type) {
+	case *ast.StructType:
+		return "inline struct literal"
+	case *ast.InterfaceType:
+		return "inline interface literal"
+	case *ast.StarExpr:
+		return "pointer expression"
+	case *ast.CompositeLit:
+		return "composite literal"
+	case *ast.ChanType:
+		return "channel type"
+	case *ast.MapType:
+		return "map type"
+	case *ast.ArrayType:
+		return "array/slice type"
+	case *ast.FuncType:
+		return "function type"
+	case *ast.FuncLit:
+		return "function literal"
+	case *ast.TypeAssertExpr:
+		return "type assertion"
+	case *ast.SliceExpr:
+		return "slice expression"
+	}
+	return fmt.Sprintf("%T (report this)", e)
 }
