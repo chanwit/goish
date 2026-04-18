@@ -302,14 +302,20 @@ func (t *Transpiler) emitStructFields(s *ast.StructType) {
 			// type's name lowercased so later ports can either (a) delegate
 			// each embedded method by hand, or (b) implement `Deref` / `DerefMut`
 			// targeting this field so callers of `s.Foo()` still resolve.
+			// Strip a leading `*` so the field type lands as `T`, not `&T` —
+			// the `Struct!` macro's `$ty:tt` slot rejects a leading reference.
 			fieldName := embeddedFieldName(f.Type)
 			msg := fmt.Sprintf("embedded %s — Goish has no method promotion; "+
 				"delegate by hand, or impl Deref<Target=%s> to reach embedded methods",
 				fieldName, goTypeString(f.Type))
 			t.todo(msg, f)
 			t.write(fieldName)
-			t.write(": ")
-			t.emitType(f.Type)
+			t.write(" ")
+			fieldType := f.Type
+			if star, ok := fieldType.(*ast.StarExpr); ok {
+				fieldType = star.X
+			}
+			t.emitType(fieldType)
 		} else {
 			for j, n := range f.Names {
 				if j > 0 {
@@ -464,7 +470,11 @@ func (t *Transpiler) emitErrorTypeFields(s *ast.StructType) {
 			t.todo(msg, f)
 			t.write(fieldName)
 			t.write(": ")
-			t.emitType(f.Type)
+			fieldType := f.Type
+			if star, ok := fieldType.(*ast.StarExpr); ok {
+				fieldType = star.X
+			}
+			t.emitType(fieldType)
 			t.writeln(",")
 			continue
 		}
@@ -2165,6 +2175,12 @@ func (t *Transpiler) emitType(e ast.Expr) {
 				t.write(mod)
 				t.write("::")
 				t.write(ty.Sel.Name)
+				// Goish sync::Mutex/RWMutex are generic over their
+				// protected data. For bare `sync.Mutex` usage (Go's
+				// "guard only" pattern), default the type param to `()`.
+				if mod == "sync" && (ty.Sel.Name == "Mutex" || ty.Sel.Name == "RWMutex") {
+					t.write("<()>")
+				}
 				return
 			}
 		}
