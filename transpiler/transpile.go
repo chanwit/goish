@@ -321,7 +321,7 @@ func (t *Transpiler) emitStructFields(s *ast.StructType) {
 			t.emitType(f.Type)
 		}
 		if i < n-1 {
-			t.writeln(",")
+			t.writeln(";")
 		} else {
 			t.nl()
 		}
