@@ -19,7 +19,38 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// A handler closure: takes a mutable `ResponseWriter` + mutable `Request`.
 /// (Go's signature is `func(ResponseWriter, *Request)` — the `*Request`
 /// is effectively mutable, so `&mut Request` is the Rust analog.)
-pub type HandlerFunc = Arc<dyn Fn(&mut ResponseWriter, &mut Request) + Send + Sync + 'static>;
+///
+/// Opaque newtype so that `HandlerFunc` doesn't leak `Arc<dyn Fn ...>`
+/// into user-facing doc/tooltips. Build one with `HandlerFunc::new(f)`
+/// or `f.into()`; invoke with `h.call(w, r)`.
+#[derive(Clone)]
+pub struct HandlerFunc(
+    #[doc(hidden)]
+    pub Arc<dyn Fn(&mut ResponseWriter, &mut Request) + Send + Sync + 'static>,
+);
+
+impl HandlerFunc {
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(&mut ResponseWriter, &mut Request) + Send + Sync + 'static,
+    {
+        HandlerFunc(Arc::new(f))
+    }
+
+    /// Invoke the handler. Hidden behind a method so call sites don't
+    /// have to deref the inner `Arc<dyn Fn>`.
+    #[allow(non_snake_case)]
+    pub fn call(&self, w: &mut ResponseWriter, r: &mut Request) {
+        (self.0)(w, r)
+    }
+}
+
+impl<F> From<F> for HandlerFunc
+where
+    F: Fn(&mut ResponseWriter, &mut Request) + Send + Sync + 'static,
+{
+    fn from(f: F) -> Self { HandlerFunc::new(f) }
+}
 
 /// Go's `http.Handler` interface. Implemented manually here so that a
 /// user-defined handler type with a `.ServeHTTP` method plugs in the
@@ -55,7 +86,7 @@ impl ServeMux {
         self.routes
             .lock()
             .unwrap()
-            .push((pattern.into(), Arc::new(f)));
+            .push((pattern.into(), HandlerFunc::new(f)));
     }
 
     /// `mux.Handle(pattern, handler)` — register a struct impl.
@@ -82,7 +113,7 @@ impl ServeMux {
 impl Handler for ServeMux {
     fn ServeHTTP(&self, w: &mut ResponseWriter, r: &mut Request) {
         match self.match_route(&r.URL.Path) {
-            Some(h) => h(w, r),
+            Some(h) => h.call(w, r),
             None => {
                 w.WriteHeader(404);
                 let _ = w.Write(b"404 page not found\n");

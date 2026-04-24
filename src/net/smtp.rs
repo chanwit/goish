@@ -110,9 +110,18 @@ impl Client<TcpStream> {
 impl<C: Read + Write + Send + 'static> Client<C> {
     /// Construct a Client from an already-paired read half and write half.
     /// Used by tests to inject in-memory pipes.
-    pub fn NewClientSplit<R: Read + 'static>(r: R, w: Box<dyn Write + Send>, _host: &str) -> (Client<NullConn>, error)
-    where R: Send {
-        let boxed = BoxedConn { inner: NullConn::with_reader(Box::new(r)), writer: Some(w) };
+    ///
+    /// Both halves take `impl Read/Write + Send + 'static` — no `Box::new`
+    /// at the call site. Internal boxing is hidden here.
+    pub fn NewClientSplit<R, W>(r: R, w: W, _host: &str) -> (Client<NullConn>, error)
+    where
+        R: Read + Send + 'static,
+        W: Write + Send + 'static,
+    {
+        let boxed = BoxedConn {
+            inner: NullConn::with_reader(Box::new(r)),
+            writer: Some(Box::new(w) as Box<dyn Write + Send>),
+        };
         let mut c = Client::<NullConn> {
             r: BufReader::new(boxed),
             localName: "localhost".into(),
