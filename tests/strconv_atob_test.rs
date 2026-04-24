@@ -46,9 +46,9 @@ test!{ fn TestParseBool(t) {
             } else {
                 // Go checks e.(*NumError).Err == test.err. We check the
                 // error message contains the sentinel's text.
-                let want_msg = format!("{}", want);
-                let got_msg = format!("{}", e);
-                if !got_msg.contains(&want_msg) {
+                let want_msg = Sprintf!("%v", want);
+                let got_msg = Sprintf!("%v", e);
+                if !strings::Contains(&got_msg, &want_msg) {
                     t.Errorf(Sprintf!("ParseBool(%s) = %s; want %s", test.In, e, want));
                 }
             }

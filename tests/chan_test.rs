@@ -6,8 +6,6 @@
 
 #![allow(non_camel_case_types, non_snake_case)]
 use goish::prelude::*;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::Arc;
 
 // ── TestChan_Buffered_TryRecvOnEmpty ──────────────────────────────────
 // Go: "Ensure that receive from empty chan blocks."
@@ -249,7 +247,7 @@ test!{ fn TestChan_CloseDrainsBuffered(t) {
 test!{ fn TestChan_ManyGoroutines(t) {
     const N: i32 = 200;
     let c = chan!(i32, 16);
-    let total = Arc::new(AtomicI32::new(0));
+    let total = sync::atomic::Int32::new(0);
 
     // Consumer first — guarantees it gets a pool slot.
     let cc = c.clone();
@@ -257,7 +255,7 @@ test!{ fn TestChan_ManyGoroutines(t) {
     let consumer = go!{
         for _ in 0..N {
             let (v, _) = cc.Recv();
-            total_c.fetch_add(v, Ordering::SeqCst);
+            total_c.Add(v);
         }
     };
 
@@ -271,7 +269,7 @@ test!{ fn TestChan_ManyGoroutines(t) {
     let _ = consumer.Wait();
 
     let expected = (N - 1) * N / 2;
-    let got = total.load(Ordering::SeqCst);
+    let got = total.Load();
     if got != expected {
         t.Errorf(Sprintf!("many goroutines sum: got %d, want %d", got, expected));
     }
@@ -286,7 +284,7 @@ test!{ fn TestChan_ManyGoroutines(t) {
 
 test!{ fn TestChan_NonblockRecvRace(t) {
     let n = 1000;
-    let errs = Arc::new(std::sync::atomic::AtomicU32::new(0));
+    let errs = sync::atomic::Uint32::new(0);
     for _ in 0..n {
         let c = chan!(i32, 1);
         let _ = c.Send(1);
@@ -295,14 +293,14 @@ test!{ fn TestChan_NonblockRecvRace(t) {
         let g = go!{
             goish::select!{
                 recv(cc) => {},
-                default => { errs_c.fetch_add(1, std::sync::atomic::Ordering::SeqCst); },
+                default => { errs_c.Add(1); },
             }
         };
         c.Close();
         let _ = c.Recv();
         let _ = g.Wait();
     }
-    let n_errs = errs.load(std::sync::atomic::Ordering::SeqCst);
+    let n_errs = errs.Load();
     if n_errs != 0 {
         t.Errorf(Sprintf!("non-blocking recv raced in %v/%v iterations", n_errs as i32, n as i32));
     }

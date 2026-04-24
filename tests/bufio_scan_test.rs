@@ -109,7 +109,7 @@ test!{ fn TestScanWords(t) {
 test!{ fn TestScanLineTooLong(t) {
     // Build a long single line exceeding MaxTokenSize (256 for test).
     let long: String = std::iter::repeat('a').take(1000).collect();
-    let input = format!("{}\n", long);
+    let input = Sprintf!("%v\n", long);
     let mut sc = bufio::NewScanner(Cursor::new(input));
     sc.Split(bufio::ScanLines);
     sc.MaxTokenSize(256);
@@ -118,7 +118,7 @@ test!{ fn TestScanLineTooLong(t) {
     if sc.Err() == &nil {
         t.Errorf(Sprintf!("expected ErrTooLong, got nil (ran=%v)", ran));
     } else {
-        let es = format!("{}", sc.Err());
+        let es = Sprintf!("%v", sc.Err());
         if !strings::Contains(&es, "too long") {
             t.Errorf(Sprintf!("expected 'too long' error, got %s", es));
         }

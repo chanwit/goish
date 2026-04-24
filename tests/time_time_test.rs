@@ -256,7 +256,7 @@ test!{ fn TestDurationString(t) {
         if tt.d > 0 {
             let neg = time::Duration::from_nanos(-tt.d as i128);
             let neg_str = neg.String();
-            let want_neg = format!("-{}", tt.s);
+            let want_neg = Sprintf!("-%v", tt.s);
             if neg_str != want_neg {
                 t.Errorf(Sprintf!("Duration(%d).String() = %s, want %s", -tt.d, neg_str, want_neg));
             }

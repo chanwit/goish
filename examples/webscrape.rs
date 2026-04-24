@@ -74,12 +74,12 @@ fn main() {
     let (out, _) = json::MarshalIndent(&summary, "", "  ");
     fmt::Println!();
     fmt::Println!("json:");
-    fmt::Println!(String::from_utf8(out.clone()).unwrap());
+    fmt::Println!(bytes::String(&out));
 
     // Checksum the normalized input.
     let joined = strings::Join(&normalized, "\n");
     let digest = crypto::sha256::Sum256(joined.as_bytes());
-    let hex_hash: string = digest.iter().map(|b| format!("{:02x}", b)).collect::<String>().into();
+    let hex_hash: string = digest.iter().map(|b| Sprintf!("%02x", b).to_string()).collect::<String>().into();
     fmt::Printf!("\nsha256 of input: %s\n", hex_hash);
 
     // Emit a CSV table of the parsed requests.

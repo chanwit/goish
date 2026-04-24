@@ -72,7 +72,7 @@ test!{ fn TestAppendInt(t) {
     ];
     for tt in &tests {
         let got = time::AppendInt(Vec::new(), tt.r#in as i64, tt.width as i64);
-        let got_s = String::from_utf8(got).unwrap();
+        let got_s = bytes::String(&got);
         if got_s != tt.want {
             t.Errorf(Sprintf!("appendInt(%d, %d) = %s, want %s", tt.r#in, tt.width, got_s, tt.want));
         }
@@ -152,9 +152,9 @@ test!{ fn TestFormatShortYear(t) {
         let tm = time::Date(y, January, 1, 0, 0, 0, 0, UTC);
         let result = tm.Format("2006.01.02");
         let want = if y < 0 {
-            format!("-{:04}.{:02}.{:02}", -y, 1, 1)
+            Sprintf!("-%04d.%02d.%02d", -y, 1, 1)
         } else {
-            format!("{:04}.{:02}.{:02}", y, 1, 1)
+            Sprintf!("%04d.%02d.%02d", y, 1, 1)
         };
         if result != want {
             t.Errorf(Sprintf!("(jan 1 %d).Format = %q, want %q", y, result, want));
@@ -231,7 +231,7 @@ fn check_time(tm: &time::Time, test: &ParseTest, t: &testing::T) {
     // Nanoseconds must be checked against the precision of the input.
     let src = "012345678";
     let pad = "000000000";
-    let nsec_str = format!("{}{}", &src[..test.frac_digits], &pad[..9 - test.frac_digits]);
+    let nsec_str = Sprintf!("%v%v", &src[..test.frac_digits], &pad[..9 - test.frac_digits]);
     let nsec: i64 = nsec_str.parse().unwrap();
     if tm.Nanosecond() as i64 != nsec {
         t.Errorf(Sprintf!("%s: bad nanosecond: %d not %d", test.name, tm.Nanosecond(), nsec));
@@ -279,7 +279,7 @@ test!{ fn TestParseDayOutOfRange(t) {
         match (test.ok, err == nil) {
             (true, true) => {}
             (false, false) => {
-                let es = format!("{}", err);
+                let es = Sprintf!("%v", err);
                 if !strings::Contains(&es, "day out of range") && !strings::Contains(&es, "month out of range") && !strings::Contains(&es, "cannot parse") {
                     t.Errorf(Sprintf!("%q: expected 'day' error, got %s", test.date, err));
                 }
@@ -409,7 +409,7 @@ test!{ fn TestParseMonthOutOfRange(t) {
         match (test.ok, err == nil) {
             (true, true) => {}
             (false, false) => {
-                let es = format!("{}", err);
+                let es = Sprintf!("%v", err);
                 if !strings::Contains(&es, "month out of range") && !strings::Contains(&es, "cannot parse") {
                     t.Errorf(Sprintf!("%q: expected 'month' error, got %s", test.value, err));
                 }
@@ -422,7 +422,7 @@ test!{ fn TestParseMonthOutOfRange(t) {
 
 test!{ fn TestParseYday(t) {
     for i in 1..=365i64 {
-        let d = format!("2020-{:03}", i);
+        let d = Sprintf!("2020-%03d", i);
         let (tm, err) = time::Parse("2006-002", &d);
         if err != nil {
             t.Errorf(Sprintf!("unexpected error for %s: %s", d, err));

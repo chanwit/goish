@@ -31,9 +31,9 @@ where F: FnOnce() + Send + 'static
 
 test!{ fn TestGetSimple(t) {
     let port = next_port();
-    let addr = format!("127.0.0.1:{}", port);
-    let path = format!("/hello-{}", port);
-    let url_ = format!("http://{}{}", addr, path);
+    let addr = Sprintf!("127.0.0.1:%v", port);
+    let path = Sprintf!("/hello-%v", port);
+    let url_ = Sprintf!("http://%v%v", addr, path);
     let path_clone = path.clone();
     start_server(&addr, move || {
         http::HandleFunc(&path_clone, move |w, _r| {
@@ -55,8 +55,8 @@ test!{ fn TestGetSimple(t) {
 
 test!{ fn TestGetStatusCodes(t) {
     let port = next_port();
-    let addr = format!("127.0.0.1:{}", port);
-    let url_ = format!("http://{}/teapot", addr);
+    let addr = Sprintf!("127.0.0.1:%v", port);
+    let url_ = Sprintf!("http://%v/teapot", addr);
     start_server(&addr, move || {
         http::HandleFunc("/teapot", move |w, _r| {
             w.WriteHeader(http::StatusTeapot);
@@ -74,13 +74,13 @@ test!{ fn TestGetStatusCodes(t) {
 
 test!{ fn TestPostForm(t) {
     let port = next_port();
-    let addr = format!("127.0.0.1:{}", port);
-    let url_ = format!("http://{}/echo", addr);
+    let addr = Sprintf!("127.0.0.1:%v", port);
+    let url_ = Sprintf!("http://%v/echo", addr);
     start_server(&addr, move || {
         http::HandleFunc("/echo", move |w, r| {
             let method = r.Method.clone();
             let body = r.Body.String();
-            let _ = w.Write(format!("{} body={}", method, body).as_bytes());
+            let _ = w.Write(Sprintf!("%v body=%v", method, body).as_bytes());
         });
     });
 
@@ -98,8 +98,8 @@ test!{ fn TestPostForm(t) {
 
 test!{ fn TestResponseHeader(t) {
     let port = next_port();
-    let addr = format!("127.0.0.1:{}", port);
-    let url_ = format!("http://{}/hdr", addr);
+    let addr = Sprintf!("127.0.0.1:%v", port);
+    let url_ = Sprintf!("http://%v/hdr", addr);
     start_server(&addr, move || {
         http::HandleFunc("/hdr", move |w, _r| {
             w.Header().Set("X-Custom", "goish");
@@ -127,8 +127,8 @@ test!{ fn TestClientGetMissing(t) {
 
 test!{ fn TestDoCustomMethod(t) {
     let port = next_port();
-    let addr = format!("127.0.0.1:{}", port);
-    let url_ = format!("http://{}/m", addr);
+    let addr = Sprintf!("127.0.0.1:%v", port);
+    let url_ = Sprintf!("http://%v/m", addr);
     start_server(&addr, move || {
         http::HandleFunc("/m", move |w, r| {
             let _ = w.Write(r.Method.as_bytes());
@@ -148,14 +148,14 @@ test!{ fn TestDoCustomMethod(t) {
 
 test!{ fn TestServeMuxPaths(t) {
     let port = next_port();
-    let addr = format!("127.0.0.1:{}", port);
+    let addr = Sprintf!("127.0.0.1:%v", port);
     start_server(&addr, move || {
         http::HandleFunc("/a", move |w, _r| { let _ = w.Write(b"A"); });
         http::HandleFunc("/b", move |w, _r| { let _ = w.Write(b"B"); });
     });
 
-    let (mut ra, _) = http::Get(&format!("http://{}/a", addr));
-    let (mut rb, _) = http::Get(&format!("http://{}/b", addr));
+    let (mut ra, _) = http::Get(&Sprintf!("http://%v/a", addr));
+    let (mut rb, _) = http::Get(&Sprintf!("http://%v/b", addr));
     let a = ra.Body.String();
     let b = rb.Body.String();
     if a != "A" || b != "B" {

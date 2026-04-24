@@ -41,7 +41,7 @@ test!{ fn TestReader(t) {
                 t.Errorf(Sprintf!("%d. want seek error %q", i, tt.seek_err));
                 continue;
             }
-            if format!("{}", err) != tt.seek_err {
+            if Sprintf!("%v", err) != tt.seek_err {
                 t.Errorf(Sprintf!("%d. seek error = %q; want %q", i, err, tt.seek_err));
                 continue;
             }
@@ -56,7 +56,7 @@ test!{ fn TestReader(t) {
         }
         let mut buf = vec![0u8; tt.n];
         let (n, err) = r.Read(&mut buf);
-        let got_eof = format!("{}", err) == "EOF";
+        let got_eof = Sprintf!("%v", err) == "EOF";
         if tt.read_eof && !got_eof {
             t.Errorf(Sprintf!("%d. read err = %v; want EOF", i, err));
             continue;
@@ -78,7 +78,7 @@ test!{ fn TestReadAfterBigSeek(t) {
     if err != nil { t.Fatal(Sprintf!("seek: %s", err)); }
     let mut buf = [0u8; 10];
     let (n, err) = r.Read(&mut buf);
-    if n != 0 || format!("{}", err) != "EOF" {
+    if n != 0 || Sprintf!("%v", err) != "EOF" {
         t.Errorf(Sprintf!("Read = %d, %v; want 0, EOF", n, err));
     }
 }}

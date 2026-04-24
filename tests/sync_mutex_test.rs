@@ -12,8 +12,6 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Arc;
 
 fn hammer_mutex(m: sync::Mutex<()>, loops: i64) {
     for i in 0..loops {
@@ -47,10 +45,10 @@ test!{ fn TestMutex(t) {
         wg.Add(1);
         let mu = m.clone();
         let w = wg.clone();
-        std::thread::spawn(move || {
+        go!{
             hammer_mutex(mu, 1000);
             w.Done();
-        });
+        };
     }
     wg.Wait();
     let _ = t;
@@ -65,13 +63,13 @@ test!{ fn TestMutexConcurrentCounter(t) {
         wg.Add(1);
         let mu = m.clone();
         let w = wg.clone();
-        std::thread::spawn(move || {
+        go!{
             for _ in 0..1000 {
                 let mut g = mu.Lock();
                 *g += 1;
             }
             w.Done();
-        });
+        };
     }
     wg.Wait();
     let final_ = *m.Lock();
@@ -95,22 +93,22 @@ test!{ fn TestMutexTryLock(t) {
 test!{ fn TestRWMutexReaders(t) {
     let rw = sync::RWMutex::new(0i64);
     let wg = sync::WaitGroup::new();
-    let reads = Arc::new(AtomicI64::new(0));
+    let reads = sync::atomic::Int64::new(0);
     for _ in 0..20 {
         wg.Add(1);
         let w = wg.clone();
         let r = rw.clone();
         let c = reads.clone();
-        std::thread::spawn(move || {
+        go!{
             let g = r.RLock();
             let _ = *g;
-            c.fetch_add(1, Ordering::SeqCst);
+            c.Add(1);
             w.Done();
-        });
+        };
     }
     wg.Wait();
-    if reads.load(Ordering::SeqCst) != 20 {
-        t.Errorf(Sprintf!("reads = %d", reads.load(Ordering::SeqCst)));
+    if reads.Load() != 20 {
+        t.Errorf(Sprintf!("reads = %d", reads.Load()));
     }
 }}
 

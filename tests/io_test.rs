@@ -67,7 +67,7 @@ test!{ fn TestReadAtLeastUnexpectedEOF(t) {
     let mut buf = [0u8; 4];
     let (n, err) = gio::ReadAtLeast(&mut src, &mut buf, 4);
     if err == nil { t.Errorf(Sprintf!("expected err, got nil (n=%d)", n)); }
-    let es = format!("{}", err);
+    let es = Sprintf!("%v", err);
     if !strings::Contains(&es, "unexpected EOF") && !strings::Contains(&es, "EOF") {
         t.Errorf(Sprintf!("expected EOF-related error, got %s", es));
     }

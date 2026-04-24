@@ -21,7 +21,7 @@ test!{ fn TestMkdirReadFileWriteFile(t) {
     if os::MkdirAll(&dir, 0o755) != nil {
         t.Fatal(Sprintf!("MkdirAll: %s", dir));
     }
-    let p = format!("{}/hello.txt", dir);
+    let p = Sprintf!("%v/hello.txt", dir);
     if os::WriteFile(&p, b"hello, world", 0o644) != nil {
         t.Fatal("WriteFile");
     }
@@ -62,7 +62,7 @@ test!{ fn TestOpenMissingFile(t) {
 test!{ fn TestCreateWriteReadBack(t) {
     let dir = tempdir();
     os::MkdirAll(&dir, 0o755);
-    let path = format!("{}/cwrb.txt", dir);
+    let path = Sprintf!("%v/cwrb.txt", dir);
     let (mut f, err) = os::Create(&path);
     if err != nil { t.Fatal(Sprintf!("Create: %s", err)); }
     let (n, werr) = f.Write(b"payload");
@@ -88,8 +88,8 @@ test!{ fn TestArgsHasProgramName(t) {
 
 test!{ fn TestRemoveAll(t) {
     let dir = tempdir();
-    os::MkdirAll(&format!("{}/a/b/c", dir), 0o755);
-    os::WriteFile(&format!("{}/a/b/c/file.txt", dir), b"x", 0o644);
+    os::MkdirAll(&Sprintf!("%v/a/b/c", dir), 0o755);
+    os::WriteFile(&Sprintf!("%v/a/b/c/file.txt", dir), b"x", 0o644);
     let err = os::RemoveAll(&dir);
     if err != nil { t.Errorf(Sprintf!("RemoveAll: %s", err)); }
     let (_, err) = os::Open(&dir);

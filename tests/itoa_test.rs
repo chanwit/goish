@@ -65,8 +65,8 @@ test!{ fn TestItoa(t) {
                 test.in_, test.base, s, test.out));
         }
         let x = strconv::AppendInt(b"abc".to_vec(), test.in_, test.base);
-        let xs = String::from_utf8(x).unwrap();
-        let want = format!("abc{}", test.out);
+        let xs = bytes::String(&x);
+        let want = Sprintf!("abc%v", test.out);
         if xs != want {
             t.Errorf(Sprintf!("AppendInt(%q, %v, %v) = %q want %v",
                 "abc", test.in_, test.base, xs, test.out));
@@ -79,7 +79,7 @@ test!{ fn TestItoa(t) {
                     test.in_, test.base, s, test.out));
             }
             let x = strconv::AppendUint(Vec::new(), test.in_ as u64, test.base);
-            let xs = String::from_utf8(x).unwrap();
+            let xs = bytes::String(&x);
             if xs != test.out {
                 t.Errorf(Sprintf!("AppendUint(%q, %v, %v) = %q want %v",
                     "abc", test.in_ as u64, test.base, xs, test.out));
@@ -130,8 +130,8 @@ test!{ fn TestUitoa(t) {
                 test.in_, test.base, s, test.out));
         }
         let x = strconv::AppendUint(b"abc".to_vec(), test.in_, test.base);
-        let xs = String::from_utf8(x).unwrap();
-        let want = format!("abc{}", test.out);
+        let xs = bytes::String(&x);
+        let want = Sprintf!("abc%v", test.out);
         if xs != want {
             t.Errorf(Sprintf!("AppendUint(%q, %v, %v) = %q want %v",
                 "abc", test.in_, test.base, xs, test.out));

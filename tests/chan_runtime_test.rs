@@ -9,8 +9,6 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Arc;
 
 test!{ fn TestSelfSelect(t) {
     // Send and recv on the same chan in a select must not deadlock.
@@ -94,7 +92,7 @@ test!{ fn TestPseudoRandomSend(t) {
     // Drain both channels through a select; verify both are chosen.
     let a: Chan<i64> = chan!(i64, 4);
     let b: Chan<i64> = chan!(i64, 4);
-    let counts = Arc::new((AtomicI64::new(0), AtomicI64::new(0)));
+    let counts = (sync::atomic::Int64::new(0), sync::atomic::Int64::new(0));
 
     // Pre-fill both buffers.
     for _ in 0..4 { a.Send(1); b.Send(2); }
@@ -102,13 +100,13 @@ test!{ fn TestPseudoRandomSend(t) {
     let cntc = counts.clone();
     for _ in 0..8 {
         select! {
-            recv(a) |v| => { let _ = v; cntc.0.fetch_add(1, Ordering::SeqCst); },
-            recv(b) |v| => { let _ = v; cntc.1.fetch_add(1, Ordering::SeqCst); },
+            recv(a) |v| => { let _ = v; cntc.0.Add(1); },
+            recv(b) |v| => { let _ = v; cntc.1.Add(1); },
         }
     }
 
-    let ca = counts.0.load(Ordering::SeqCst);
-    let cb = counts.1.load(Ordering::SeqCst);
+    let ca = counts.0.Load();
+    let cb = counts.1.Load();
     if ca + cb != 8 {
         t.Errorf(Sprintf!("total = %d, want 8", ca + cb));
     }

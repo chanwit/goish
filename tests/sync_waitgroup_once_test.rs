@@ -5,8 +5,6 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::Arc;
 
 test!{ fn TestWaitGroup(t) {
     let wg1 = sync::WaitGroup::new();
@@ -14,19 +12,19 @@ test!{ fn TestWaitGroup(t) {
     for _ in 0..16 {
         wg1.Add(1);
         wg2.Add(1);
-        let n = Arc::new(AtomicI64::new(0));
+        let n = sync::atomic::Int64::new(0);
         let n1 = n.clone();
         let n2 = n.clone();
         let w1 = wg1.clone();
         let w2 = wg2.clone();
-        std::thread::spawn(move || {
-            n1.fetch_add(1, Ordering::SeqCst);
+        go!{
+            n1.Add(1);
             w1.Done();
-        });
-        std::thread::spawn(move || {
-            n2.fetch_add(1, Ordering::SeqCst);
+        };
+        go!{
+            n2.Add(1);
             w2.Done();
-        });
+        };
     }
     wg1.Wait();
     wg2.Wait();
@@ -40,10 +38,10 @@ test!{ fn TestWaitGroupReuse(t) {
         wg.Add(4);
         for _ in 0..4 {
             let w = wg.clone();
-            std::thread::spawn(move || {
+            go!{
                 std::thread::sleep(std::time::Duration::from_millis(5));
                 w.Done();
-            });
+            };
         }
         wg.Wait();
     }
@@ -61,7 +59,7 @@ struct OneT { f: fn(), called: i64 }
 
 test!{ fn TestOnce(t) {
     let once = sync::Once::new();
-    let counter = Arc::new(AtomicI64::new(0));
+    let counter = sync::atomic::Int64::new(0);
     // Spawn 100 goroutines each attempting Do; only one call should run.
     let wg = sync::WaitGroup::new();
     for _ in 0..100 {
@@ -69,14 +67,14 @@ test!{ fn TestOnce(t) {
         let o = once.clone();
         let c = counter.clone();
         let w = wg.clone();
-        std::thread::spawn(move || {
-            o.Do(move || { c.fetch_add(1, Ordering::SeqCst); });
+        go!{
+            o.Do(move || { c.Add(1); });
             w.Done();
-        });
+        };
     }
     wg.Wait();
-    if counter.load(Ordering::SeqCst) != 1 {
-        t.Errorf(Sprintf!("Once ran %d times, want 1", counter.load(Ordering::SeqCst)));
+    if counter.Load() != 1 {
+        t.Errorf(Sprintf!("Once ran %d times, want 1", counter.Load()));
     }
 }}
 
@@ -96,12 +94,12 @@ test!{ fn TestOnceDistinct(t) {
     // Two different Once values run their bodies independently.
     let o1 = sync::Once::new();
     let o2 = sync::Once::new();
-    let count = Arc::new(AtomicI64::new(0));
+    let count = sync::atomic::Int64::new(0);
     let c1 = count.clone(); let c2 = count.clone();
-    o1.Do(move || { c1.fetch_add(1, Ordering::SeqCst); });
-    o2.Do(move || { c2.fetch_add(1, Ordering::SeqCst); });
-    if count.load(Ordering::SeqCst) != 2 {
-        t.Errorf(Sprintf!("distinct Once total = %d, want 2", count.load(Ordering::SeqCst)));
+    o1.Do(move || { c1.Add(1); });
+    o2.Do(move || { c2.Add(1); });
+    if count.Load() != 2 {
+        t.Errorf(Sprintf!("distinct Once total = %d, want 2", count.Load()));
     }
     // Let OneT unused helper avoid dead_code.
     let _ = OneT { f: || {}, called: 0 };

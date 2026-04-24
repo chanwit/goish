@@ -34,7 +34,9 @@ fn parseUint64Tests() -> Vec<PUTest> { vec![
 ]}
 
 fn err_matches(got: &error, want: &error) -> bool {
-    format!("{}", got).contains(&format!("{}", want))
+    let g = Sprintf!("%v", got);
+    let w = Sprintf!("%v", want);
+    strings::Contains(&g, &w)
 }
 
 test!{ fn TestParseUint64(t) {
@@ -236,8 +238,8 @@ test!{ fn TestAtoi(t) {
     for s in bad {
         let (_, err) = strconv::Atoi(s);
         if err == nil { t.Errorf(Sprintf!("Atoi(%q) err = nil; want error", s)); }
-        let msg = format!("{}", err);
-        if !msg.contains("strconv.Atoi") {
+        let msg = Sprintf!("%v", err);
+        if !strings::Contains(&msg, "strconv.Atoi") {
             t.Errorf(Sprintf!("Atoi(%q) err does not say 'strconv.Atoi': %s", s, err));
         }
     }

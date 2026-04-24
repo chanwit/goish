@@ -59,7 +59,7 @@ test!{ fn TestErrorf(t) {
     ];
 
     for c in cases {
-        let got_text = format!("{}", c.err);
+        let got_text = Sprintf!("%v", c.err);
         if got_text != c.want_text {
             t.Errorf(Sprintf!("err.Error() = %q, want %q", got_text, c.want_text));
         }

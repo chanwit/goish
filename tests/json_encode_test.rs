@@ -36,7 +36,7 @@ test!{ fn TestEncodeString(t) {
     for tt in &tests {
         let (bytes_, err) = json::Marshal(&Value::String(tt.r#in.into()));
         if err != nil { t.Errorf(Sprintf!("Marshal(%q) error: %s", tt.r#in, err)); continue; }
-        let got = String::from_utf8(bytes_).unwrap();
+        let got = bytes::String(&bytes_);
         if got != tt.out {
             t.Errorf(Sprintf!("Marshal(%q) = %q, want %q", tt.r#in, got, tt.out));
         }
@@ -48,7 +48,7 @@ test!{ fn TestHTMLEscape(t) {
     let want = "{\"M\":\"\\u003chtml\\u003efoo \\u0026\\u2028 \\u2029\\u003c/html\\u003e\"}";
     let mut b: Vec<u8> = Vec::new();
     json::HTMLEscape(&mut b, m.as_bytes());
-    let got = String::from_utf8(b).unwrap();
+    let got = bytes::String(&b);
     if got != want {
         t.Errorf(Sprintf!("HTMLEscape:\n\tgot:  %s\n\twant: %s", got, want));
     }
@@ -57,7 +57,7 @@ test!{ fn TestHTMLEscape(t) {
 test!{ fn TestMarshalNull(t) {
     let (b, err) = json::Marshal(&Value::Null);
     if err != nil { t.Errorf(Sprintf!("Marshal(Null) error: %s", err)); }
-    let s = String::from_utf8(b).unwrap();
+    let s = bytes::String(&b);
     if s != "null" {
         t.Errorf(Sprintf!("Marshal(Null) = %q, want null", s));
     }
@@ -65,21 +65,21 @@ test!{ fn TestMarshalNull(t) {
 
 test!{ fn TestMarshalBool(t) {
     let (b, _) = json::Marshal(&Value::Bool(true));
-    assert_eq_s(t, &String::from_utf8(b).unwrap(), "true");
+    assert_eq_s(t, &bytes::String(&b), "true");
     let (b, _) = json::Marshal(&Value::Bool(false));
-    assert_eq_s(t, &String::from_utf8(b).unwrap(), "false");
+    assert_eq_s(t, &bytes::String(&b), "false");
 }}
 
 test!{ fn TestMarshalNumber(t) {
     let (b, _) = json::Marshal(&Value::Number(42.0));
-    assert_eq_s(t, &String::from_utf8(b).unwrap(), "42");
+    assert_eq_s(t, &bytes::String(&b), "42");
     let (b, _) = json::Marshal(&Value::Number(3.14));
-    let s = String::from_utf8(b).unwrap();
+    let s = bytes::String(&b);
     if !s.starts_with("3.14") {
         t.Errorf(Sprintf!("Marshal(3.14) = %q, want starts with 3.14", s));
     }
     let (b, _) = json::Marshal(&Value::Number(-0.5));
-    assert_eq_s(t, &String::from_utf8(b).unwrap(), "-0.5");
+    assert_eq_s(t, &bytes::String(&b), "-0.5");
 }}
 
 test!{ fn TestMarshalArray(t) {
@@ -87,7 +87,7 @@ test!{ fn TestMarshalArray(t) {
         Value::Number(1.0), Value::Number(2.0), Value::Number(3.0),
     ]);
     let (b, _) = json::Marshal(&v);
-    assert_eq_s(t, &String::from_utf8(b).unwrap(), "[1,2,3]");
+    assert_eq_s(t, &bytes::String(&b), "[1,2,3]");
 }}
 
 test!{ fn TestMarshalObjectPreservesInsertionOrder(t) {
@@ -97,7 +97,7 @@ test!{ fn TestMarshalObjectPreservesInsertionOrder(t) {
     v.Set("b", Value::Number(2.0));
     v.Set("c", Value::Number(3.0));
     let (b, _) = json::Marshal(&v);
-    let s = String::from_utf8(b).unwrap();
+    let s = bytes::String(&b);
     if s != "{\"a\":1,\"b\":2,\"c\":3}" {
         t.Errorf(Sprintf!("Marshal(ordered) = %q, want a,b,c ordered", s));
     }
@@ -111,7 +111,7 @@ test!{ fn TestUnsupportedValues(t) {
     let (b, err2) = json::Marshal(&Value::Number(f64::INFINITY));
     if err == nil && err2 == nil {
         // then at least check that the output for NaN/Inf is null, not a bogus finite number.
-        let s = String::from_utf8(b).unwrap();
+        let s = bytes::String(&b);
         if s != "null" {
             t.Errorf(Sprintf!("Marshal(+Inf) = %q, want null or error", s));
         }
@@ -124,7 +124,7 @@ test!{ fn TestMarshalIndent(t) {
     v.Set("y", Value::Number(2.0));
     let (b, err) = json::MarshalIndent(&v, "", "  ");
     if err != nil { t.Errorf(Sprintf!("MarshalIndent error: %s", err)); }
-    let s = String::from_utf8(b).unwrap();
+    let s = bytes::String(&b);
     if !s.contains("\n  \"x\"") || !s.contains("\n  \"y\"") {
         t.Errorf(Sprintf!("MarshalIndent output missing expected lines: %q", s));
     }
@@ -135,7 +135,7 @@ test!{ fn TestCompact(t) {
     let mut out = Vec::new();
     let err = json::Compact(&mut out, pretty);
     if err != nil { t.Errorf(Sprintf!("Compact error: %s", err)); }
-    let got = String::from_utf8(out).unwrap();
+    let got = bytes::String(&out);
     if got != "{\"x\":1,\"y\":2}" {
         t.Errorf(Sprintf!("Compact = %q, want compact form", got));
     }
@@ -146,7 +146,7 @@ test!{ fn TestIndent(t) {
     let mut out = Vec::new();
     let err = json::Indent(&mut out, compact, "", "  ");
     if err != nil { t.Errorf(Sprintf!("Indent error: %s", err)); }
-    let got = String::from_utf8(out).unwrap();
+    let got = bytes::String(&out);
     if !got.contains("\n  \"a\"") {
         t.Errorf(Sprintf!("Indent did not produce pretty output: %q", got));
     }
@@ -158,7 +158,7 @@ test!{ fn TestMarshalRawMessageValue(t) {
     let mut v = Value::Object(vec![]);
     v.Set("Answer", Value::Number(42.0));
     let (b, _) = json::Marshal(&v);
-    let s = String::from_utf8(b).unwrap();
+    let s = bytes::String(&b);
     if s != "{\"Answer\":42}" {
         t.Errorf(Sprintf!("got %q want %q", s, "{\"Answer\":42}"));
     }
@@ -173,7 +173,7 @@ test!{ fn TestMarshalNestedObject(t) {
         ("n".into(), Value::Number(7.0)),
     ]);
     let (b, _) = json::Marshal(&outer);
-    assert_eq_s(t, &String::from_utf8(b).unwrap(),
+    assert_eq_s(t, &bytes::String(&b),
                 "{\"inner\":{\"k\":\"v\"},\"n\":7}");
 }}
 
@@ -185,7 +185,7 @@ test!{ fn TestMarshalEmpties(t) {
     ];
     for (v, want) in cases {
         let (b, _) = json::Marshal(&v);
-        assert_eq_s(t, &String::from_utf8(b).unwrap(), want);
+        assert_eq_s(t, &bytes::String(&b), want);
     }
 }}
 

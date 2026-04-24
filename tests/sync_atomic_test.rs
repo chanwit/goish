@@ -8,7 +8,6 @@
 #![allow(non_snake_case)]
 use goish::prelude::*;
 use goish::sync::atomic;
-use std::sync::Arc;
 
 test!{ fn TestSwapInt32(t) {
     let x = atomic::Int32::new(0);
@@ -118,10 +117,10 @@ test!{ fn TestConcurrentIncrement(t) {
         wg.Add(1);
         let n = x.clone();
         let w = wg.clone();
-        std::thread::spawn(move || {
+        go!{
             for _ in 0..100 { n.Add(1); }
             w.Done();
-        });
+        };
     }
     wg.Wait();
     if x.Load() != 10_000 {
@@ -132,23 +131,23 @@ test!{ fn TestConcurrentIncrement(t) {
 test!{ fn TestConcurrentCAS(t) {
     // 10 goroutines racing to CAS 0→1. Only one should succeed.
     let x = atomic::Int32::new(0);
-    let wins = Arc::new(std::sync::atomic::AtomicI64::new(0));
+    let wins = sync::atomic::Int64::new(0);
     let wg = sync::WaitGroup::new();
     for _ in 0..10 {
         wg.Add(1);
         let n = x.clone();
         let w = wg.clone();
         let c = wins.clone();
-        std::thread::spawn(move || {
+        go!{
             if n.CompareAndSwap(0, 1) {
-                c.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                c.Add(1);
             }
             w.Done();
-        });
+        };
     }
     wg.Wait();
-    if wins.load(std::sync::atomic::Ordering::SeqCst) != 1 {
+    if wins.Load() != 1 {
         t.Errorf(Sprintf!("CAS winners = %d, want 1",
-            wins.load(std::sync::atomic::Ordering::SeqCst)));
+            wins.Load()));
     }
 }}

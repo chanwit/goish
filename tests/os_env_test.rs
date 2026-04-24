@@ -71,7 +71,7 @@ test!{ fn TestLookupEnv(t) {
 
 test!{ fn TestUnsetenv(t) {
     const TEST_KEY: &str = "GOISH_TEST_UNSETENV";
-    let prefix = format!("{}=", TEST_KEY);
+    let prefix = Sprintf!("%v=", TEST_KEY);
     let is_set = || -> bool {
         for k in os::Environ() { if strings::HasPrefix(&k, &prefix) { return true; } }
         false

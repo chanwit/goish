@@ -146,7 +146,7 @@ test!{ fn TestReplaceAllFunc(t) {
     ];
     for (pat, input, want) in cases {
         let re = regexp::MustCompile(pat);
-        let got = re.ReplaceAllStringFunc(input, |s| format!("x{}y", s).into());
+        let got = re.ReplaceAllStringFunc(input, |s| Sprintf!("x%vy", s));
         if got != want {
             t.Errorf(Sprintf!("ReplaceAllStringFunc(%q, %q) = %q want %q",
                 pat, input, got, want));
@@ -170,7 +170,7 @@ test!{ fn TestQuoteMeta(t) {
         }
         if !tc.pattern.is_empty() {
             let re = regexp::MustCompile(&quoted);
-            let src = format!("abc{}def", tc.pattern);
+            let src = Sprintf!("abc%vdef", tc.pattern);
             let replaced = re.ReplaceAllString(&src, "xyz");
             if replaced != "abcxyzdef" {
                 t.Errorf(Sprintf!("QuoteMeta then Replace = %q", replaced));

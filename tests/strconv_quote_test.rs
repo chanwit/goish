@@ -32,7 +32,7 @@ test!{ fn TestQuote(t) {
         }
         let ab = strconv::AppendQuote(b"abc".to_vec(), tt.r#in);
         let got = std::str::from_utf8(&ab).unwrap();
-        let want = format!("abc{}", tt.out);
+        let want = Sprintf!("abc%v", tt.out);
         if got != want {
             t.Errorf(Sprintf!("AppendQuote(%q, %q) = %s, want %s", "abc", tt.r#in, got, want));
         }
@@ -47,7 +47,7 @@ test!{ fn TestQuoteToASCII(t) {
         }
         let ab = strconv::AppendQuoteToASCII(b"abc".to_vec(), tt.r#in);
         let got = std::str::from_utf8(&ab).unwrap();
-        let want = format!("abc{}", tt.ascii);
+        let want = Sprintf!("abc%v", tt.ascii);
         if got != want {
             t.Errorf(Sprintf!("AppendQuoteToASCII(%q, %q) = %s, want %s", "abc", tt.r#in, got, want));
         }

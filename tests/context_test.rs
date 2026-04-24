@@ -8,8 +8,6 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 
 test!{ fn TestBackground(t) {
@@ -30,7 +28,7 @@ test!{ fn TestWithCancel(t) {
         if ctx.Err() != nil { break; }
         std::thread::sleep(Duration::from_millis(1));
     }
-    let es = format!("{}", ctx.Err());
+    let es = Sprintf!("%v", ctx.Err());
     if !strings::Contains(&es, "canceled") && !strings::Contains(&es, "Canceled") {
         t.Errorf(Sprintf!("WithCancel.Err() = %s, want 'canceled'", es));
     }
@@ -39,16 +37,16 @@ test!{ fn TestWithCancel(t) {
 test!{ fn TestWithCancelDone(t) {
     let (ctx, cancel) = context::WithCancel(context::Background());
     let done = ctx.Done();
-    let flag = Arc::new(AtomicBool::new(false));
+    let flag = sync::atomic::Bool::new(false);
     let f = flag.clone();
-    std::thread::spawn(move || {
+    go!{
         let _ = done.Recv();
-        f.store(true, Ordering::SeqCst);
-    });
+        f.Store(true);
+    };
     std::thread::sleep(Duration::from_millis(10));
     cancel.call();
     std::thread::sleep(Duration::from_millis(50));
-    if !flag.load(Ordering::SeqCst) {
+    if !flag.Load() {
         t.Errorf(Sprintf!("Done channel did not fire after cancel"));
     }
 }}

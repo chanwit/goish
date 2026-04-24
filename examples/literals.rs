@@ -55,12 +55,12 @@ fn main() {
     // Producer thread (stand-in for `go func() { ... }()`).
     let producer = jobs.clone();
     let signaller = done.clone();
-    std::thread::spawn(move || {
+    go!{
         for i in 1..=4 {
             producer.Send(i * 10);
         }
         signaller.Send(true);
-    });
+    };
 
     // Consumer (main).
     for _ in 0..4 {

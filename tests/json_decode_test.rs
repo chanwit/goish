@@ -173,7 +173,7 @@ test!{ fn TestUnmarshalRoundtrip(t) {
         if err != nil { t.Errorf(Sprintf!("Unmarshal(%q): %s", s, err)); continue; }
         let (b, err) = json::Marshal(&v);
         if err != nil { t.Errorf(Sprintf!("Marshal after Unmarshal(%q): %s", s, err)); continue; }
-        let got = String::from_utf8(b).unwrap();
+        let got = bytes::String(&b);
         if got != s {
             t.Errorf(Sprintf!("roundtrip: %q → %q", s, got));
         }
@@ -202,7 +202,7 @@ test!{ fn TestSkipArrayObjects(t) {
 
 test!{ fn TestLargeString(t) {
     let big = "a".repeat(10000);
-    let input = format!("\"{}\"", big);
+    let input = Sprintf!("\"%v\"", big);
     let mut v = Value::Null;
     json::Unmarshal(input.as_bytes(), &mut v);
     if v.String().len() != 10000 {

@@ -4,7 +4,7 @@
 
 #![allow(non_snake_case)]
 use goish::prelude::*;
-use std::sync::atomic::{AtomicI64, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
 // ── Bug 1: Fairness ──────────────────────────────────────────────────
@@ -42,7 +42,7 @@ test!{ fn TestSelectFairness(t) {
 // makes the panic participate in the random pick.
 
 test!{ fn TestSelectSendOnClosedPanics(t) {
-    let panicked = Arc::new(AtomicBool::new(false));
+    let panicked = sync::atomic::Bool::new(false);
     let p = panicked.clone();
     let handle = std::thread::spawn(move || {
         let c: Chan<i64> = chan!(i64, 1);
@@ -55,10 +55,10 @@ test!{ fn TestSelectSendOnClosedPanics(t) {
         }
     });
     match handle.join() {
-        Err(_) => { p.store(true, Ordering::SeqCst); }
+        Err(_) => { p.Store(true); }
         Ok(_) => {}
     }
-    if !panicked.load(Ordering::SeqCst) {
+    if !panicked.Load() {
         t.Errorf(Sprintf!("select with send to closed channel should have panicked"));
     }
 }}
@@ -106,12 +106,12 @@ test!{ fn TestSelectWakeLatency(t) {
     let cc = c.clone();
     let send_at: Arc<Mutex<Option<std::time::Instant>>> = Arc::new(Mutex::new(None));
     let sa = send_at.clone();
-    std::thread::spawn(move || {
+    go!{
         std::thread::sleep(std::time::Duration::from_millis(10));
         // Timestamp the moment just before the rendezvous completes.
         *sa.lock().unwrap() = Some(std::time::Instant::now());
         cc.Send(42);
-    });
+    };
     let mut got: i64 = 0;
     select! {
         recv(c) |v| => { got = v; },

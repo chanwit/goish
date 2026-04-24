@@ -103,12 +103,10 @@ test!{ fn TestTimerStopBeforeFire(t) {
 }}
 
 test!{ fn TestAfterFunc(t) {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
-    let ran = Arc::new(AtomicBool::new(false));
+    let ran = sync::atomic::Bool::new(false);
     let r = ran.clone();
     let _timer = time::AfterFunc(Millisecond * 20i64, move || {
-        r.store(true, Ordering::SeqCst);
+        r.Store(true);
     });
     // Poll up to 2s. Fast local machines observe the callback within
     // ~25ms; loaded CI runners can need several hundred ms for the
@@ -116,10 +114,10 @@ test!{ fn TestAfterFunc(t) {
     // path fast while giving CI enough headroom to avoid false
     // negatives.
     let deadline = std::time::Instant::now() + std::time::Duration::from_millis(2000);
-    while !ran.load(Ordering::SeqCst) && std::time::Instant::now() < deadline {
+    while !ran.Load() && std::time::Instant::now() < deadline {
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
-    if !ran.load(Ordering::SeqCst) {
+    if !ran.Load() {
         t.Errorf(Sprintf!("AfterFunc callback did not run within 2s"));
     }
 }}
