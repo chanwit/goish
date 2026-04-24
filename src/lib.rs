@@ -121,8 +121,11 @@ pub mod __goish_inventory {
 pub mod chan;
 #[doc(hidden)]
 pub mod clone_dyn;
+// Name-mangled so it doesn't pollute the user's namespace. `Interface!`
+// expands to `::goish::__DynClone` internally — user call sites never
+// see or type "DynClone".
 #[doc(hidden)]
-pub use clone_dyn::DynClone;
+pub use clone_dyn::DynClone as __DynClone;
 pub mod consts;
 pub mod defer;
 pub mod gostring;
@@ -166,7 +169,7 @@ pub mod prelude {
     pub use crate::encoding;
     pub use crate::errors::{self, error, nil, GoishError, IsNil};
     #[doc(hidden)]
-    pub use crate::clone_dyn::DynClone;
+    pub use crate::clone_dyn::DynClone as __DynClone;
     pub use crate::{Interface, ErrorType};
     pub use crate::flag;
     pub use crate::fmt;

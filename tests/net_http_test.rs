@@ -251,7 +251,7 @@ fn handler_can_select_on_request_context() {
         let wp = worker.clone();
         let _g = go!{
             time::Sleep(time::Millisecond * 10i64);
-            wp.Send("done".into());
+            wp.Send("done");
         };
         select!{
             recv(worker) |v| => { let _ = w.Write(v.as_bytes()); },

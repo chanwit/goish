@@ -641,7 +641,7 @@ fn interface_decl_emit(d: InterfaceDecl) -> TokenStream2 {
         #[allow(non_camel_case_types, non_snake_case)]
         pub trait #trait_name:
             #( #supers + )*
-            ::goish::DynClone + ::std::marker::Send + ::std::marker::Sync
+            ::goish::__DynClone + ::std::marker::Send + ::std::marker::Sync
         {
             #trait_methods
         }

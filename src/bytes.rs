@@ -254,15 +254,24 @@ pub fn NewReader(b: impl Into<Vec<byte>>) -> Reader {
 
 use crate::types::int64 as int64_;
 
+/// Go's `string([]byte)` — reinterpret bytes as a string. Non-UTF-8 bytes
+/// go through lossy decode (U+FFFD replacement), matching GoString's
+/// `From<&[u8]>` construction. Zero turbofish and no `.unwrap()` at the
+/// call site.
 #[allow(non_snake_case)]
-pub fn Equal(a: &[byte], b: &[byte]) -> bool {
-    a == b
+pub fn String(b: impl AsRef<[u8]>) -> crate::types::string {
+    crate::types::string::from(b.as_ref())
 }
 
 #[allow(non_snake_case)]
-pub fn Compare(a: &[byte], b: &[byte]) -> int {
+pub fn Equal(a: impl AsRef<[byte]>, b: impl AsRef<[byte]>) -> bool {
+    a.as_ref() == b.as_ref()
+}
+
+#[allow(non_snake_case)]
+pub fn Compare(a: impl AsRef<[byte]>, b: impl AsRef<[byte]>) -> int {
     use std::cmp::Ordering::*;
-    match a.cmp(b) {
+    match a.as_ref().cmp(b.as_ref()) {
         Less => -1,
         Equal => 0,
         Greater => 1,
@@ -270,8 +279,8 @@ pub fn Compare(a: &[byte], b: &[byte]) -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn Contains(s: &[byte], sub: &[byte]) -> bool {
-    Index(s, sub) >= 0
+pub fn Contains(s: impl AsRef<[byte]>, sub: impl AsRef<[byte]>) -> bool {
+    Index(s.as_ref(), sub.as_ref()) >= 0
 }
 
 #[allow(non_snake_case)]
@@ -288,17 +297,19 @@ pub fn ContainsRune(s: &[byte], r: char) -> bool {
 }
 
 #[allow(non_snake_case)]
-pub fn HasPrefix(s: &[byte], prefix: &[byte]) -> bool {
-    s.starts_with(prefix)
+pub fn HasPrefix(s: impl AsRef<[byte]>, prefix: impl AsRef<[byte]>) -> bool {
+    s.as_ref().starts_with(prefix.as_ref())
 }
 
 #[allow(non_snake_case)]
-pub fn HasSuffix(s: &[byte], suffix: &[byte]) -> bool {
-    s.ends_with(suffix)
+pub fn HasSuffix(s: impl AsRef<[byte]>, suffix: impl AsRef<[byte]>) -> bool {
+    s.as_ref().ends_with(suffix.as_ref())
 }
 
 #[allow(non_snake_case)]
-pub fn Index(s: &[byte], sep: &[byte]) -> int {
+pub fn Index(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let s = s.as_ref();
+    let sep = sep.as_ref();
     if sep.is_empty() {
         return 0;
     }
@@ -319,7 +330,9 @@ pub fn IndexByte(s: &[byte], b: byte) -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn LastIndex(s: &[byte], sep: &[byte]) -> int {
+pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let s = s.as_ref();
+    let sep = sep.as_ref();
     if sep.is_empty() {
         return s.len() as int;
     }

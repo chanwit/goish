@@ -49,7 +49,7 @@ macro_rules! clone_trait_object {
                     // freshly heap-allocated clone of the pointee; keep the
                     // vtable portion intact.
                     let data_ptr = &mut fat_ptr as *mut *const (dyn $trait) as *mut *mut ();
-                    *data_ptr = $crate::DynClone::__clone_box(&**self);
+                    *data_ptr = $crate::__DynClone::__clone_box(&**self);
                     ::std::boxed::Box::from_raw(fat_ptr as *mut (dyn $trait))
                 }
             }

@@ -82,9 +82,9 @@ impl Digest {
 }
 
 #[allow(non_snake_case)]
-pub fn Sum256(data: &[byte]) -> [byte; 32] {
+pub fn Sum256(data: impl AsRef<[byte]>) -> [byte; 32] {
     let mut h = New();
-    h.Write(data);
+    h.Write(data.as_ref());
     let v = h.Sum(&[]);
     let mut out = [0u8; 32];
     out.copy_from_slice(&v);

@@ -236,6 +236,15 @@ pub fn ReadAll<R: Reader + ?Sized>(r: &mut R) -> (Vec<byte>, error) {
     }
 }
 
+/// Like `ReadAll`, but returns a `string` instead of `Vec<byte>` — saves
+/// the caller a `bytes::String(...)` round-trip on the common case of
+/// reading a text body. Non-UTF-8 bytes go through lossy decode.
+#[allow(non_snake_case)]
+pub fn ReadAllString<R: Reader + ?Sized>(r: &mut R) -> (crate::types::string, error) {
+    let (b, e) = ReadAll(r);
+    (crate::types::string::from(b), e)
+}
+
 #[allow(non_snake_case)]
 pub fn ReadFull<R: Reader + ?Sized>(r: &mut R, buf: &mut [byte]) -> (int, error) {
     ReadAtLeast(r, buf, buf.len() as int)

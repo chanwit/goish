@@ -62,9 +62,12 @@ impl<T> Chan<T> {
 
     /// `ch <- v` — blocks until a receiver is ready or there's room.
     ///
+    /// Accepts any `impl Into<T>` so `c.Send("hello")` works when
+    /// `T = string`, matching Go's implicit string-literal coercion.
+    ///
     /// Panics on a closed or nil channel.
-    pub fn Send(&self, v: T) {
-        if self.live().send(v).is_err() {
+    pub fn Send(&self, v: impl Into<T>) {
+        if self.live().send(v.into()).is_err() {
             panic!("send on closed channel");
         }
     }
@@ -72,8 +75,8 @@ impl<T> Chan<T> {
     /// Async send — used by the `go!{}` macro inside async contexts.
     ///
     /// Panics on a closed or nil channel.
-    pub async fn send(&self, v: T) {
-        if self.live().send_async(v).await.is_err() {
+    pub async fn send(&self, v: impl Into<T>) {
+        if self.live().send_async(v.into()).await.is_err() {
             panic!("send on closed channel");
         }
     }
@@ -108,12 +111,12 @@ impl<T> Chan<T> {
 
     /// Non-blocking try-send. Returns true on success, false on full buffer.
     /// Panics on closed or nil channel.
-    pub fn TrySend(&self, v: T) -> bool {
+    pub fn TrySend(&self, v: impl Into<T>) -> bool {
         let inner = self.live();
         if inner.is_closed() {
             panic!("send on closed channel");
         }
-        inner.try_send(v).is_ok()
+        inner.try_send(v.into()).is_ok()
     }
 
     #[doc(hidden)]
