@@ -39,7 +39,7 @@ pub struct Cookie {
     pub SameSite: SameSite,
     pub Partitioned: bool,
     pub Raw: string,
-    pub Unparsed: Vec<string>,
+    pub Unparsed: crate::types::slice<string>,
 }
 
 /// Go-shape Cookie literal.
