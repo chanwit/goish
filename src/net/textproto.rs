@@ -244,12 +244,12 @@ impl<R: Read> Reader<R> {
 
     /// ReadDotLines reads "dot-style" lines (SMTP/NNTP) terminated by a "."
     /// on a line by itself.
-    pub fn ReadDotLines(&mut self) -> (Vec<string>, error) {
-        let mut lines = Vec::new();
+    pub fn ReadDotLines(&mut self) -> (crate::types::slice<string>, error) {
+        let mut lines: Vec<string> = Vec::new();
         loop {
             let (line, err) = self.ReadLine();
-            if err != nil { return (lines, err); }
-            if line == "." { return (lines, nil); }
+            if err != nil { return (lines.into(), err); }
+            if line == "." { return (lines.into(), nil); }
             let unstuffed = if let Some(r) = line.strip_prefix('.') { r.into() } else { line };
             lines.push(unstuffed);
         }
@@ -257,15 +257,15 @@ impl<R: Read> Reader<R> {
 
     /// ReadDotBytes is like ReadDotLines but returns one blob with \n
     /// separators and a trailing \n.
-    pub fn ReadDotBytes(&mut self) -> (Vec<u8>, error) {
+    pub fn ReadDotBytes(&mut self) -> (crate::types::slice<u8>, error) {
         let (lines, err) = self.ReadDotLines();
-        if err != nil { return (Vec::new(), err); }
-        let mut out = Vec::new();
-        for l in lines {
+        if err != nil { return (crate::types::slice::new(), err); }
+        let mut out: Vec<u8> = Vec::new();
+        for l in lines.iter() {
             out.extend_from_slice(l.as_bytes());
             out.push(b'\n');
         }
-        (out, nil)
+        (out.into(), nil)
     }
 }
 
@@ -348,12 +348,13 @@ pub fn TrimString(s: &str) -> string {
     s.trim_matches(|c: char| c == ' ' || c == '\t').into()
 }
 
-pub fn TrimBytes(b: &[u8]) -> Vec<u8> {
+pub fn TrimBytes(b: impl AsRef<[u8]>) -> crate::types::slice<u8> {
+    let b = b.as_ref();
     let mut start = 0;
     let mut end = b.len();
     while start < end && (b[start] == b' ' || b[start] == b'\t') { start += 1; }
     while end > start && (b[end - 1] == b' ' || b[end - 1] == b'\t') { end -= 1; }
-    b[start..end].to_vec()
+    b[start..end].to_vec().into()
 }
 
 // Quieten lints on feature trimmed types
