@@ -35,7 +35,7 @@ test!{ fn TestErrorType_RoundTrips(t) {
     let err = wrap_multi(vec![a, b].into());
 
     // It's a non-nil error.
-    if err == nil { t.Errorf("ErrorType!.into() returned nil".to_string()); }
+    if err == nil { t.Errorf("ErrorType!.into() returned nil"); }
 
     // Display / Sprintf see the generated Display impl.
     let s = Sprintf!("%s", err);
@@ -49,33 +49,33 @@ test!{ fn TestErrorType_RoundTrips(t) {
         None => return t.Fatal("errors::As::<MultiError> failed"),
     };
     if len!(me.errs) != 2 { t.Errorf(Sprintf!("want 2 errs, got %d", len!(me.errs))); }
-    if Sprintf!("%s", me.errs[0i64]) != "one" { t.Errorf("errs[0] != one".to_string()); }
-    if Sprintf!("%s", me.errs[1i64]) != "two" { t.Errorf("errs[1] != two".to_string()); }
+    if Sprintf!("%s", me.errs[0i64]) != "one" { t.Errorf("errs[0] != one"); }
+    if Sprintf!("%s", me.errs[1i64]) != "two" { t.Errorf("errs[1] != two"); }
 }}
 
 test!{ fn TestErrorType_PtrIdentityEq(t) {
     let a = wrap_multi(vec![errors::New("x")].into());
     let b = a.clone();
     // Clone shares the underlying Arc — PartialEq checks ptr identity.
-    if a != b { t.Errorf("clone of Custom error not ==".to_string()); }
+    if a != b { t.Errorf("clone of Custom error not =="); }
 
     let c = wrap_multi(vec![errors::New("x")].into());
     // Different Arc even with same contents — not equal (matches Go's
     // pointer-receiver == semantics).
-    if a == c { t.Errorf("distinct Custom errors unexpectedly ==".to_string()); }
+    if a == c { t.Errorf("distinct Custom errors unexpectedly =="); }
 }}
 
 test!{ fn TestErrorType_BuiltinAsReturnsNone(t) {
     let e = errors::New("boom");
     if errors::As::<MultiError>(&e).is_some() {
-        t.Errorf("Builtin error shouldn't recover as MultiError".to_string());
+        t.Errorf("Builtin error shouldn't recover as MultiError");
     }
 }}
 
 test!{ fn TestErrorType_NilAsReturnsNone(t) {
     let e: error = nil;
     if errors::As::<MultiError>(&e).is_some() {
-        t.Errorf("nil error shouldn't recover as any user type".to_string());
+        t.Errorf("nil error shouldn't recover as any user type");
     }
 }}
 
@@ -100,7 +100,7 @@ test!{ fn TestErrorType_Is_OnIdentity(t) {
     }.into();
     let other = outer.clone();
     if !errors::Is(&outer, &other) {
-        t.Errorf("Is did not recognise Arc-identical errors".to_string());
+        t.Errorf("Is did not recognise Arc-identical errors");
     }
 
     // Display composes the user's Error() body.

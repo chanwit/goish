@@ -10,7 +10,7 @@ test!{ fn TestGoexitIsCleanExit(t) {
     runtime::Goexit();
     // Unreachable: Goexit unwinds via panic-with-sentinel. If this line ran,
     // we'd fail the test. The harness treats the sentinel as Outcome::Ok.
-    t.Errorf("unreachable after Goexit()".to_string());
+    t.Errorf("unreachable after Goexit()");
 }}
 
 test!{ fn TestGoexitRunsDefers(t) {
@@ -21,7 +21,7 @@ test!{ fn TestGoexitRunsDefers(t) {
     }
     let _ = std::panic::catch_unwind(|| inner());
     if !RAN.load(Ordering::SeqCst) {
-        t.Errorf("defer did not run through Goexit unwind".to_string());
+        t.Errorf("defer did not run through Goexit unwind");
     }
 }}
 
@@ -37,19 +37,19 @@ test!{ fn TestGoexitInsideGoroutine(t) {
 
 test!{ fn TestAppendBothNil(t) {
     let got = errors::Append(nil, nil);
-    if got != nil { t.Errorf("Append(nil, nil) != nil".to_string()); }
+    if got != nil { t.Errorf("Append(nil, nil) != nil"); }
 }}
 
 test!{ fn TestAppendFirstNil(t) {
     let more = errors::New("more");
     let got = errors::Append(nil, more.clone());
-    if got != more { t.Errorf("Append(nil, more) != more".to_string()); }
+    if got != more { t.Errorf("Append(nil, more) != more"); }
 }}
 
 test!{ fn TestAppendSecondNil(t) {
     let err = errors::New("err");
     let got = errors::Append(err.clone(), nil);
-    if got != err { t.Errorf("Append(err, nil) != err".to_string()); }
+    if got != err { t.Errorf("Append(err, nil) != err"); }
 }}
 
 test!{ fn TestAppendBoth(t) {
@@ -70,7 +70,7 @@ test!{ fn TestAppendChain(t) {
     let msg = Sprintf!("%s", err);
     for needle in ["one", "two", "three"].iter() {
         if !strings::Contains(&msg, needle) {
-            t.Errorf(Sprintf!("chained Append lost %q from %q", needle.to_string(), msg));
+            t.Errorf(Sprintf!("chained Append lost %q from %q", needle, msg));
         }
     }
 }}

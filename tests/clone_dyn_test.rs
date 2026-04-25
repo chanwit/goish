@@ -77,10 +77,10 @@ test!{ fn TestCore_WithDoesntMutateOriginal(t) {
     let child = base.With("leaf");
 
     if len!(base.Tags()) != 1 {
-        t.Errorf("With mutated the parent's tags".to_string());
+        t.Errorf("With mutated the parent's tags");
     }
     if len!(child.Tags()) != 2 {
-        t.Errorf("With didn't extend tags on the child".to_string());
+        t.Errorf("With didn't extend tags on the child");
     }
 }}
 

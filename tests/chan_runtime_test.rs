@@ -161,8 +161,8 @@ test!{ fn TestCloseThenRecv(t) {
 
 test!{ fn TestChanOfStrings(t) {
     let c: Chan<String> = chan!(String, 2);
-    c.Send("hello".to_string());
-    c.Send("world".to_string());
+    c.Send("hello");
+    c.Send("world");
     close!(c);
     let (a, _) = c.Recv();
     let (b, _) = c.Recv();
