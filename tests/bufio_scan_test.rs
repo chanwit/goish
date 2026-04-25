@@ -99,7 +99,7 @@ test!{ fn TestScanWords(t) {
         sc.Split(bufio::ScanWords);
         let mut got: Vec<String> = Vec::new();
         while sc.Scan() { got.push(sc.Text().to_string()); }
-        if got.len() != want.len() || !got.iter().zip(&want).all(|(a, b)| a == b) {
+        if got != want {
             t.Errorf(Sprintf!("ScanWords(%q) got %v-count, want %v-count",
                 input, got.len(), want.len()));
         }

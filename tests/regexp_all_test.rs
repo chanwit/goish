@@ -190,7 +190,7 @@ test!{ fn TestSplit(t) {
     for (pat, input, n, want) in cases {
         let re = regexp::MustCompile(pat);
         let got = re.Split(input, n);
-        if got.len() != want.len() || !got.iter().zip(&want).all(|(a, b)| a == b) {
+        if got != want {
             t.Errorf(Sprintf!("Split(%q, %q, %d) = %d parts want %d",
                 pat, input, n, got.len(), want.len()));
         }

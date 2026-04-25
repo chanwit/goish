@@ -53,7 +53,7 @@ test!{ fn TestFindAllString(t) {
     for tt in tests {
         let re = regexp::MustCompile(tt.pat);
         let got = re.FindAllString(tt.text, -1);
-        if got.len() != tt.want.len() || !got.iter().zip(&tt.want).all(|(a, b)| a == b) {
+        if got != tt.want {
             t.Errorf(Sprintf!("FindAllString(%q, %q) = %d matches want %d",
                 tt.pat, tt.text, got.len(), tt.want.len()));
         }
@@ -93,7 +93,7 @@ test!{ fn TestFindStringSubmatch(t) {
     for tt in tests {
         let re = regexp::MustCompile(tt.pat);
         let got = re.FindStringSubmatch(tt.text);
-        if got.len() != tt.want.len() || !got.iter().zip(&tt.want).all(|(a, b)| a == b) {
+        if got != tt.want {
             t.Errorf(Sprintf!("FindStringSubmatch(%q, %q) got %d want %d",
                 tt.pat, tt.text, got.len(), tt.want.len()));
         }
