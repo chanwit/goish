@@ -545,9 +545,10 @@ impl Time {
         std::string::String::from_utf8(buf).unwrap_or_default().into()
     }
 
-    pub fn AppendFormat(&self, mut b: Vec<u8>, layout: impl AsRef<str>) -> Vec<u8> {
-        self.append_format(&mut b, layout.as_ref());
-        b
+    pub fn AppendFormat(&self, b: impl AsRef<[u8]>, layout: impl AsRef<str>) -> crate::types::slice<u8> {
+        let mut out: Vec<u8> = b.as_ref().to_vec();
+        self.append_format(&mut out, layout.as_ref());
+        out.into()
     }
 
     fn append_format(&self, b: &mut Vec<u8>, mut layout: &str) {
@@ -1100,9 +1101,10 @@ pub(crate) fn append_int(b: &mut Vec<u8>, x: i64, width: i32) {
 
 /// Public AppendInt, matches Go's time.AppendInt (used via export_test).
 #[allow(non_snake_case)]
-pub fn AppendInt(mut b: Vec<u8>, x: crate::types::int, width: crate::types::int) -> Vec<u8> {
-    append_int(&mut b, x as i64, width as i32);
-    b
+pub fn AppendInt(b: impl AsRef<[u8]>, x: crate::types::int, width: crate::types::int) -> crate::types::slice<u8> {
+    let mut out: Vec<u8> = b.as_ref().to_vec();
+    append_int(&mut out, x as i64, width as i32);
+    out.into()
 }
 
 fn append_nano(b: &mut Vec<u8>, nanosec: i64, std: i32) {
