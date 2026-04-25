@@ -34,7 +34,7 @@ impl Digest {
         (p.len() as int, crate::errors::nil)
     }
 
-    pub fn Sum(&self, b: &[byte]) -> Vec<byte> {
+    pub fn Sum(&self, b: impl AsRef<[byte]>) -> crate::types::slice<byte> {
         let mut state = self.state;
         let mut buf = self.buf.clone();
         let bit_len = self.len.wrapping_mul(8);
@@ -49,11 +49,11 @@ impl Digest {
             process(&mut state, &block);
             i += 64;
         }
-        let mut out = b.to_vec();
+        let mut out: Vec<byte> = b.as_ref().to_vec();
         for v in state.iter() {
             out.extend_from_slice(&v.to_be_bytes());
         }
-        out
+        out.into()
     }
 
     pub fn Reset(&mut self) {
