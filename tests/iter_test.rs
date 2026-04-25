@@ -22,7 +22,7 @@ test!{ fn TestSeqEarlyStop(t) {
             if !yield_(counter) { return; }
         }
     };
-    let mut collected = Vec::new();
+    let mut collected: slice<int> = slice::new();
     seq.for_each(|v| {
         collected.push(v);
         v < 3
@@ -38,8 +38,8 @@ test!{ fn TestSeq2Pairs(t) {
             if !yield_(*k, *v) { return; }
         }
     };
-    let mut keys = Vec::new();
-    let mut vals = Vec::new();
+    let mut keys: slice<int> = slice::new();
+    let mut vals: slice<int> = slice::new();
     seq.for_each(|k, v| { keys.push(k); vals.push(v); true });
     if keys != vec![1i64, 2, 3] { t.Errorf(Sprintf!("Seq2 keys mismatch")); }
     if vals != vec![10i64, 20, 30] { t.Errorf(Sprintf!("Seq2 vals mismatch")); }
