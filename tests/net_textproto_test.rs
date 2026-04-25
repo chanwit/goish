@@ -119,10 +119,10 @@ test!{ fn TestReadDotLines(t) {
 test!{ fn TestReadDotBytes(t) {
     let mut r = reader("dotlines\r\n.foo\r\n..bar\n...baz\nquux\r\n\r\n.\r\n");
     let (b, err) = r.ReadDotBytes();
-    let want = b"dotlines\nfoo\n.bar\n..baz\nquux\n\n".to_vec();
+    let want = b"dotlines\nfoo\n.bar\n..baz\nquux\n\n";
     if err != nil { t.Fatal(&Sprintf!("ReadDotBytes err: %s", err)); }
     if b != want {
-        t.Errorf(Sprintf!("ReadDotBytes len = %d, want %d", len!(b) as i64, len!(want) as i64));
+        t.Errorf(Sprintf!("ReadDotBytes len = %d, want %d", len!(b) as i64, want.len() as i64));
     }
 }}
 
