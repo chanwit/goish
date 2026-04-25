@@ -78,8 +78,8 @@ fn main() {
 
     // Checksum the normalized input.
     let joined = strings::Join(&normalized, "\n");
-    let digest = crypto::sha256::Sum256(joined.as_bytes());
-    let hex_hash: string = digest.iter().map(|b| Sprintf!("%02x", b).to_string()).collect::<String>().into();
+    let digest = crypto::sha256::Sum256(&joined);
+    let hex_hash = hex::EncodeToString(&digest);
     fmt::Printf!("\nsha256 of input: %s\n", hex_hash);
 
     // Emit a CSV table of the parsed requests.
