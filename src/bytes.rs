@@ -284,16 +284,17 @@ pub fn Contains(s: impl AsRef<[byte]>, sub: impl AsRef<[byte]>) -> bool {
 }
 
 #[allow(non_snake_case)]
-pub fn ContainsAny(s: &[byte], chars: impl AsRef<str>) -> bool {
+pub fn ContainsAny(s: impl AsRef<[byte]>, chars: impl AsRef<str>) -> bool {
+    let s = s.as_ref();
     let set: Vec<byte> = chars.as_ref().as_bytes().to_vec();
     s.iter().any(|b| set.contains(b))
 }
 
 #[allow(non_snake_case)]
-pub fn ContainsRune(s: &[byte], r: char) -> bool {
+pub fn ContainsRune(s: impl AsRef<[byte]>, r: char) -> bool {
     let mut buf = [0u8; 4];
     let encoded = r.encode_utf8(&mut buf).as_bytes();
-    Contains(s, encoded)
+    Contains(s.as_ref(), encoded)
 }
 
 #[allow(non_snake_case)]
@@ -325,8 +326,8 @@ pub fn Index(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn IndexByte(s: &[byte], b: byte) -> int {
-    s.iter().position(|x| *x == b).map(|i| i as int).unwrap_or(-1)
+pub fn IndexByte(s: impl AsRef<[byte]>, b: byte) -> int {
+    s.as_ref().iter().position(|x| *x == b).map(|i| i as int).unwrap_or(-1)
 }
 
 #[allow(non_snake_case)]
@@ -348,12 +349,14 @@ pub fn LastIndex(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn LastIndexByte(s: &[byte], b: byte) -> int {
-    s.iter().rposition(|x| *x == b).map(|i| i as int).unwrap_or(-1)
+pub fn LastIndexByte(s: impl AsRef<[byte]>, b: byte) -> int {
+    s.as_ref().iter().rposition(|x| *x == b).map(|i| i as int).unwrap_or(-1)
 }
 
 #[allow(non_snake_case)]
-pub fn Count(s: &[byte], sep: &[byte]) -> int {
+pub fn Count(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> int {
+    let s = s.as_ref();
+    let sep = sep.as_ref();
     if sep.is_empty() {
         // Go: count of non-overlapping sep in s; for empty sep, it's utf-8 rune count + 1.
         return (s.len() + 1) as int;
@@ -372,8 +375,8 @@ pub fn Count(s: &[byte], sep: &[byte]) -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn Split(s: &[byte], sep: &[byte]) -> crate::types::slice<crate::types::slice<byte>> {
-    SplitN(s, sep, -1)
+pub fn Split(s: impl AsRef<[byte]>, sep: impl AsRef<[byte]>) -> crate::types::slice<crate::types::slice<byte>> {
+    SplitN(s.as_ref(), sep.as_ref(), -1)
 }
 
 #[allow(non_snake_case)]
@@ -432,7 +435,10 @@ pub fn Join<P: AsRef<[byte]>>(parts: &[P], sep: &[byte]) -> crate::types::slice<
 }
 
 #[allow(non_snake_case)]
-pub fn Replace(s: &[byte], old: &[byte], new: &[byte], n: int) -> crate::types::slice<byte> {
+pub fn Replace(s: impl AsRef<[byte]>, old: impl AsRef<[byte]>, new: impl AsRef<[byte]>, n: int) -> crate::types::slice<byte> {
+    let s = s.as_ref();
+    let old = old.as_ref();
+    let new = new.as_ref();
     if old.is_empty() || n == 0 {
         return s.to_vec().into();
     }
@@ -455,19 +461,19 @@ pub fn Replace(s: &[byte], old: &[byte], new: &[byte], n: int) -> crate::types::
 }
 
 #[allow(non_snake_case)]
-pub fn ReplaceAll(s: &[byte], old: &[byte], new: &[byte]) -> crate::types::slice<byte> {
-    Replace(s, old, new, -1)
+pub fn ReplaceAll(s: impl AsRef<[byte]>, old: impl AsRef<[byte]>, new: impl AsRef<[byte]>) -> crate::types::slice<byte> {
+    Replace(s.as_ref(), old.as_ref(), new.as_ref(), -1)
 }
 
 #[allow(non_snake_case)]
-pub fn ToUpper(s: &[byte]) -> crate::types::slice<byte> {
-    let v: Vec<byte> = s.iter().map(|b| b.to_ascii_uppercase()).collect();
+pub fn ToUpper(s: impl AsRef<[byte]>) -> crate::types::slice<byte> {
+    let v: Vec<byte> = s.as_ref().iter().map(|b| b.to_ascii_uppercase()).collect();
     v.into()
 }
 
 #[allow(non_snake_case)]
-pub fn ToLower(s: &[byte]) -> crate::types::slice<byte> {
-    let v: Vec<byte> = s.iter().map(|b| b.to_ascii_lowercase()).collect();
+pub fn ToLower(s: impl AsRef<[byte]>) -> crate::types::slice<byte> {
+    let v: Vec<byte> = s.as_ref().iter().map(|b| b.to_ascii_lowercase()).collect();
     v.into()
 }
 
