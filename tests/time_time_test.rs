@@ -363,14 +363,14 @@ test!{ fn TestSub(t) {
 // ─── Duration conversion helpers ──────────────────────────────────────
 
 test!{ fn TestDurationNanoseconds(t) {
-    let cases: Vec<(i128, i64)> = vec![
+    let cases: slice<(i128, int)> = vec![
         (-1000, -1000),
         (-1, -1),
         (1, 1),
         (1000, 1000),
         (i64::MAX as i128, i64::MAX),
         (i64::MIN as i128, i64::MIN),
-    ];
+    ].into();
     for (ns_in, want) in cases {
         let d = time::Duration::from_nanos(ns_in);
         if d.Nanoseconds() != want {
