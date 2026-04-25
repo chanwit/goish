@@ -13,12 +13,12 @@ test!{ fn TestReadSimple(t) {
     let mut r = encoding::csv::NewReader("a,b,c\n1,2,3\n");
     let (rec, err) = r.Read();
     if err != nil { t.Errorf(Sprintf!("first Read err: %s", err)); return; }
-    if rec != vec!["a".to_string(), "b".to_string(), "c".to_string()] {
+    if rec != vec!["a", "b", "c"] {
         t.Errorf(Sprintf!("first record = %v", format!("{:?}", rec)));
     }
     let (rec, err) = r.Read();
     if err != nil { t.Errorf(Sprintf!("second Read err: %s", err)); return; }
-    if rec != vec!["1".to_string(), "2".to_string(), "3".to_string()] {
+    if rec != vec!["1", "2", "3"] {
         t.Errorf(Sprintf!("second record = %v", format!("{:?}", rec)));
     }
     let (_, err) = r.Read();
@@ -54,7 +54,7 @@ test!{ fn TestReadCRLF(t) {
     let mut r = encoding::csv::NewReader("a,b\r\n1,2\r\n");
     let (rec, err) = r.Read();
     if err != nil { t.Errorf(Sprintf!("Read err: %s", err)); return; }
-    if rec != vec!["a".to_string(), "b".to_string()] {
+    if rec != vec!["a", "b"] {
         t.Errorf(Sprintf!("record = %v", format!("{:?}", rec)));
     }
 }}
@@ -73,7 +73,7 @@ test!{ fn TestReadWrongFields(t) {
 
 test!{ fn TestWriteSimple(t) {
     let mut w = encoding::csv::NewWriter();
-    let row = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+    let row = vec!["a", "b", "c"];
     let err = w.Write(&row);
     if err != nil { t.Errorf(Sprintf!("Write err: %s", err)); return; }
     let s = w.String();
@@ -84,7 +84,7 @@ test!{ fn TestWriteSimple(t) {
 
 test!{ fn TestWriteQuoted(t) {
     let mut w = encoding::csv::NewWriter();
-    let row = vec!["hello, world".to_string(), "she said \"hi\"".to_string()];
+    let row = vec!["hello, world", "she said \"hi\""];
     let err = w.Write(&row);
     if err != nil { t.Errorf(Sprintf!("Write err: %s", err)); return; }
     let s = w.String();
@@ -97,9 +97,9 @@ test!{ fn TestWriteQuoted(t) {
 test!{ fn TestWriteRoundTrip(t) {
     let mut w = encoding::csv::NewWriter();
     for row in &[
-        vec!["a".to_string(), "b".to_string()],
-        vec!["hello, world".to_string(), "plain".to_string()],
-        vec!["with\nnewline".to_string(), "ok".to_string()],
+        vec!["a", "b"],
+        vec!["hello, world", "plain"],
+        vec!["with\nnewline", "ok"],
     ] {
         let err = w.Write(row);
         if err != nil { t.Errorf(Sprintf!("Write err: %s", err)); return; }

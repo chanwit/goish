@@ -20,7 +20,7 @@ test!{ fn TestScanLines(t) {
         ("crlf\r\nlines\r\n", vec!["crlf", "lines"]),
     ];
     for (input, want) in cases {
-        let mut sc = bufio::NewScanner(Cursor::new(input.to_string()));
+        let mut sc = bufio::NewScanner(Cursor::new(input));
         sc.Split(bufio::ScanLines);
         let mut got: Vec<String> = Vec::new();
         while sc.Scan() { got.push(sc.Text().to_string()); }
@@ -34,7 +34,7 @@ test!{ fn TestScanLines(t) {
 test!{ fn TestScanBytes(t) {
     let tests = vec!["", "a", "hello", "abcdefgh"];
     for input in tests {
-        let mut sc = bufio::NewScanner(Cursor::new(input.to_string()));
+        let mut sc = bufio::NewScanner(Cursor::new(input));
         sc.Split(bufio::ScanBytes);
         let mut i = 0;
         while sc.Scan() {
@@ -56,7 +56,7 @@ test!{ fn TestScanBytes(t) {
 test!{ fn TestScanRunes(t) {
     let tests = vec!["", "a", "abc", "¼", "☹", "abc¼☹日本語"];
     for input in tests {
-        let mut sc = bufio::NewScanner(Cursor::new(input.to_string()));
+        let mut sc = bufio::NewScanner(Cursor::new(input));
         sc.Split(bufio::ScanRunes);
         let expected: Vec<char> = input.chars().collect();
         let mut rune_count = 0;
@@ -95,7 +95,7 @@ test!{ fn TestScanWords(t) {
         (" abc\tdef\nghi\rjkl mno pqr  ", vec!["abc", "def", "ghi", "jkl", "mno", "pqr"]),
     ];
     for (input, want) in tests {
-        let mut sc = bufio::NewScanner(Cursor::new(input.to_string()));
+        let mut sc = bufio::NewScanner(Cursor::new(input));
         sc.Split(bufio::ScanWords);
         let mut got: Vec<String> = Vec::new();
         while sc.Scan() { got.push(sc.Text().to_string()); }
@@ -128,7 +128,7 @@ test!{ fn TestScanLineTooLong(t) {
 test!{ fn TestScanNoNewline(t) {
     // A last line without trailing \n still emits a token.
     let input = "last-line-no-newline";
-    let mut sc = bufio::NewScanner(Cursor::new(input.to_string()));
+    let mut sc = bufio::NewScanner(Cursor::new(input));
     sc.Split(bufio::ScanLines);
     let mut got: Vec<String> = Vec::new();
     while sc.Scan() { got.push(sc.Text().to_string()); }
@@ -140,7 +140,7 @@ test!{ fn TestScanNoNewline(t) {
 test!{ fn TestScanBlankLines(t) {
     // Blank lines produce empty tokens.
     let input = "one\n\ntwo\n\n\nthree";
-    let mut sc = bufio::NewScanner(Cursor::new(input.to_string()));
+    let mut sc = bufio::NewScanner(Cursor::new(input));
     sc.Split(bufio::ScanLines);
     let mut got: Vec<String> = Vec::new();
     while sc.Scan() { got.push(sc.Text().to_string()); }
