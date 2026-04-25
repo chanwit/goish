@@ -56,22 +56,25 @@ impl ByteOrder {
         b[..8].copy_from_slice(&bytes);
     }
 
-    pub fn AppendUint16(&self, mut b: Vec<byte>, v: u16) -> Vec<byte> {
+    pub fn AppendUint16(&self, b: crate::types::slice<byte>, v: u16) -> crate::types::slice<byte> {
         let bytes = if self.big { v.to_be_bytes() } else { v.to_le_bytes() };
-        b.extend_from_slice(&bytes);
-        b
+        let mut out: Vec<byte> = b.into();
+        out.extend_from_slice(&bytes);
+        out.into()
     }
 
-    pub fn AppendUint32(&self, mut b: Vec<byte>, v: u32) -> Vec<byte> {
+    pub fn AppendUint32(&self, b: crate::types::slice<byte>, v: u32) -> crate::types::slice<byte> {
         let bytes = if self.big { v.to_be_bytes() } else { v.to_le_bytes() };
-        b.extend_from_slice(&bytes);
-        b
+        let mut out: Vec<byte> = b.into();
+        out.extend_from_slice(&bytes);
+        out.into()
     }
 
-    pub fn AppendUint64(&self, mut b: Vec<byte>, v: u64) -> Vec<byte> {
+    pub fn AppendUint64(&self, b: crate::types::slice<byte>, v: u64) -> crate::types::slice<byte> {
         let bytes = if self.big { v.to_be_bytes() } else { v.to_le_bytes() };
-        b.extend_from_slice(&bytes);
-        b
+        let mut out: Vec<byte> = b.into();
+        out.extend_from_slice(&bytes);
+        out.into()
     }
 
     pub fn String(&self) -> &'static str {
@@ -170,7 +173,7 @@ mod tests {
 
     #[test]
     fn append_uint_helpers() {
-        let out = BigEndian.AppendUint32(vec![0xaa], 1u32);
+        let out = BigEndian.AppendUint32(vec![0xaau8].into(), 1u32);
         assert_eq!(out, vec![0xaa, 0, 0, 0, 1]);
     }
 
