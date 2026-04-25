@@ -366,20 +366,20 @@ impl<R: std::io::Read> Reader<R> {
 
     /// r.ReadBytes(delim) — like ReadString but returns bytes.
     #[allow(non_snake_case)]
-    pub fn ReadBytes(&mut self, delim: crate::types::byte) -> (Vec<crate::types::byte>, error) {
+    pub fn ReadBytes(&mut self, delim: crate::types::byte) -> (crate::types::slice<crate::types::byte>, error) {
         let mut buf = Vec::<u8>::new();
         if let Some(b) = self.unread.take() {
             buf.push(b);
-            if b == delim { return (buf, nil); }
+            if b == delim { return (buf.into(), nil); }
         }
         match self.inner.read_until(delim, &mut buf) {
-            Ok(0) if buf.is_empty() => (buf, New("EOF")),
-            Ok(0) => (buf, New("EOF")),
+            Ok(0) if buf.is_empty() => (buf.into(), New("EOF")),
+            Ok(0) => (buf.into(), New("EOF")),
             Ok(_) => {
                 let last_is_delim = buf.last() == Some(&delim);
-                (buf, if last_is_delim { nil } else { New("EOF") })
+                (buf.into(), if last_is_delim { nil } else { New("EOF") })
             }
-            Err(e) => (buf, New(&format!("bufio.ReadBytes: {}", e))),
+            Err(e) => (buf.into(), New(&format!("bufio.ReadBytes: {}", e))),
         }
     }
 

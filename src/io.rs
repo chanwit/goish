@@ -223,15 +223,15 @@ fn copy_buffer_impl<W: Writer + ?Sized, R: Reader + ?Sized>(
 }
 
 #[allow(non_snake_case)]
-pub fn ReadAll<R: Reader + ?Sized>(r: &mut R) -> (Vec<byte>, error) {
-    let mut buf = Vec::with_capacity(512);
+pub fn ReadAll<R: Reader + ?Sized>(r: &mut R) -> (crate::types::slice<byte>, error) {
+    let mut buf: Vec<byte> = Vec::with_capacity(512);
     let mut scratch = [0u8; 4096];
     loop {
         let (n, e) = r.Read(&mut scratch);
         if n > 0 { buf.extend_from_slice(&scratch[..n as usize]); }
         if e != nil {
-            if e == EOF() { return (buf, nil); }
-            return (buf, e);
+            if e == EOF() { return (buf.into(), nil); }
+            return (buf.into(), e);
         }
     }
 }
