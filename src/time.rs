@@ -1137,13 +1137,13 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    pub fn Error(&self) -> String {
+    pub fn Error(&self) -> crate::types::string {
         if self.Message.is_empty() {
             format!("parsing time {} as {}: cannot parse {} as {}",
                 quote_go(&self.Value), quote_go(&self.Layout),
-                quote_go(&self.ValueElem), quote_go(&self.LayoutElem))
+                quote_go(&self.ValueElem), quote_go(&self.LayoutElem)).into()
         } else {
-            format!("parsing time {}{}", quote_go(&self.Value), self.Message)
+            format!("parsing time {}{}", quote_go(&self.Value), self.Message).into()
         }
     }
 }

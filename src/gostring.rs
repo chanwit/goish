@@ -159,6 +159,18 @@ impl<'a> From<std::borrow::Cow<'a, str>> for GoString {
     fn from(c: std::borrow::Cow<'a, str>) -> Self { GoString::from(c.into_owned()) }
 }
 
+// ── Conversions out (boundary to std::String / Vec<u8>) ─────────────
+//
+// Lets `s.into()` flow back to std::String at FFI/error-message
+// boundaries — needed by anything that takes `impl Into<String>`
+// (e.g. `errors::New(impl Into<String>)`, third-party APIs).
+impl From<GoString> for std::string::String {
+    fn from(s: GoString) -> Self { s.as_str().to_owned() }
+}
+impl From<&GoString> for std::string::String {
+    fn from(s: &GoString) -> Self { s.as_str().to_owned() }
+}
+
 // Go's `string([]byte)` — bytes → string. Go reinterprets the bytes as-is;
 // Rust's str requires valid UTF-8, so we use lossy decode (invalid sequences
 // become U+FFFD). Matches `fmt.Sprintf("%s", b)` output in practice.
