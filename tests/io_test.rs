@@ -191,8 +191,8 @@ test!{ fn TestMultiReaderFinalEOF(t) {
 test!{ fn TestMultiWriter(t) {
     // Heterogeneous sinks: pre-boxed trait objects still work thanks to
     // the Reader/Writer blanket impls for Box<T>.
-    let dst1: Vec<u8> = Vec::new();
-    let dst2: Vec<u8> = Vec::new();
+    let dst1 = bytes::Buffer::new();
+    let dst2 = bytes::Buffer::new();
     let boxed1: Box<dyn gio::Writer + Send> = Box::new(dst1);
     let boxed2: Box<dyn gio::Writer + Send> = Box::new(dst2);
     let mut mw = gio::MultiWriter(vec![boxed1, boxed2]);
