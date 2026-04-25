@@ -10,7 +10,7 @@ test!{ fn TestBigEndianUint16(t) {
     let mut b = [0u8; 2];
     encoding::binary::BigEndian.PutUint16(&mut b, 0x1234);
     if b != [0x12, 0x34] {
-        t.Errorf(Sprintf!("PutUint16 big endian = %v, want [0x12, 0x34]", format!("{:?}", b)));
+        t.Errorf(Sprintf!("PutUint16 big endian = %v, want [0x12, 0x34]", b));
     }
     let v = encoding::binary::BigEndian.Uint16(&b);
     if v != 0x1234 {
@@ -22,7 +22,7 @@ test!{ fn TestLittleEndianUint16(t) {
     let mut b = [0u8; 2];
     encoding::binary::LittleEndian.PutUint16(&mut b, 0x1234);
     if b != [0x34, 0x12] {
-        t.Errorf(Sprintf!("PutUint16 little endian = %v, want [0x34, 0x12]", format!("{:?}", b)));
+        t.Errorf(Sprintf!("PutUint16 little endian = %v, want [0x34, 0x12]", b));
     }
     let v = encoding::binary::LittleEndian.Uint16(&b);
     if v != 0x1234 {
@@ -34,7 +34,7 @@ test!{ fn TestBigEndianUint32(t) {
     let mut b = [0u8; 4];
     encoding::binary::BigEndian.PutUint32(&mut b, 0x12345678);
     if b != [0x12, 0x34, 0x56, 0x78] {
-        t.Errorf(Sprintf!("PutUint32 big endian mismatch: %v", format!("{:?}", b)));
+        t.Errorf(Sprintf!("PutUint32 big endian mismatch: %v", b));
     }
     let v = encoding::binary::BigEndian.Uint32(&b);
     if v != 0x12345678 {
@@ -46,7 +46,7 @@ test!{ fn TestLittleEndianUint32(t) {
     let mut b = [0u8; 4];
     encoding::binary::LittleEndian.PutUint32(&mut b, 0x12345678);
     if b != [0x78, 0x56, 0x34, 0x12] {
-        t.Errorf(Sprintf!("PutUint32 little endian mismatch: %v", format!("{:?}", b)));
+        t.Errorf(Sprintf!("PutUint32 little endian mismatch: %v", b));
     }
 }}
 
@@ -54,7 +54,7 @@ test!{ fn TestBigEndianUint64(t) {
     let mut b = [0u8; 8];
     encoding::binary::BigEndian.PutUint64(&mut b, 0x0102030405060708);
     if b != [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08] {
-        t.Errorf(Sprintf!("PutUint64 big endian mismatch: %v", format!("{:?}", b)));
+        t.Errorf(Sprintf!("PutUint64 big endian mismatch: %v", b));
     }
     let v = encoding::binary::BigEndian.Uint64(&b);
     if v != 0x0102030405060708 {
@@ -66,7 +66,7 @@ test!{ fn TestLittleEndianUint64(t) {
     let mut b = [0u8; 8];
     encoding::binary::LittleEndian.PutUint64(&mut b, 0x0102030405060708);
     if b != [0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01] {
-        t.Errorf(Sprintf!("PutUint64 little endian mismatch: %v", format!("{:?}", b)));
+        t.Errorf(Sprintf!("PutUint64 little endian mismatch: %v", b));
     }
 }}
 

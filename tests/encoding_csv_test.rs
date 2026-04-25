@@ -14,12 +14,12 @@ test!{ fn TestReadSimple(t) {
     let (rec, err) = r.Read();
     if err != nil { t.Errorf(Sprintf!("first Read err: %s", err)); return; }
     if rec != vec!["a", "b", "c"] {
-        t.Errorf(Sprintf!("first record = %v", format!("{:?}", rec)));
+        t.Errorf(Sprintf!("first record = %v", rec));
     }
     let (rec, err) = r.Read();
     if err != nil { t.Errorf(Sprintf!("second Read err: %s", err)); return; }
     if rec != vec!["1", "2", "3"] {
-        t.Errorf(Sprintf!("second record = %v", format!("{:?}", rec)));
+        t.Errorf(Sprintf!("second record = %v", rec));
     }
     let (_, err) = r.Read();
     if err == nil { t.Errorf(Sprintf!("expected EOF, got nil")); }
@@ -55,7 +55,7 @@ test!{ fn TestReadCRLF(t) {
     let (rec, err) = r.Read();
     if err != nil { t.Errorf(Sprintf!("Read err: %s", err)); return; }
     if rec != vec!["a", "b"] {
-        t.Errorf(Sprintf!("record = %v", format!("{:?}", rec)));
+        t.Errorf(Sprintf!("record = %v", rec));
     }
 }}
 
