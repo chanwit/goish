@@ -41,7 +41,7 @@ impl Cmd {
         }
     }
 
-    pub fn Output(&mut self) -> (Vec<byte>, error) {
+    pub fn Output(&mut self) -> (crate::types::slice<byte>, error) {
         let mut c = self.build();
         c.stdout(Stdio::piped());
         c.stderr(Stdio::piped());
@@ -62,10 +62,10 @@ impl Cmd {
                             Success: o.status.success(),
                         });
                         if o.status.success() {
-                            (o.stdout, nil)
+                            (o.stdout.into(), nil)
                         } else {
                             (
-                                o.stdout,
+                                o.stdout.into(),
                                 New(&format!(
                                     "exit status {}",
                                     o.status.code().unwrap_or(-1)
@@ -73,14 +73,14 @@ impl Cmd {
                             )
                         }
                     }
-                    Err(e) => (Vec::new(), New(&e.to_string())),
+                    Err(e) => (crate::types::slice::new(), New(&e.to_string())),
                 }
             }
-            Err(e) => (Vec::new(), New(&e.to_string())),
+            Err(e) => (crate::types::slice::new(), New(&e.to_string())),
         }
     }
 
-    pub fn CombinedOutput(&mut self) -> (Vec<byte>, error) {
+    pub fn CombinedOutput(&mut self) -> (crate::types::slice<byte>, error) {
         use std::io::Read;
         let mut c = self.build();
         c.stdout(Stdio::piped());
@@ -109,10 +109,10 @@ impl Cmd {
                             Success: status.success(),
                         });
                         if status.success() {
-                            (out, nil)
+                            (out.into(), nil)
                         } else {
                             (
-                                out,
+                                out.into(),
                                 New(&format!(
                                     "exit status {}",
                                     status.code().unwrap_or(-1)
@@ -120,10 +120,10 @@ impl Cmd {
                             )
                         }
                     }
-                    Err(e) => (out, New(&e.to_string())),
+                    Err(e) => (out.into(), New(&e.to_string())),
                 }
             }
-            Err(e) => (Vec::new(), New(&e.to_string())),
+            Err(e) => (crate::types::slice::new(), New(&e.to_string())),
         }
     }
 
