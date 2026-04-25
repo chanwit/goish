@@ -41,6 +41,10 @@ impl<T: Clone + 'static> DynClone for T {
 #[doc(hidden)]
 macro_rules! clone_trait_object {
     ($trait:path) => {
+        // unused_parens: `(dyn $trait)` parens are required when $trait
+        // expands to multi-bound (`Foo + Send`) but redundant for single
+        // bounds. Suppress the warning across both shapes.
+        #[allow(unused_parens)]
         impl ::std::clone::Clone for ::std::boxed::Box<dyn $trait> {
             fn clone(&self) -> Self {
                 let mut fat_ptr: *const (dyn $trait) = &**self;

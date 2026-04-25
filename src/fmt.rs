@@ -451,6 +451,7 @@ macro_rules! Println {
 #[macro_export]
 macro_rules! Printf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
+        #[allow(unused_imports)]
         use $crate::fmt::__GoFmtFallback as _;
         let out = $crate::fmt::go_format_strs(
             $fmt,
@@ -465,6 +466,7 @@ macro_rules! Printf {
 #[macro_export]
 macro_rules! Sprintf {
     ($fmt:expr $(, $arg:expr)* $(,)?) => {{
+        #[allow(unused_imports)]
         use $crate::fmt::__GoFmtFallback as _;
         let _s: $crate::types::string = $crate::fmt::go_format_strs(
             $fmt,
@@ -479,6 +481,7 @@ macro_rules! Sprintf {
 #[macro_export]
 macro_rules! Fprintf {
     ($w:expr, $fmt:expr $(, $arg:expr)* $(,)?) => {{
+        #[allow(unused_imports)]
         use $crate::fmt::__GoFmtFallback as _;
         let out = $crate::fmt::go_format_strs(
             $fmt,

@@ -184,7 +184,10 @@ macro_rules! __goish_struct_emit {
         // correct Go-like signal. If a user needs fewer derives, they
         // should fall back to a plain Rust struct.
         #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-        #[allow(non_snake_case)]
+        // unused_parens: the macro paren-wraps multi-tt path types so
+        // they parse as a single tt for downstream dispatch; this
+        // produces redundant parens in the emitted field type.
+        #[allow(non_snake_case, unused_parens)]
         pub struct $name {
             $( pub $fn: $crate::__goish_type!($ft), )*
         }

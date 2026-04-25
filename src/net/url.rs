@@ -19,7 +19,6 @@
 
 use crate::errors::{error, nil, New};
 use crate::types::{int, map, slice, string};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct URL {
