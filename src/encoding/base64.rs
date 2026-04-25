@@ -70,7 +70,7 @@ impl Encoding {
     }
 
     #[allow(non_snake_case)]
-    pub fn DecodeString(&self, s: impl AsRef<str>) -> (Vec<byte>, error) {
+    pub fn DecodeString(&self, s: impl AsRef<str>) -> (crate::types::slice<byte>, error) {
         let src = s.as_ref().as_bytes();
         // Strip optional padding for raw variants that might still receive it.
         let mut end = src.len();
@@ -81,13 +81,13 @@ impl Encoding {
         }
         let src = &src[..end];
 
-        let mut out = Vec::with_capacity(src.len() * 3 / 4);
+        let mut out: Vec<byte> = Vec::with_capacity(src.len() * 3 / 4);
         let mut buf = [0i32; 4];
         let mut bi = 0;
         for &b in src {
             let v = self.decode_table[b as usize];
             if v < 0 {
-                return (Vec::new(), New(&format!("encoding/base64: invalid byte: {:#x}", b)));
+                return (crate::types::slice::new(), New(&format!("encoding/base64: invalid byte: {:#x}", b)));
             }
             buf[bi] = v as i32;
             bi += 1;
@@ -105,9 +105,9 @@ impl Encoding {
                 out.push(((buf[0] << 2) | (buf[1] >> 4)) as u8);
                 out.push(((buf[1] << 4) | (buf[2] >> 2)) as u8);
             }
-            _ => return (Vec::new(), New("encoding/base64: unexpected EOF")),
+            _ => return (crate::types::slice::new(), New("encoding/base64: unexpected EOF")),
         }
-        (out, nil)
+        (out.into(), nil)
     }
 }
 

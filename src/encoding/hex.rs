@@ -30,25 +30,25 @@ pub fn EncodeToString(src: &[byte]) -> string {
 
 /// Decode a hex string. Odd length or non-hex chars return an error.
 #[allow(non_snake_case)]
-pub fn DecodeString(s: impl AsRef<str>) -> (Vec<byte>, error) {
+pub fn DecodeString(s: impl AsRef<str>) -> (crate::types::slice<byte>, error) {
     let s = s.as_ref();
     if s.len() % 2 != 0 {
-        return (Vec::new(), New("encoding/hex: odd length hex string"));
+        return (crate::types::slice::new(), New("encoding/hex: odd length hex string"));
     }
     let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(s.len() / 2);
+    let mut out: Vec<byte> = Vec::with_capacity(s.len() / 2);
     for chunk in bytes.chunks(2) {
         let hi = match decode_nibble(chunk[0]) {
             Some(v) => v,
-            None => return (Vec::new(), invalid(chunk[0])),
+            None => return (crate::types::slice::new(), invalid(chunk[0])),
         };
         let lo = match decode_nibble(chunk[1]) {
             Some(v) => v,
-            None => return (Vec::new(), invalid(chunk[1])),
+            None => return (crate::types::slice::new(), invalid(chunk[1])),
         };
         out.push((hi << 4) | lo);
     }
-    (out, nil)
+    (out.into(), nil)
 }
 
 fn decode_nibble(b: u8) -> Option<u8> {

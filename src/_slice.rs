@@ -483,6 +483,9 @@ impl<T, U, const N: usize> PartialEq<[U; N]> for slice<T> where T: PartialEq<U> 
 impl<T, U, const N: usize> PartialEq<&[U; N]> for slice<T> where T: PartialEq<U> {
     fn eq(&self, other: &&[U; N]) -> bool { self.as_slice() == other.as_slice() }
 }
+impl<T, U> PartialEq<&[U]> for slice<T> where T: PartialEq<U> {
+    fn eq(&self, other: &&[U]) -> bool { self.as_slice() == *other }
+}
 
 #[cfg(test)]
 mod tests {
