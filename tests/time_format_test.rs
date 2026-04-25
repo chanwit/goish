@@ -71,7 +71,7 @@ test!{ fn TestAppendInt(t) {
         AiTest { r#in: 123456789, width: 9, want: "123456789" },
     ].into();
     for tt in &tests {
-        let got = time::AppendInt(Vec::new(), tt.r#in as i64, tt.width as i64);
+        let got = time::AppendInt(b"", tt.r#in as i64, tt.width as i64);
         let got_s = bytes::String(&got);
         if got_s != tt.want {
             t.Errorf(Sprintf!("appendInt(%d, %d) = %s, want %s", tt.r#in, tt.width, got_s, tt.want));

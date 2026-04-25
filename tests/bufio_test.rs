@@ -117,7 +117,7 @@ test!{ fn TestWriterFlushRequired(t) {
 }}
 
 test!{ fn TestReaderReadStringEmpty(t) {
-    let mut r = bufio::NewReader(Cursor::new(Vec::<u8>::new()));
+    let mut r = bufio::NewReader(Cursor::new(b""));
     let (s, err) = r.ReadString(b'\n');
     if err == nil { t.Errorf(Sprintf!("expected EOF")); }
     if s != "" { t.Errorf(Sprintf!("got %q", s)); }
