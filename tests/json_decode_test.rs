@@ -139,7 +139,7 @@ test!{ fn TestUnmarshalNestedArray(t) {
 test!{ fn TestUnmarshalNestedObject(t) {
     let input = "{\"outer\":{\"inner\":{\"k\":\"v\",\"n\":42},\"list\":[1,2,3]},\"other\":true}";
     let mut v = Value::Null;
-    json::Unmarshal(input.as_bytes(), &mut v);
+    json::Unmarshal(input, &mut v);
     if v.Get("outer").Get("inner").Get("k").String() != "v" {
         t.Errorf(Sprintf!("outer.inner.k mismatch"));
     }
@@ -169,7 +169,7 @@ test!{ fn TestUnmarshalRoundtrip(t) {
     ];
     for s in originals {
         let mut v = Value::Null;
-        let err = json::Unmarshal(s.as_bytes(), &mut v);
+        let err = json::Unmarshal(s, &mut v);
         if err != nil { t.Errorf(Sprintf!("Unmarshal(%q): %s", s, err)); continue; }
         let (b, err) = json::Marshal(&v);
         if err != nil { t.Errorf(Sprintf!("Marshal after Unmarshal(%q): %s", s, err)); continue; }
@@ -193,7 +193,7 @@ test!{ fn TestSkipArrayObjects(t) {
     // Parse deeply nested arrays/objects.
     let input = "[[{},[]],[[[{\"x\":1}]]]]";
     let mut v = Value::Null;
-    let err = json::Unmarshal(input.as_bytes(), &mut v);
+    let err = json::Unmarshal(input, &mut v);
     if err != nil { t.Errorf(Sprintf!("err: %s", err)); }
     if !v.IsArray() || v.Len() != 2 {
         t.Errorf(Sprintf!("skip: top-level Len = %d", v.Len()));
@@ -204,7 +204,7 @@ test!{ fn TestLargeString(t) {
     let big = "a".repeat(10000);
     let input = Sprintf!("\"%v\"", big);
     let mut v = Value::Null;
-    json::Unmarshal(input.as_bytes(), &mut v);
+    json::Unmarshal(input, &mut v);
     if v.String().len() != 10000 {
         t.Errorf(Sprintf!("large string len = %d, want 10000", v.String().len()));
     }

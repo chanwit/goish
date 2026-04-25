@@ -22,7 +22,7 @@ fn compareTests() -> slice<BinOpTest> { slice!([]BinOpTest{
 
 test!{ fn TestEqual(t) {
     for tt in &compareTests() {
-        let eql = bytes::Equal(tt.a.as_bytes(), tt.b.as_bytes());
+        let eql = bytes::Equal(&tt.a, &tt.b);
         if eql != (tt.i == 0) {
             t.Errorf(Sprintf!("Equal(%q, %q) = %v", tt.a, tt.b, eql));
         }
@@ -48,7 +48,7 @@ fn indexTests() -> slice<BinOpTest> { slice!([]BinOpTest{
 
 test!{ fn TestIndex(t) {
     for tt in &indexTests() {
-        let got = bytes::Index(tt.a.as_bytes(), tt.b.as_bytes());
+        let got = bytes::Index(&tt.a, &tt.b);
         if got != tt.i {
             t.Errorf(Sprintf!("Index(%q, %q) = %v; want %v",
                 tt.a, tt.b, got, tt.i));
@@ -75,7 +75,7 @@ fn lastIndexTests() -> slice<BinOpTest> { slice!([]BinOpTest{
 
 test!{ fn TestLastIndex(t) {
     for tt in &lastIndexTests() {
-        let got = bytes::LastIndex(tt.a.as_bytes(), tt.b.as_bytes());
+        let got = bytes::LastIndex(&tt.a, &tt.b);
         if got != tt.i {
             t.Errorf(Sprintf!("LastIndex(%q, %q) = %v; want %v",
                 tt.a, tt.b, got, tt.i));
@@ -95,7 +95,7 @@ test!{ fn TestIndexByte(t) {
     for tt in &cases {
         // Go's IndexByte takes a byte; we take the first byte of tt.b.
         let b = tt.b.as_bytes()[0];
-        let got = bytes::IndexByte(tt.a.as_bytes(), b);
+        let got = bytes::IndexByte(&tt.a, b);
         if got != tt.i {
             t.Errorf(Sprintf!("IndexByte(%q, %q) = %v; want %v",
                 tt.a, tt.b, got, tt.i));
