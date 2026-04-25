@@ -18,7 +18,7 @@ fn spawn_million_goroutines() {
     let counter = Arc::new(AtomicUsize::new(0));
 
     let start = Instant::now();
-    let mut handles = Vec::with_capacity(N);
+    let mut handles: slice<Goroutine> = slice::with_capacity(N);
     for _ in 0..N {
         let c = counter.clone();
         handles.push(go!{
@@ -97,7 +97,7 @@ fn million_goroutines_per_request_channels() {
     // Each "request" has its own reply channel. Main spawns N goroutines
     // each with its own reply channel, then spawns N "server" goroutines
     // that respond. 2M goroutines total, minimal contention per channel.
-    let mut replies = Vec::with_capacity(N);
+    let mut replies: slice<Chan<i64>> = slice::with_capacity(N);
     for i in 0..N {
         let reply = chan!(i64, 1);
         let reply_server = reply.clone();
