@@ -5,14 +5,14 @@
 use goish::prelude::*;
 
 test!{ fn TestRuneCountInString(t) {
-    let cases: Vec<(&str, i64)> = vec![
+    let cases: slice<(&str, int)> = vec![
         ("", 0),
         ("abcd", 4),
         ("☺☻☹", 3),
         ("1,2,3,4", 7),
         ("日本語", 3),
         ("aé", 2),
-    ];
+    ].into();
     for (inp, want) in cases {
         let got = utf8::RuneCountInString(inp);
         if got != want {
@@ -31,7 +31,7 @@ test!{ fn TestValidString(t) {
 }}
 
 test!{ fn TestRuneLen(t) {
-    let cases: Vec<(i32, i64)> = vec![
+    let cases: slice<(i32, int)> = vec![
         (0x00, 1),       // ASCII
         (0x7f, 1),
         (0x80, 2),       // two bytes
@@ -42,7 +42,7 @@ test!{ fn TestRuneLen(t) {
         (0x10ffff, 4),   // max valid
         (-1, -1),        // invalid
         (0x110000, -1),  // out of range
-    ];
+    ].into();
     for (r, want) in cases {
         let got = utf8::RuneLen(r);
         if got != want {
@@ -73,12 +73,12 @@ test!{ fn TestEncodeRune(t) {
 }}
 
 test!{ fn TestDecodeRuneInString(t) {
-    let cases: Vec<(&str, i32, i64)> = vec![
+    let cases: slice<(&str, i32, int)> = vec![
         ("A", 0x41, 1),
         ("é", 0xe9, 2),
         ("中", 0x4e2d, 3),
         ("😀", 0x1f600, 4),
-    ];
+    ].into();
     for (inp, want_rune, want_size) in cases {
         let (r, n) = utf8::DecodeRuneInString(inp);
         if r != want_rune || n != want_size {
