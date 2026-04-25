@@ -108,7 +108,7 @@ test!{ fn TestScanWords(t) {
 
 test!{ fn TestScanLineTooLong(t) {
     // Build a long single line exceeding MaxTokenSize (256 for test).
-    let long: String = std::iter::repeat('a').take(1000).collect();
+    let long = strings::Repeat("a", 1000);
     let input = Sprintf!("%v\n", long);
     let mut sc = bufio::NewScanner(Cursor::new(input));
     sc.Split(bufio::ScanLines);

@@ -77,7 +77,7 @@ test!{ fn TestBuilderGrow(t) {
         if b.Cap() < grow_len {
             t.Errorf(Sprintf!("growLen=%d: Cap() = %d, want >= %d", grow_len, b.Cap(), grow_len));
         }
-        let p = std::iter::repeat('a').take(grow_len as usize).collect::<String>();
+        let p = strings::Repeat("a", grow_len);
         b.WriteString(&p);
         if b.String() != p {
             t.Errorf(Sprintf!("growLen=%d: String mismatch", grow_len));
