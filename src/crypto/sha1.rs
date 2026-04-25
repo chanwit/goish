@@ -23,7 +23,8 @@ pub fn New() -> Digest {
 }
 
 impl Digest {
-    pub fn Write(&mut self, p: &[byte]) -> (int, crate::errors::error) {
+    pub fn Write(&mut self, p: impl AsRef<[byte]>) -> (int, crate::errors::error) {
+        let p = p.as_ref();
         self.len = self.len.wrapping_add(p.len() as u64);
         self.buf.extend_from_slice(p);
         while self.buf.len() >= 64 {

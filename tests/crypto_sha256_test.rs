@@ -63,7 +63,7 @@ test!{ fn TestGolden(t) {
             continue;
         }
         let mut c = crypto::sha256::New();
-        c.Write(g.inp.as_bytes());
+        c.Write(g.inp);
         let s1 = to_hex(&c.Sum(&[]));
         if s1 != g.out {
             t.Errorf(Sprintf!("streaming: sha256(%s) = %s want %s", g.inp, s1, g.out));

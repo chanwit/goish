@@ -71,7 +71,7 @@ test!{ fn TestGolden(t) {
         }
         // Streaming: write input, Sum, compare.
         let mut c = crypto::md5::New();
-        c.Write(g.inp.as_bytes());
+        c.Write(g.inp);
         let s1 = to_hex(&c.Sum(&[]));
         if s1 != g.out {
             t.Errorf(Sprintf!("streaming: md5(%s) = %s want %s", g.inp, s1, g.out));
@@ -88,7 +88,7 @@ test!{ fn TestGolden(t) {
         }
         // Reset + rewrite should give same result.
         c.Reset();
-        c.Write(g.inp.as_bytes());
+        c.Write(g.inp);
         let s3 = to_hex(&c.Sum(&[]));
         if s3 != g.out {
             t.Errorf(Sprintf!("post-reset: md5(%s) = %s want %s", g.inp, s3, g.out));
