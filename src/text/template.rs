@@ -67,15 +67,30 @@ impl Template {
     pub fn Name(&self) -> &str { &self.name }
 
     /// `t.Execute(w, data)` — render the template against `data`,
-    /// appending to `w` (any type that accepts `push_str`).
-    pub fn Execute(&self, out: &mut String, data: &Value) -> crate::errors::error {
-        render(&self.root, out, data, self)
+    /// writing the rendered output to `w`. Mirrors Go's
+    /// `(*Template).Execute(io.Writer, any) error`. Goish accepts any
+    /// `std::io::Write`, so `bytes::Buffer`, `os::Stdout`, and
+    /// `Vec<u8>` all work directly.
+    pub fn Execute<W: std::io::Write>(&self, out: &mut W, data: &Value) -> crate::errors::error {
+        let mut buf = String::new();
+        let e = render(&self.root, &mut buf, data, self);
+        if e != crate::errors::nil { return e; }
+        match out.write_all(buf.as_bytes()) {
+            Ok(()) => crate::errors::nil,
+            Err(e) => crate::errors::New(&format!("template: write: {}", e)),
+        }
     }
 
-    pub fn ExecuteTemplate(&self, out: &mut String, name: &str, data: &Value) -> crate::errors::error {
-        match self.defines.get(name) {
-            Some(nodes) => render(nodes, out, data, self),
-            None => crate::errors::New(&format!("template: no template {:?} associated with template {:?}", name, self.name)),
+    pub fn ExecuteTemplate<W: std::io::Write>(&self, out: &mut W, name: &str, data: &Value) -> crate::errors::error {
+        let mut buf = String::new();
+        let e = match self.defines.get(name) {
+            Some(nodes) => render(nodes, &mut buf, data, self),
+            None => return crate::errors::New(&format!("template: no template {:?} associated with template {:?}", name, self.name)),
+        };
+        if e != crate::errors::nil { return e; }
+        match out.write_all(buf.as_bytes()) {
+            Ok(()) => crate::errors::nil,
+            Err(e) => crate::errors::New(&format!("template: write: {}", e)),
         }
     }
 }
@@ -333,10 +348,10 @@ mod tests {
     fn exec(src: &str, data: &Value) -> String {
         let (t, err) = New("t").Parse(src);
         assert!(err == crate::errors::nil, "parse error: {}", err);
-        let mut out = String::new();
+        let mut out: Vec<u8> = Vec::new();
         let e = t.Execute(&mut out, data);
         assert!(e == crate::errors::nil, "exec error: {}", e);
-        out
+        String::from_utf8(out).unwrap()
     }
 
     #[test]

@@ -11,10 +11,10 @@ use serde_json::json;
 fn exec(src: &str, data: &serde_json::Value) -> string {
     let (t, err) = template::New("t").Parse(src);
     if err != nil { panic!("parse error: {}", err); }
-    let mut out = String::new();
+    let mut out = bytes::Buffer::new();
     let e = t.Execute(&mut out, data);
     if e != nil { panic!("exec error: {}", e); }
-    out.into()
+    out.String()
 }
 
 test!{ fn TestPlainText(t) {
