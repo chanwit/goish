@@ -19,9 +19,10 @@ fn main() {
 
     // Normalize with strings helpers.
     let compact = regexp::MustCompile(r"\s+");
-    let normalized: slice<string> = lines.iter()
-        .map(|l| compact.ReplaceAllString(strings::TrimSpace(l), " "))
-        .collect();
+    let mut normalized: slice<string> = slice::new();
+    for l in lines.iter() {
+        normalized.push(compact.ReplaceAllString(strings::TrimSpace(l), " "));
+    }
 
     // Parse out method / url / status.
     let parts_re = regexp::MustCompile(r"^(\w+)\s+(\S+)\s+(\d+)$");
@@ -30,7 +31,7 @@ fn main() {
     let mut reqs: slice<Req> = slice::new();
     for l in &normalized {
         let caps = parts_re.FindStringSubmatch(l);
-        if caps.is_empty() { continue; }
+        if len!(caps) == 0 { continue; }
         let (u, err) = url::Parse(&caps[2]);
         if err != nil { continue; }
         reqs.push(Req {
@@ -53,8 +54,10 @@ fn main() {
     // Print a table.
     fmt::Printf!("%-32s %s\n", "host", "count");
     fmt::Println!(strings::Repeat("-", 40));
-    let mut entries: slice<(string, int)> = by_host.iter()
-        .map(|(k, v)| (k.clone(), *v)).collect();
+    let mut entries: slice<(string, int)> = slice::new();
+    for (k, v) in by_host.iter() {
+        entries.push((k.clone(), *v));
+    }
     sort::Slice(&mut entries, |a, b| a.0 < b.0);
     for (h, c) in &entries {
         fmt::Printf!("%-32s %d\n", h, c);
@@ -63,13 +66,13 @@ fn main() {
     // Build a JSON summary.
     let mut summary = json::Value::Object(Vec::new());
     summary.Set("total", json::Value::Number(reqs.len() as f64));
-    let hosts_arr: slice<json::Value> = entries.iter()
-        .map(|(h, c)| {
-            let mut obj = json::Value::Object(Vec::new());
-            obj.Set("host", json::Value::String(h.clone()));
-            obj.Set("count", json::Value::Number(*c as f64));
-            obj
-        }).collect();
+    let mut hosts_arr: slice<json::Value> = slice::new();
+    for (h, c) in entries.iter() {
+        let mut obj = json::Value::Object(Vec::new());
+        obj.Set("host", json::Value::String(h.clone()));
+        obj.Set("count", json::Value::Number(*c as f64));
+        hosts_arr.push(obj);
+    }
     summary.Set("hosts", json::Array(hosts_arr));
     let (out, _) = json::MarshalIndent(&summary, "", "  ");
     fmt::Println!();
