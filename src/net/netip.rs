@@ -112,10 +112,10 @@ impl Addr {
         out
     }
 
-    pub fn AsSlice(&self) -> Vec<u8> {
-        if !self.valid { return Vec::new(); }
-        if self.is4 { return self.As4().to_vec(); }
-        self.As16().to_vec()
+    pub fn AsSlice(&self) -> crate::types::slice<u8> {
+        if !self.valid { return crate::types::slice::new(); }
+        if self.is4 { return self.As4().to_vec().into(); }
+        self.As16().to_vec().into()
     }
 
     pub fn BitLen(&self) -> i64 {
@@ -234,9 +234,9 @@ impl Addr {
         Addr { hi, lo, is4: false, zone_idx: self.zone_idx, valid: true }
     }
 
-    pub fn MarshalText(&self) -> (Vec<u8>, error) {
-        if !self.valid { return (Vec::new(), nil); }
-        (self.String().as_bytes().to_vec(), nil)
+    pub fn MarshalText(&self) -> (crate::types::slice<u8>, error) {
+        if !self.valid { return (crate::types::slice::new(), nil); }
+        (self.String().as_bytes().to_vec().into(), nil)
     }
 }
 
