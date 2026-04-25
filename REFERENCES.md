@@ -1340,6 +1340,30 @@ or where the port deliberately simplifies:
   runtime tests** (`tests/http_client_serve_test.rs`) — hyper drives its
   own runtime, mixing in tokio-tasks dead-locks. All four keep
   `std::thread::spawn`.
+- **`Vec<T>` that is Goish-correct (not leaks).** Tests/examples cannot
+  always use `slice<T>` in place of `Vec<T>`; documented categories:
+  (a) **`mpsc::Receiver<Vec<...>>`** — std mpsc API requires `Vec`,
+  out of Goish's control (`tests/net_smtp_test.rs`).
+  (b) **Explicit benchmarks** comparing thread-vs-task or paired
+  Vec-vs-slice timings (`tests/chan_bench.rs` — 3 sites).
+  (c) **`Vec<(T, &[u8])>`** with mixed-size byte-array literals — the
+  `vec![tuples].into()` form fails because Vec's element-type inference
+  picks the smallest array size; explicit `&[…u8]` casts on each row
+  would be uglier than the Vec form (`tests/unicode_utf8_test.rs:55`).
+  (d) **`Vec<char>` from `.chars().collect()`** — chars iter is
+  Rust-only; no Goish `slice<char>` analog for char-by-char iteration
+  (`tests/bufio_scan_test.rs:61`).
+  (e) **Empty multi-generic constructor** like `Vec::<Cursor<Vec<u8>>>::new()`
+  for `MultiReader` with no inputs — both type params can't be pinned
+  via `slice` (`tests/io_test.rs:183`).
+  (f) **Generic helper fns without `T: Clone` bound** —
+  `fn drain_to_vec<T>(h: &mut Heap<T>) -> Vec<T>` can't return
+  `slice<T>` because `slice` requires `Clone` for many ops
+  (`tests/container_heap_test.rs:29`).
+  (g) **`json::Value::Array(Vec<Value>)` / `Object(Vec<(string, Value)>)`**
+  enum variants — the lib intentionally uses `Vec` for insertion-ordered
+  JSON storage; sweeping to `slice` would be a 39-site breaking change
+  with no semantic improvement (`examples/webscrape.rs`, et al).
 
 ---
 
