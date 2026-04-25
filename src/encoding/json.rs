@@ -23,7 +23,7 @@ pub use serde_json::Value as RawValue;
 
 /// json.RawMessage — a byte slice representing raw JSON, used to defer
 /// parsing of a sub-tree.
-pub type RawMessage = Vec<byte>;
+pub type RawMessage = crate::types::slice<byte>;
 
 /// json.Value — a JSON value. Equivalent to Go's `interface{}` after an
 /// Unmarshal into a non-typed destination.
