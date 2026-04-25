@@ -40,7 +40,10 @@ fn main() {
 
     fmt::Println!("env entries:", env.len());
     // Map iteration order is unspecified — sort for stable demo output.
-    let mut env_keys: slice<&string> = env.keys().collect();
+    let mut env_keys: slice<&string> = slice::new();
+    for k in env.keys() {
+        env_keys.push(k);
+    }
     env_keys.sort();
     for k in &env_keys {
         fmt::Printf!("  %-8s = %d\n", k, env[*k]);

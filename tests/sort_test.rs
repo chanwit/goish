@@ -67,7 +67,8 @@ test!{ fn TestSortSliceStable(t) {
     ];
     sort::SliceStable(&mut data, |a, b| a.0 < b.0);
     // All 1s first (in original order a, c, e), then 2s (b, d).
-    let tags: Vec<&str> = data.iter().map(|p| p.1).collect();
+    let mut tags: Vec<&str> = Vec::with_capacity(data.len());
+    for p in &data { tags.push(p.1); }
     if tags != vec!["a", "c", "e", "b", "d"] {
         t.Errorf(Sprintf!("SliceStable did not preserve order"));
     }
