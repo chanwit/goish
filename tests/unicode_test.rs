@@ -59,7 +59,7 @@ test!{ fn TestIsUpperLower(t) {
 }}
 
 test!{ fn TestToUpper(t) {
-    let cases: Vec<(char, char)> = vec![('a', 'A'), ('z', 'Z'), ('A', 'A'), ('0', '0'), ('é', 'É')];
+    let cases: slice<(char, char)> = vec![('a', 'A'), ('z', 'Z'), ('A', 'A'), ('0', '0'), ('é', 'É')].into();
     for (inp, want) in cases {
         let got = unicode::ToUpper(inp as u32 as i32) as u32;
         if got != want as u32 {
@@ -69,7 +69,7 @@ test!{ fn TestToUpper(t) {
 }}
 
 test!{ fn TestToLower(t) {
-    let cases: Vec<(char, char)> = vec![('A', 'a'), ('Z', 'z'), ('a', 'a'), ('0', '0'), ('É', 'é')];
+    let cases: slice<(char, char)> = vec![('A', 'a'), ('Z', 'z'), ('a', 'a'), ('0', '0'), ('É', 'é')].into();
     for (inp, want) in cases {
         let got = unicode::ToLower(inp as u32 as i32) as u32;
         if got != want as u32 {
