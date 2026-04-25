@@ -63,7 +63,7 @@ fn to_hex(bytes: &[u8]) -> String {
 test!{ fn TestGolden(t) {
     let __golden = golden();
     for (_, g) in range!(__golden) {
-        let sum = crypto::md5::Sum(g.inp.as_bytes());
+        let sum = crypto::md5::Sum(g.inp);
         let hex = to_hex(&sum);
         if hex != g.out {
             t.Errorf(Sprintf!("Sum function: md5(%s) = %s want %s", g.inp, hex, g.out));

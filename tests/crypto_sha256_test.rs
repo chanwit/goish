@@ -56,7 +56,7 @@ fn to_hex(bytes: &[u8]) -> String {
 test!{ fn TestGolden(t) {
     let __golden = golden();
     for (_, g) in range!(__golden) {
-        let sum = crypto::sha256::Sum256(g.inp.as_bytes());
+        let sum = crypto::sha256::Sum256(g.inp);
         let hex = to_hex(&sum);
         if hex != g.out {
             t.Errorf(Sprintf!("Sum: sha256(%s) = %s want %s", g.inp, hex, g.out));

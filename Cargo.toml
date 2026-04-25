@@ -3,7 +3,7 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.21.53"
+version = "0.21.54"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]

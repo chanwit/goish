@@ -51,7 +51,7 @@ fn golden() -> slice<Golden> {
 test!{ fn TestGolden(t) {
     let __golden = golden();
     for (_, g) in range!(__golden) {
-        let got = hash::crc32::ChecksumIEEE(g.inp.as_bytes());
+        let got = hash::crc32::ChecksumIEEE(g.inp);
         if got != g.ieee {
             t.Errorf(Sprintf!("ChecksumIEEE(%q) = %x, want %x", g.inp, got as i64, g.ieee as i64));
         }
