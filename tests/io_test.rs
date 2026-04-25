@@ -121,7 +121,7 @@ test!{ fn TestTeeReader(t) {
 }}
 
 test!{ fn TestSectionReader_ReadAt(t) {
-    let data: Vec<u8> = b"0123456789".to_vec();
+    let data = b"0123456789";
     let sr = gio::NewSectionReader(data, 2, 5);
     let mut buf = [0u8; 5];
     let (n, err) = sr.ReadAt(&mut buf, 0);
@@ -133,13 +133,13 @@ test!{ fn TestSectionReader_ReadAt(t) {
 }}
 
 test!{ fn TestSectionReader_Size(t) {
-    let data: Vec<u8> = b"0123456789".to_vec();
+    let data = b"0123456789";
     let sr = gio::NewSectionReader(data, 2, 7);
     if sr.Size() != 7 { t.Errorf(Sprintf!("Size = %d, want 7", sr.Size())); }
 }}
 
 test!{ fn TestSectionReader_Seek(t) {
-    let data: Vec<u8> = b"0123456789".to_vec();
+    let data = b"0123456789";
     let mut sr = gio::NewSectionReader(data, 2, 5);
     // Seek from start to offset 1 (absolute: base+1 = 3)
     let (p, err) = sr.Seek(1, gio::SeekStart);

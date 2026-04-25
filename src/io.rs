@@ -555,6 +555,18 @@ impl ReaderAt for &[byte] {
     }
 }
 
+impl<const N: usize> ReaderAt for &[byte; N] {
+    fn ReadAt(&self, p: &mut [byte], off: int64) -> (int, error) {
+        (self.as_slice()).ReadAt(p, off)
+    }
+}
+
+impl ReaderAt for crate::types::slice<byte> {
+    fn ReadAt(&self, p: &mut [byte], off: int64) -> (int, error) {
+        self.as_slice().ReadAt(p, off)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
