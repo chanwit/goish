@@ -51,12 +51,12 @@ impl MIMEHeader {
         "".into()
     }
 
-    pub fn Values(&self, key: &str) -> Vec<string> {
+    pub fn Values(&self, key: &str) -> crate::types::slice<string> {
         let k = CanonicalMIMEHeaderKey(key);
         for (ek, ev) in self.entries.iter() {
-            if *ek == k { return ev.clone(); }
+            if *ek == k { return ev.clone().into(); }
         }
-        Vec::new()
+        crate::types::slice::new()
     }
 
     pub fn Del(&mut self, key: &str) {

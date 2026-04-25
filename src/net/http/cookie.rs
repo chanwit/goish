@@ -118,28 +118,28 @@ impl Cookie {
 
 // ── ParseCookie (Cookie request header) ─────────────────────────────
 
-pub fn ParseCookie(line: &str) -> (Vec<Cookie>, error) {
+pub fn ParseCookie(line: &str) -> (crate::types::slice<Cookie>, error) {
     let parts: Vec<&str> = trim_string(line).split(';').collect();
     if parts.len() == 1 && parts[0].is_empty() {
-        return (Vec::new(), New("http: blank cookie"));
+        return (crate::types::slice::new(), New("http: blank cookie"));
     }
-    let mut out = Vec::with_capacity(parts.len());
+    let mut out: Vec<Cookie> = Vec::with_capacity(parts.len());
     for s in &parts {
         let s = trim_string(s);
         let (name, value) = match s.find('=') {
             Some(i) => (&s[..i], &s[i + 1..]),
-            None => return (Vec::new(), New("http: '=' not found in cookie")),
+            None => return (crate::types::slice::new(), New("http: '=' not found in cookie")),
         };
         if !is_token(name) {
-            return (Vec::new(), New("http: invalid cookie name"));
+            return (crate::types::slice::new(), New("http: invalid cookie name"));
         }
         let (val, quoted, ok) = parse_cookie_value(value, true);
         if !ok {
-            return (Vec::new(), New("http: invalid cookie value"));
+            return (crate::types::slice::new(), New("http: invalid cookie value"));
         }
         out.push(Cookie { Name: name.into(), Value: val, Quoted: quoted, ..Cookie::default() });
     }
-    (out, nil)
+    (out.into(), nil)
 }
 
 // ── ParseSetCookie (Set-Cookie response header) ────────────────────

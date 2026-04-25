@@ -73,20 +73,20 @@ where
     }
 }
 
-/// Collect a `Seq<V>` into a `Vec<V>`.
+/// Collect a `Seq<V>` into a `slice<V>`.
 #[allow(non_snake_case)]
-pub fn Collect<V, S: Seq<V>>(mut seq: S) -> Vec<V> {
-    let mut out = Vec::new();
+pub fn Collect<V, S: Seq<V>>(mut seq: S) -> crate::types::slice<V> {
+    let mut out: Vec<V> = Vec::new();
     seq.for_each(|v| { out.push(v); true });
-    out
+    out.into()
 }
 
-/// Collect a `Seq2<K, V>` into a `Vec<(K, V)>`.
+/// Collect a `Seq2<K, V>` into a `slice<(K, V)>`.
 #[allow(non_snake_case)]
-pub fn Collect2<K, V, S: Seq2<K, V>>(mut seq: S) -> Vec<(K, V)> {
-    let mut out = Vec::new();
+pub fn Collect2<K, V, S: Seq2<K, V>>(mut seq: S) -> crate::types::slice<(K, V)> {
+    let mut out: Vec<(K, V)> = Vec::new();
     seq.for_each(|k, v| { out.push((k, v)); true });
-    out
+    out.into()
 }
 
 #[cfg(test)]
