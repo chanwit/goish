@@ -179,12 +179,12 @@ test!{ fn TestURLString(t) {
 }}
 
 test!{ fn TestURLHostnameAndPort(t) {
-    let cases: Vec<(&str, &str, &str)> = vec![
+    let cases: slice<(&str, &str, &str)> = vec![
         ("foo.com:80", "foo.com", "80"),
         ("foo.com", "foo.com", ""),
         ("[1::6]:8080", "1::6", "8080"),
         ("[1::6]", "1::6", ""),
-    ];
+    ].into();
     for (host, hn, port) in cases {
         let u = url::URL { Host: host.into(), ..Default::default() };
         if u.Hostname() != hn {
@@ -197,13 +197,13 @@ test!{ fn TestURLHostnameAndPort(t) {
 }}
 
 test!{ fn TestRequestURI(t) {
-    let cases: Vec<(&str, &str)> = vec![
+    let cases: slice<(&str, &str)> = vec![
         ("http://example.com/foo", "/foo"),
         ("http://example.com/", "/"),
         ("http://example.com", "/"),
         ("http://example.com/path?q=1", "/path?q=1"),
         ("mailto:user@example.com", "user@example.com"),
-    ];
+    ].into();
     for (input, want) in cases {
         let (u, _) = url::Parse(input);
         let got = u.RequestURI();
