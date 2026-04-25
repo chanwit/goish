@@ -190,10 +190,10 @@ pub fn Chdir(path: impl AsRef<str>) -> error {
 
 /// os.ReadFile(path) → (bytes, error)
 #[allow(non_snake_case)]
-pub fn ReadFile(path: impl AsRef<str>) -> (Vec<crate::types::byte>, error) {
+pub fn ReadFile(path: impl AsRef<str>) -> (crate::types::slice<crate::types::byte>, error) {
     match std::fs::read(path.as_ref()) {
-        Ok(b) => (b, nil),
-        Err(e) => (Vec::new(), New(&format!("os.ReadFile: {}", e))),
+        Ok(b) => (b.into(), nil),
+        Err(e) => (crate::types::slice::new(), New(&format!("os.ReadFile: {}", e))),
     }
 }
 

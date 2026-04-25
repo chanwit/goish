@@ -16,16 +16,18 @@
 use crate::types::map;
 use std::hash::Hash;
 
-/// `maps.Keys(m)` — collect keys into a Vec (order is arbitrary).
+/// `maps.Keys(m)` — collect keys into a slice (order is arbitrary).
 #[allow(non_snake_case)]
-pub fn Keys<K: Clone + Eq + Hash, V>(m: &map<K, V>) -> Vec<K> {
-    m.keys().cloned().collect()
+pub fn Keys<K: Clone + Eq + Hash, V>(m: &map<K, V>) -> crate::types::slice<K> {
+    let v: Vec<K> = m.keys().cloned().collect();
+    v.into()
 }
 
-/// `maps.Values(m)` — collect values into a Vec (order is arbitrary).
+/// `maps.Values(m)` — collect values into a slice (order is arbitrary).
 #[allow(non_snake_case)]
-pub fn Values<K: Eq + Hash, V: Clone>(m: &map<K, V>) -> Vec<V> {
-    m.values().cloned().collect()
+pub fn Values<K: Eq + Hash, V: Clone>(m: &map<K, V>) -> crate::types::slice<V> {
+    let v: Vec<V> = m.values().cloned().collect();
+    v.into()
 }
 
 /// `maps.Equal(m1, m2)` — equal iff same keys and equal values.
