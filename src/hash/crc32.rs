@@ -52,8 +52,8 @@ pub fn Update(crc: u32, tab: &Table, p: &[byte]) -> u32 {
 }
 
 #[allow(non_snake_case)]
-pub fn ChecksumIEEE(data: &[byte]) -> u32 {
-    Checksum(data, IEEETable())
+pub fn ChecksumIEEE(data: impl AsRef<[byte]>) -> u32 {
+    Checksum(data.as_ref(), IEEETable())
 }
 
 /// hash.Hash32 interface — state machine style.
@@ -63,7 +63,8 @@ pub struct Hash32 {
 }
 
 impl Hash32 {
-    pub fn Write(&mut self, p: &[byte]) -> (int, crate::errors::error) {
+    pub fn Write(&mut self, p: impl AsRef<[byte]>) -> (int, crate::errors::error) {
+        let p = p.as_ref();
         for &b in p {
             self.crc = self.tab.0[((self.crc ^ b as u32) & 0xff) as usize] ^ (self.crc >> 8);
         }
@@ -73,7 +74,8 @@ impl Hash32 {
 
     /// `h.Sum(b)` — append the big-endian 32-bit CRC to `b` and return
     /// the result. Matches Go's `hash.Hash.Sum(in []byte) []byte`.
-    pub fn Sum(&self, b: &[byte]) -> crate::types::slice<byte> {
+    pub fn Sum(&self, b: impl AsRef<[byte]>) -> crate::types::slice<byte> {
+        let b = b.as_ref();
         let s = self.Sum32();
         let mut out = crate::types::slice::with_capacity(b.len() + 4);
         out.extend_from_slice(b);
