@@ -108,15 +108,15 @@ test!{ fn TestLimitReader(t) {
 
 test!{ fn TestTeeReader(t) {
     let src = Cursor::new(b"hello");
-    let mut mirror: Vec<u8> = Vec::new();
+    let mut mirror = bytes::Buffer::new();
     let mut tr = gio::TeeReader(src, &mut mirror);
     let (buf, err) = gio::ReadAll(&mut tr);
     if err != nil { t.Errorf(Sprintf!("ReadAll err: %s", err)); }
     if buf != b"hello" {
         t.Errorf(Sprintf!("TeeReader ReadAll = %s", bytes::String(&buf)));
     }
-    if mirror != b"hello" {
-        t.Errorf(Sprintf!("TeeReader mirror = %s", bytes::String(&mirror)));
+    if mirror.Bytes() != b"hello" {
+        t.Errorf(Sprintf!("TeeReader mirror = %s", mirror.String()));
     }
 }}
 
