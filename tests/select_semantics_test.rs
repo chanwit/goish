@@ -101,15 +101,14 @@ test!{ fn TestSelectExprEvaluatedOnce(t) {
 // runner mask the wake-latency signal entirely.
 
 test!{ fn TestSelectWakeLatency(t) {
-    use std::sync::{Arc, Mutex};
     let c: Chan<i64> = chan!(i64, 0);
     let cc = c.clone();
-    let send_at: Arc<Mutex<Option<std::time::Instant>>> = Arc::new(Mutex::new(None));
+    let send_at: sync::Mutex<Option<std::time::Instant>> = sync::Mutex::new(None);
     let sa = send_at.clone();
     go!{
         std::thread::sleep(std::time::Duration::from_millis(10));
         // Timestamp the moment just before the rendezvous completes.
-        *sa.lock().unwrap() = Some(std::time::Instant::now());
+        *sa.Lock() = Some(std::time::Instant::now());
         cc.Send(42);
     };
     let mut got: i64 = 0;
@@ -120,7 +119,7 @@ test!{ fn TestSelectWakeLatency(t) {
     if got != 42 {
         t.Errorf(Sprintf!("got %d want 42", got));
     }
-    let sent_at = send_at.lock().unwrap().expect("sender did not set timestamp");
+    let sent_at = send_at.Lock().expect("sender did not set timestamp");
     let latency = received_at.duration_since(sent_at);
     // The old macro_rules! select would add up to 1 ms of spin-sleep on
     // top of the send-to-receive handoff. Park-based select should be
