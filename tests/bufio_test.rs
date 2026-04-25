@@ -72,7 +72,7 @@ test!{ fn TestReaderReadRune(t) {
 }}
 
 test!{ fn TestWriterWriteString(t) {
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = bytes::Buffer::new();
     {
         let mut w = bufio::NewWriter(&mut buf);
         let (n, err) = w.WriteString("hello, world");
@@ -82,20 +82,20 @@ test!{ fn TestWriterWriteString(t) {
             t.Errorf(Sprintf!("Flush err"));
         }
     }
-    if buf != b"hello, world" {
-        t.Errorf(Sprintf!("buf = %q", bytes::String(&buf)));
+    if buf.Bytes() != b"hello, world" {
+        t.Errorf(Sprintf!("buf = %q", buf.String()));
     }
 }}
 
 test!{ fn TestWriterWriteByte(t) {
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = bytes::Buffer::new();
     {
         let mut w = bufio::NewWriter(&mut buf);
         for b in b"abcdef" { let _ = w.WriteByte(*b); }
         let _ = w.Flush();
     }
-    if buf != b"abcdef" {
-        t.Errorf(Sprintf!("buf = %q", bytes::String(&buf)));
+    if buf.Bytes() != b"abcdef" {
+        t.Errorf(Sprintf!("buf = %q", buf.String()));
     }
 }}
 
@@ -103,7 +103,7 @@ test!{ fn TestWriterFlushRequired(t) {
     // Without Flush, the backing writer must not see data (until BufWriter
     // is full, which doesn't happen for small writes). Verify content is
     // nonexistent before Flush, and present after.
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = bytes::Buffer::new();
     let mut w = bufio::NewWriter(&mut buf);
     let _ = w.WriteString("abc");
     // buf is borrowed; we can't check it mid-flight. Just verify Flush
@@ -111,8 +111,8 @@ test!{ fn TestWriterFlushRequired(t) {
     let err = w.Flush();
     if err != nil { t.Errorf(Sprintf!("Flush: %s", err)); }
     drop(w);
-    if buf != b"abc" {
-        t.Errorf(Sprintf!("buf after Flush = %q", bytes::String(&buf)));
+    if buf.Bytes() != b"abc" {
+        t.Errorf(Sprintf!("buf after Flush = %q", buf.String()));
     }
 }}
 
@@ -124,7 +124,7 @@ test!{ fn TestReaderReadStringEmpty(t) {
 }}
 
 test!{ fn TestWriterMultipleWrites(t) {
-    let mut buf: Vec<u8> = Vec::new();
+    let mut buf = bytes::Buffer::new();
     {
         let mut w = bufio::NewWriter(&mut buf);
         for _ in 0..100 {
@@ -132,7 +132,7 @@ test!{ fn TestWriterMultipleWrites(t) {
         }
         let _ = w.Flush();
     }
-    if buf.len() != 300 {
-        t.Errorf(Sprintf!("buf len = %d, want 300", buf.len()));
+    if buf.Len() != 300 {
+        t.Errorf(Sprintf!("buf len = %d, want 300", buf.Len()));
     }
 }}
