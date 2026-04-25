@@ -560,6 +560,17 @@ macro_rules! make {
             v
         }
     };
+    // make(list[T]) — Goish form for `l := list.New()`. Hides the
+    // turbofish that bare `container::list::New::<T>()` would force.
+    (list [$t:ty]) => {
+        $crate::container::list::New::<$t>()
+    };
+    // make(ring[T], n) — Goish form for `r := ring.New(n)`. ring::New
+    // takes `int` (i64), not usize, so we cast — works for any numeric
+    // literal at the call site.
+    (ring [$t:ty], $n:expr) => {
+        $crate::container::ring::New::<$t>(($n) as $crate::types::int)
+    };
 }
 
 /// Two forms — pick the one closest to your Go original:

@@ -52,7 +52,7 @@ fn verify(t: &goish::testing::T, r: &Ring<i64>, N: i64, want_sum: i64) {
 }
 
 fn makeN(n: i64) -> Ring<i64> {
-    let r = ring::New::<i64>(n);
+    let r = make!(ring[i64], n);
     if n == 0 { return r; }
     r.SetValue(1);
     let mut cur = r.Next();
@@ -83,7 +83,7 @@ test!{ fn TestCornerCases(t) {
 
 test!{ fn TestNew(t) {
     for i in 0..10i64 {
-        let r = ring::New::<i64>(i);
+        let r = make!(ring[i64], i);
         verify(t, &r, i, -1);
     }
     for i in 0..10i64 {

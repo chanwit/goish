@@ -15,14 +15,14 @@ fn values(l: &list::List<i64>) -> Vec<i64> {
 }
 
 test!{ fn TestNewEmpty(t) {
-    let l: list::List<i64> = list::New();
+    let l = make!(list[i64]);
     if l.Len() != 0 { t.Errorf(Sprintf!("empty Len = %d", l.Len())); }
     if l.Front().is_some() { t.Errorf(Sprintf!("empty Front should be None")); }
     if l.Back().is_some() { t.Errorf(Sprintf!("empty Back should be None")); }
 }}
 
 test!{ fn TestPushBack(t) {
-    let mut l: list::List<i64> = list::New();
+    let mut l = make!(list[i64]);
     l.PushBack(1); l.PushBack(2); l.PushBack(3);
     if l.Len() != 3 { t.Errorf(Sprintf!("Len = %d, want 3", l.Len())); }
     let got = values(&l);
@@ -32,7 +32,7 @@ test!{ fn TestPushBack(t) {
 }}
 
 test!{ fn TestPushFront(t) {
-    let mut l: list::List<i64> = list::New();
+    let mut l = make!(list[i64]);
     l.PushFront(1); l.PushFront(2); l.PushFront(3);
     let got = values(&l);
     if got != vec![3, 2, 1] {
@@ -41,7 +41,7 @@ test!{ fn TestPushFront(t) {
 }}
 
 test!{ fn TestRemove(t) {
-    let mut l: list::List<i64> = list::New();
+    let mut l = make!(list[i64]);
     let a = l.PushBack(10);
     l.PushBack(20);
     l.PushBack(30);
@@ -55,7 +55,7 @@ test!{ fn TestRemove(t) {
 }}
 
 test!{ fn TestFrontBack(t) {
-    let mut l: list::List<i64> = list::New();
+    let mut l = make!(list[i64]);
     l.PushBack(1);
     l.PushBack(2);
     l.PushBack(3);
@@ -70,7 +70,7 @@ test!{ fn TestFrontBack(t) {
 }}
 
 test!{ fn TestNextPrev(t) {
-    let mut l: list::List<i64> = list::New();
+    let mut l = make!(list[i64]);
     l.PushBack(1); l.PushBack(2); l.PushBack(3);
     let f = l.Front().unwrap();
     let n = l.Next(f).unwrap();
@@ -88,7 +88,7 @@ test!{ fn TestNextPrev(t) {
 }}
 
 test!{ fn TestMixedPushRemove(t) {
-    let mut l: list::List<i64> = list::New();
+    let mut l = make!(list[i64]);
     let _ = l.PushBack(1);
     let b = l.PushBack(2);
     let _ = l.PushBack(3);

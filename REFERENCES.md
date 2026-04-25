@@ -1093,16 +1093,21 @@ h.Sum32();
 ### `container/{list, heap, ring}`
 
 ```rust
-let mut l = container::list::New::<int>();
+// list / ring use `make!` to mirror Go's `list.New()` / `ring.New(n)`
+// without the turbofish.
+let mut l = make!(list[int]);
 l.PushBack(1); l.PushBack(2); l.PushFront(0);
 let mut e = l.Front();
 while let Some(node) = e { fmt::Println!(node.Value); e = node.Next(); }
 
-let mut h = container::heap::Heap::<int>::new();
+// heap takes a less-fn closure, so it stays at the explicit constructor;
+// turbofish is the trade for keeping the comparator visible at the
+// call site (matches Go's `container/heap.Init(h)` ceremony).
+let mut h = container::heap::New::<int>(|a, b| a < b);
 h.Push(2); h.Push(1); h.Push(5);
 let min = h.Pop();
 
-let r = container::ring::New::<int>(3);
+let r = make!(ring[int], 3);
 ```
 
 ### `regexp`
@@ -1275,6 +1280,19 @@ or where the port deliberately simplifies:
   `sync::atomic::Int64::Add` returns the *new* value (Go convention);
   call sites that rely on the OLD value (test ordering probes,
   swap-style counters) keep `std::sync::atomic::AtomicI64` + `fetch_add`.
+- **Turbofish `::<T>` that is Goish-correct (not leaks).** When the
+  type parameter carries dispatch information that the caller would
+  have to write *somewhere* (Go uses a different syntactic slot for
+  the same info), the turbofish is the natural Goish shape:
+  `errors::As::<MultiError>(&err)` mirrors Go's `errors.As(err, &target)`
+  where `target` is `*MultiError` — the type drives recovery either
+  way. Same for `json::Unmarshal::<HashMap<string, int>>(&data)`
+  (Go: `json.Unmarshal(data, &out)` where `out` is the typed target),
+  `Chan::<T>::default()` for nil channels (no value to infer from),
+  and `container::heap::New::<int>(|a, b| a < b)` (the comparator
+  closure can't always pin T). Bare turbofish on a *no-arg constructor
+  with type-only inference burden* (e.g. `list::New::<int>()`,
+  `ring::New::<int>(3)`) IS a leak — fix with a `make!`-family arm.
 - **`'static` lifetimes that are Goish-correct (not leaks).** Three
   patterns where `'static` in a public signature mirrors Go's actual
   surface and shouldn't be sealed: (a) **singleton returns** —
