@@ -66,8 +66,9 @@ impl MIMEHeader {
 
     pub fn Len(&self) -> i64 { self.entries.len() as i64 }
 
-    pub fn Keys(&self) -> Vec<string> {
-        self.entries.iter().map(|(k, _)| k.clone()).collect()
+    pub fn Keys(&self) -> crate::types::slice<string> {
+        let v: Vec<string> = self.entries.iter().map(|(k, _)| k.clone()).collect();
+        v.into()
     }
 }
 

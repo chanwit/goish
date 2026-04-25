@@ -60,12 +60,13 @@ test!{ fn TestAddressParsingList(t) {
         ("",           "jdoe@example.org"),
         ("Who?",       "one@y.test"),
     ];
-    for i in 0..3 {
-        if list[i].Name != want[i].0 {
-            t.Errorf(Sprintf!("[%d].Name = %s, want %s", i as i64, list[i].Name, want[i].0));
+    for i in 0..3i64 {
+        let u = i as usize;
+        if list[i].Name != want[u].0 {
+            t.Errorf(Sprintf!("[%d].Name = %s, want %s", i, list[i].Name, want[u].0));
         }
-        if list[i].Address != want[i].1 {
-            t.Errorf(Sprintf!("[%d].Address = %s, want %s", i as i64, list[i].Address, want[i].1));
+        if list[i].Address != want[u].1 {
+            t.Errorf(Sprintf!("[%d].Address = %s, want %s", i, list[i].Address, want[u].1));
         }
     }
 }}

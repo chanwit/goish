@@ -77,24 +77,24 @@ pub fn ParseAddress(s: &str) -> (Address, error) {
     }
 }
 
-pub fn ParseAddressList(s: &str) -> (Vec<Address>, error) {
+pub fn ParseAddressList(s: &str) -> (crate::types::slice<Address>, error) {
     let mut p = Parser::new(s);
-    let mut out = Vec::new();
+    let mut out: Vec<Address> = Vec::new();
     loop {
         match p.parse_address() {
             Ok(a) => out.push(a),
-            Err(e) => return (Vec::new(), New(&format!("mail: {}", e))),
+            Err(e) => return (crate::types::slice::new(), New(&format!("mail: {}", e))),
         }
         p.skip_cfws();
         if p.eof() { break; }
         if !p.consume(',') {
-            return (Vec::new(), New(&format!("mail: expected comma, got {:?}", p.peek_str())));
+            return (crate::types::slice::new(), New(&format!("mail: expected comma, got {:?}", p.peek_str())));
         }
     }
     if out.is_empty() {
-        return (Vec::new(), New("mail: empty address list"));
+        return (crate::types::slice::new(), New("mail: empty address list"));
     }
-    (out, nil)
+    (out.into(), nil)
 }
 
 struct Parser<'a> {

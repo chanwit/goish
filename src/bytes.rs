@@ -119,12 +119,12 @@ impl Buffer {
     }
 
     /// buf.Next(n) — return the next n bytes (or fewer on EOF) and advance.
-    pub fn Next(&mut self, n: int) -> Vec<byte> {
+    pub fn Next(&mut self, n: int) -> crate::types::slice<byte> {
         let available = self.inner.len() - self.read_pos;
         let take = (n as usize).min(available);
-        let out = self.inner[self.read_pos..self.read_pos + take].to_vec();
+        let out: Vec<byte> = self.inner[self.read_pos..self.read_pos + take].to_vec();
         self.read_pos += take;
-        out
+        out.into()
     }
 }
 
