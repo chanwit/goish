@@ -81,74 +81,86 @@ pub fn ContainsFunc<T, F: Fn(&T) -> bool>(s: &[T], f: F) -> bool {
 /// `slices.Insert(s, i, values...)` — inserts values at position i,
 /// shifting the tail right. Panics if i is out of range.
 #[allow(non_snake_case)]
-pub fn Insert<T: Clone>(s: &mut Vec<T>, i: int, values: &[T]) {
+pub fn Insert<T: Clone>(s: &mut crate::types::slice<T>, i: int, values: &[T]) {
     let i = i as usize;
     if i > s.len() { panic!("slices.Insert: index out of range"); }
+    let mut v: Vec<T> = std::mem::take(s).into_vec();
     let mut splice: Vec<T> = values.to_vec();
-    let tail: Vec<T> = s.drain(i..).collect();
-    s.append(&mut splice);
-    s.extend(tail);
+    let tail: Vec<T> = v.drain(i..).collect();
+    v.append(&mut splice);
+    v.extend(tail);
+    *s = v.into();
 }
 
 /// `slices.Delete(s, i, j)` — removes elements s[i..j]. Panics if out of range.
 #[allow(non_snake_case)]
-pub fn Delete<T>(s: &mut Vec<T>, i: int, j: int) {
+pub fn Delete<T: Clone>(s: &mut crate::types::slice<T>, i: int, j: int) {
     let i = i as usize;
     let j = j as usize;
     if i > j || j > s.len() { panic!("slices.Delete: invalid range"); }
-    s.drain(i..j);
+    let mut v: Vec<T> = std::mem::take(s).into_vec();
+    v.drain(i..j);
+    *s = v.into();
 }
 
 /// `slices.DeleteFunc(s, del)` — removes every element for which del
 /// returns true; preserves order.
 #[allow(non_snake_case)]
-pub fn DeleteFunc<T, F: FnMut(&T) -> bool>(s: &mut Vec<T>, mut del: F) {
-    s.retain(|x| !del(x));
+pub fn DeleteFunc<T: Clone, F: FnMut(&T) -> bool>(s: &mut crate::types::slice<T>, mut del: F) {
+    let mut v: Vec<T> = std::mem::take(s).into_vec();
+    v.retain(|x| !del(x));
+    *s = v.into();
 }
 
 /// `slices.Replace(s, i, j, values...)` — replaces s[i..j] with values.
 #[allow(non_snake_case)]
-pub fn Replace<T: Clone>(s: &mut Vec<T>, i: int, j: int, values: &[T]) {
+pub fn Replace<T: Clone>(s: &mut crate::types::slice<T>, i: int, j: int, values: &[T]) {
     let i = i as usize;
     let j = j as usize;
     if i > j || j > s.len() { panic!("slices.Replace: invalid range"); }
-    s.splice(i..j, values.iter().cloned());
+    let mut v: Vec<T> = std::mem::take(s).into_vec();
+    v.splice(i..j, values.iter().cloned());
+    *s = v.into();
 }
 
 /// `slices.Clone(s)` — shallow copy.
 #[allow(non_snake_case)]
-pub fn Clone<T: Clone>(s: &[T]) -> Vec<T> {
-    s.to_vec()
+pub fn Clone<T: Clone>(s: &[T]) -> crate::types::slice<T> {
+    s.to_vec().into()
 }
 
 /// `slices.Compact(s)` — removes consecutive runs of duplicates.
 #[allow(non_snake_case)]
-pub fn Compact<T: PartialEq>(s: &mut Vec<T>) {
-    s.dedup();
+pub fn Compact<T: Clone + PartialEq>(s: &mut crate::types::slice<T>) {
+    let mut v: Vec<T> = std::mem::take(s).into_vec();
+    v.dedup();
+    *s = v.into();
 }
 
 /// `slices.CompactFunc(s, eq)` — compact using custom equality.
 #[allow(non_snake_case)]
-pub fn CompactFunc<T, F: FnMut(&mut T, &mut T) -> bool>(s: &mut Vec<T>, eq: F) {
-    s.dedup_by(eq);
+pub fn CompactFunc<T: Clone, F: FnMut(&mut T, &mut T) -> bool>(s: &mut crate::types::slice<T>, eq: F) {
+    let mut v: Vec<T> = std::mem::take(s).into_vec();
+    v.dedup_by(eq);
+    *s = v.into();
 }
 
-/// `slices.Concat(ss...)` — flattens several slices into a new Vec.
+/// `slices.Concat(ss...)` — flattens several slices into a new slice.
 #[allow(non_snake_case)]
-pub fn Concat<T: Clone>(slices: &[&[T]]) -> Vec<T> {
+pub fn Concat<T: Clone>(slices: &[&[T]]) -> crate::types::slice<T> {
     let total: usize = slices.iter().map(|s| s.len()).sum();
-    let mut out = Vec::with_capacity(total);
+    let mut out: Vec<T> = Vec::with_capacity(total);
     for s in slices { out.extend_from_slice(s); }
-    out
+    out.into()
 }
 
 /// `slices.Repeat(x, count)` — concatenates x with itself `count` times.
 #[allow(non_snake_case)]
-pub fn Repeat<T: Clone>(x: &[T], count: int) -> Vec<T> {
-    if count <= 0 { return Vec::new(); }
-    let mut out = Vec::with_capacity(x.len() * count as usize);
+pub fn Repeat<T: Clone>(x: &[T], count: int) -> crate::types::slice<T> {
+    if count <= 0 { return crate::types::slice::new(); }
+    let mut out: Vec<T> = Vec::with_capacity(x.len() * count as usize);
     for _ in 0..count { out.extend_from_slice(x); }
-    out
+    out.into()
 }
 
 /// `slices.Reverse(s)` — reverses s in place.
@@ -304,23 +316,23 @@ mod tests {
 
     #[test]
     fn insert_delete_reverse() {
-        let mut s = vec![1i64, 2, 4];
+        let mut s: crate::types::slice<i64> = vec![1i64, 2, 4].into();
         Insert(&mut s, 2, &[3]);
-        assert_eq!(s, vec![1, 2, 3, 4]);
+        assert_eq!(s.as_slice(), &[1, 2, 3, 4]);
         Delete(&mut s, 1, 3);
-        assert_eq!(s, vec![1i64, 4]);
-        Reverse(&mut s);
-        assert_eq!(s, vec![4i64, 1]);
+        assert_eq!(s.as_slice(), &[1i64, 4]);
+        Reverse(s.as_mut_slice());
+        assert_eq!(s.as_slice(), &[4i64, 1]);
     }
 
     #[test]
     fn compact_concat_clone() {
-        let mut s = vec![1i64, 1, 2, 3, 3, 3, 4];
+        let mut s: crate::types::slice<i64> = vec![1i64, 1, 2, 3, 3, 3, 4].into();
         Compact(&mut s);
-        assert_eq!(s, vec![1, 2, 3, 4]);
-        let c: Vec<i64> = Concat(&[&[1, 2], &[3, 4]]);
-        assert_eq!(c, vec![1i64, 2, 3, 4]);
-        let cl = Clone(&s);
-        assert_eq!(cl, s);
+        assert_eq!(s.as_slice(), &[1, 2, 3, 4]);
+        let c: crate::types::slice<i64> = Concat(&[&[1, 2], &[3, 4]]);
+        assert_eq!(c.as_slice(), &[1i64, 2, 3, 4]);
+        let cl = Clone(s.as_slice());
+        assert_eq!(cl.as_slice(), s.as_slice());
     }
 }

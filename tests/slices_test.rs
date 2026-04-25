@@ -83,15 +83,15 @@ test!{ fn TestMinPanicsOnEmpty(t) {
 }}
 
 test!{ fn TestReverse(t) {
-    let mut s = vec![1i64, 2, 3, 4];
-    slices::Reverse(&mut s);
+    let mut s: slice<int> = slice!([]int { 1, 2, 3, 4 });
+    slices::Reverse(s.as_mut_slice());
     if s != vec![4i64, 3, 2, 1] {
         t.Errorf(Sprintf!("Reverse mismatch"));
     }
 }}
 
 test!{ fn TestInsertDelete(t) {
-    let mut s = vec![1i64, 2, 5, 6];
+    let mut s: slice<int> = slice!([]int { 1, 2, 5, 6 });
     slices::Insert(&mut s, 2, &[3, 4]);
     if s != vec![1i64, 2, 3, 4, 5, 6] {
         t.Errorf(Sprintf!("Insert mismatch"));
@@ -103,7 +103,7 @@ test!{ fn TestInsertDelete(t) {
 }}
 
 test!{ fn TestCompactCompactFunc(t) {
-    let mut s = vec![1i64, 1, 2, 3, 3, 3, 4, 4];
+    let mut s: slice<int> = slice!([]int { 1, 1, 2, 3, 3, 3, 4, 4 });
     slices::Compact(&mut s);
     if s != vec![1i64, 2, 3, 4] {
         t.Errorf(Sprintf!("Compact mismatch"));
@@ -111,11 +111,11 @@ test!{ fn TestCompactCompactFunc(t) {
 }}
 
 test!{ fn TestConcatRepeat(t) {
-    let c: slice<int> = slices::Concat(&[&[1, 2], &[3, 4], &[5]]).into();
+    let c = slices::Concat(&[&[1i64, 2], &[3, 4], &[5]]);
     if c != vec![1i64, 2, 3, 4, 5] {
         t.Errorf(Sprintf!("Concat mismatch"));
     }
-    let r: slice<int> = slices::Repeat(&[1, 2], 3).into();
+    let r = slices::Repeat(&[1i64, 2], 3);
     if r != vec![1i64, 2, 1, 2, 1, 2] {
         t.Errorf(Sprintf!("Repeat mismatch"));
     }
@@ -134,7 +134,7 @@ test!{ fn TestCompare(t) {
 }}
 
 test!{ fn TestDeleteFunc(t) {
-    let mut s = vec![1i64, 2, 3, 4, 5, 6];
+    let mut s: slice<int> = slice!([]int { 1, 2, 3, 4, 5, 6 });
     slices::DeleteFunc(&mut s, |x| *x % 2 == 0);
     if s != vec![1i64, 3, 5] {
         t.Errorf(Sprintf!("DeleteFunc mismatch"));
