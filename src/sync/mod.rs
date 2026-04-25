@@ -14,7 +14,10 @@
 // Cloneable handles — each sync primitive wraps an Arc internally so that
 // multiple goroutines can share them by `clone()`.
 
-use std::sync::{Arc, Condvar, Mutex as StdMutex, MutexGuard as StdMutexGuard, RwLock as StdRwLock};
+use std::sync::{Arc, Condvar, Mutex as StdMutex, MutexGuard as StdMutexGuard,
+                RwLock as StdRwLock,
+                RwLockReadGuard as StdRwLockReadGuard,
+                RwLockWriteGuard as StdRwLockWriteGuard};
 use std::sync::atomic::{AtomicI64, Ordering};
 
 // ── Mutex ──────────────────────────────────────────────────────────────
@@ -24,6 +27,23 @@ use std::sync::atomic::{AtomicI64, Ordering};
 #[derive(Clone)]
 pub struct Mutex<T: ?Sized> {
     inner: Arc<StdMutex<T>>,
+}
+
+/// Goish-shaped guard returned by `Mutex::Lock` / `TryLock`. Wraps
+/// `std::sync::MutexGuard` so the std type name doesn't surface in
+/// rustdoc / IDE return-type tooltips. Transparent at call sites via
+/// `Deref` + `DerefMut` (`*g = v`, `g.field`, `g.method()`).
+pub struct MutexGuard<'a, T: ?Sized> {
+    #[doc(hidden)]
+    pub inner: StdMutexGuard<'a, T>,
+}
+
+impl<'a, T: ?Sized> std::ops::Deref for MutexGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &T { &self.inner }
+}
+impl<'a, T: ?Sized> std::ops::DerefMut for MutexGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut T { &mut self.inner }
 }
 
 impl<T> Mutex<T> {
@@ -40,18 +60,18 @@ impl<T> Mutex<T> {
     /// Absorbs Rust's poisoning: if a previous holder panicked, the next
     /// Lock() still succeeds and observes the post-panic state. Matches
     /// Go's `sync.Mutex`, which has no poison concept.
-    pub fn Lock(&self) -> StdMutexGuard<'_, T> {
-        self.inner.lock().unwrap_or_else(|p| p.into_inner())
+    pub fn Lock(&self) -> MutexGuard<'_, T> {
+        MutexGuard { inner: self.inner.lock().unwrap_or_else(|p| p.into_inner()) }
     }
 
     /// mu.TryLock() — non-blocking. Returns the guard when the lock is
     /// available (including the poisoned case, matching Go semantics),
     /// None only when the lock is currently held by another thread.
-    pub fn TryLock(&self) -> Option<StdMutexGuard<'_, T>> {
+    pub fn TryLock(&self) -> Option<MutexGuard<'_, T>> {
         use std::sync::TryLockError;
         match self.inner.try_lock() {
-            Ok(g) => Some(g),
-            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Ok(g) => Some(MutexGuard { inner: g }),
+            Err(TryLockError::Poisoned(p)) => Some(MutexGuard { inner: p.into_inner() }),
             Err(TryLockError::WouldBlock) => None,
         }
     }
@@ -73,6 +93,33 @@ pub struct RWMutex<T: ?Sized> {
     inner: Arc<StdRwLock<T>>,
 }
 
+/// Goish-shaped write guard for `RWMutex::Lock` / `TryLock`. Wraps
+/// `std::sync::RwLockWriteGuard`. Transparent via `Deref` + `DerefMut`.
+pub struct RWMutexWriteGuard<'a, T: ?Sized> {
+    #[doc(hidden)]
+    pub inner: StdRwLockWriteGuard<'a, T>,
+}
+
+impl<'a, T: ?Sized> std::ops::Deref for RWMutexWriteGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &T { &self.inner }
+}
+impl<'a, T: ?Sized> std::ops::DerefMut for RWMutexWriteGuard<'a, T> {
+    fn deref_mut(&mut self) -> &mut T { &mut self.inner }
+}
+
+/// Goish-shaped read guard for `RWMutex::RLock` / `TryRLock`. Wraps
+/// `std::sync::RwLockReadGuard`. Transparent via `Deref`.
+pub struct RWMutexReadGuard<'a, T: ?Sized> {
+    #[doc(hidden)]
+    pub inner: StdRwLockReadGuard<'a, T>,
+}
+
+impl<'a, T: ?Sized> std::ops::Deref for RWMutexReadGuard<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &T { &self.inner }
+}
+
 impl<T> RWMutex<T> {
     pub fn new(v: T) -> Self
     where
@@ -83,33 +130,33 @@ impl<T> RWMutex<T> {
 
     /// RWMutex.Lock() / RLock() absorb Rust poisoning the same way
     /// `Mutex::Lock` does — Go's `sync.RWMutex` never poisons.
-    pub fn Lock(&self) -> std::sync::RwLockWriteGuard<'_, T> {
-        self.inner.write().unwrap_or_else(|p| p.into_inner())
+    pub fn Lock(&self) -> RWMutexWriteGuard<'_, T> {
+        RWMutexWriteGuard { inner: self.inner.write().unwrap_or_else(|p| p.into_inner()) }
     }
 
-    pub fn RLock(&self) -> std::sync::RwLockReadGuard<'_, T> {
-        self.inner.read().unwrap_or_else(|p| p.into_inner())
+    pub fn RLock(&self) -> RWMutexReadGuard<'_, T> {
+        RWMutexReadGuard { inner: self.inner.read().unwrap_or_else(|p| p.into_inner()) }
     }
 
     /// Non-blocking write lock. Treats a poisoned lock as available
     /// (matches Go), returns None only when another thread holds it.
     #[allow(non_snake_case)]
-    pub fn TryLock(&self) -> Option<std::sync::RwLockWriteGuard<'_, T>> {
+    pub fn TryLock(&self) -> Option<RWMutexWriteGuard<'_, T>> {
         use std::sync::TryLockError;
         match self.inner.try_write() {
-            Ok(g) => Some(g),
-            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Ok(g) => Some(RWMutexWriteGuard { inner: g }),
+            Err(TryLockError::Poisoned(p)) => Some(RWMutexWriteGuard { inner: p.into_inner() }),
             Err(TryLockError::WouldBlock) => None,
         }
     }
 
     /// Non-blocking read lock. Same poison semantics as `TryLock`.
     #[allow(non_snake_case)]
-    pub fn TryRLock(&self) -> Option<std::sync::RwLockReadGuard<'_, T>> {
+    pub fn TryRLock(&self) -> Option<RWMutexReadGuard<'_, T>> {
         use std::sync::TryLockError;
         match self.inner.try_read() {
-            Ok(g) => Some(g),
-            Err(TryLockError::Poisoned(p)) => Some(p.into_inner()),
+            Ok(g) => Some(RWMutexReadGuard { inner: g }),
+            Err(TryLockError::Poisoned(p)) => Some(RWMutexReadGuard { inner: p.into_inner() }),
             Err(TryLockError::WouldBlock) => None,
         }
     }

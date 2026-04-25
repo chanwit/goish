@@ -239,31 +239,35 @@ impl T {
     }
 
     /// Called by test! macro after the user body runs (possibly via panic).
-    /// Returns Ok if the test is considered passing (or skipped), Err with the
-    /// log otherwise.
+    /// Returns `(true, "")` if the test is considered passing (or skipped),
+    /// `(false, log)` otherwise.
+    ///
+    /// Comma-ok shape rather than `Result<(), string>` so the macro
+    /// expansion stays clear of `std::result::Result` — the only place
+    /// the std name would otherwise leak under this `#[doc(hidden)]` API.
     #[doc(hidden)]
-    pub fn finish(&self, outcome: Outcome) -> std::result::Result<(), string> {
+    pub fn finish(&self, outcome: Outcome) -> (bool, string) {
         self.run_cleanups();
         match outcome {
             Outcome::Ok => {
                 if self.Failed() {
-                    Err(self.log_contents())
+                    (false, self.log_contents())
                 } else {
-                    Ok(())
+                    (true, string::default())
                 }
             }
             Outcome::Aborted => {
                 if self.Skipped() && !self.failed.load(Ordering::SeqCst) {
-                    Ok(())
+                    (true, string::default())
                 } else {
-                    Err(self.log_contents())
+                    (false, self.log_contents())
                 }
             }
             Outcome::Paniced(msg) => {
                 let mut log = self.log_contents_raw();
                 if !log.is_empty() && !log.ends_with('\n') { log.push('\n'); }
                 log.push_str(&format!("panic: {}", msg));
-                Err(log.into())
+                (false, log.into())
             }
         }
     }
@@ -322,7 +326,8 @@ macro_rules! test {
                     __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
                 }
             };
-            if let Err(log) = finished {
+            let (passed, log) = finished;
+            if !passed {
                 panic!("{}", log);
             } else if __t.Skipped() {
                 // libtest has no way to report "skipped"; just exit OK with a log line.
@@ -375,7 +380,8 @@ macro_rules! test_h {
                     __t.finish($crate::testing::__priv::Outcome::Paniced(msg))
                 }
             };
-            if let Err(log) = finished { panic!("{}", log); }
+            let (passed, log) = finished;
+            if !passed { panic!("{}", log); }
         }
 
         $crate::__goish_inventory::submit! {

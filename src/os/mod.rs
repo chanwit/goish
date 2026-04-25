@@ -406,24 +406,61 @@ pub fn Create(path: impl AsRef<str>) -> (File, error) {
 }
 
 // ── Standard streams ───────────────────────────────────────────────────
+//
+// Each handle is an opaque Goish newtype around the std equivalent. The
+// std type names (`StdinLock<'static>`, `std::io::Stdout`, `std::io::Stderr`)
+// no longer surface in return-position tooltips. `Read`/`Write` impls
+// delegate to the inner so `bufio::NewReader(os::Stdin())`,
+// `io::Copy(&mut os::Stdout(), &mut r)` etc. keep working unchanged.
 
-/// os.Stdin — returns a lock on the process's stdin. Implements std::io::Read
-/// so goish::io::Reader and bufio::NewScanner accept it directly.
 #[allow(non_snake_case)]
-pub fn Stdin() -> std::io::StdinLock<'static> {
-    std::io::stdin().lock()
+pub struct StdinT {
+    #[doc(hidden)]
+    pub inner: std::io::StdinLock<'static>,
 }
 
-/// os.Stdout — stdout handle. Implements std::io::Write.
+impl std::io::Read for StdinT {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> { self.inner.read(buf) }
+}
+
 #[allow(non_snake_case)]
-pub fn Stdout() -> std::io::Stdout {
-    std::io::stdout()
+pub struct StdoutT {
+    #[doc(hidden)]
+    pub inner: std::io::Stdout,
+}
+
+impl std::io::Write for StdoutT {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> { self.inner.write(buf) }
+    fn flush(&mut self) -> std::io::Result<()> { self.inner.flush() }
+}
+
+#[allow(non_snake_case)]
+pub struct StderrT {
+    #[doc(hidden)]
+    pub inner: std::io::Stderr,
+}
+
+impl std::io::Write for StderrT {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> { self.inner.write(buf) }
+    fn flush(&mut self) -> std::io::Result<()> { self.inner.flush() }
+}
+
+/// os.Stdin — returns a lock on the process's stdin.
+#[allow(non_snake_case)]
+pub fn Stdin() -> StdinT {
+    StdinT { inner: std::io::stdin().lock() }
+}
+
+/// os.Stdout — stdout handle.
+#[allow(non_snake_case)]
+pub fn Stdout() -> StdoutT {
+    StdoutT { inner: std::io::stdout() }
 }
 
 /// os.Stderr — stderr handle.
 #[allow(non_snake_case)]
-pub fn Stderr() -> std::io::Stderr {
-    std::io::stderr()
+pub fn Stderr() -> StderrT {
+    StderrT { inner: std::io::stderr() }
 }
 
 #[cfg(test)]
