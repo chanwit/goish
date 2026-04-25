@@ -39,9 +39,9 @@ impl Buffer {
         &self.inner[self.read_pos..]
     }
 
-    /// buf.String() — UTF-8 contents as a string (lossy for invalid bytes).
-    pub fn String(&self) -> String {
-        String::from_utf8_lossy(&self.inner[self.read_pos..]).into_owned()
+    /// buf.String() — UTF-8 contents as a Goish `string` (lossy for invalid bytes).
+    pub fn String(&self) -> crate::types::string {
+        std::string::String::from_utf8_lossy(&self.inner[self.read_pos..]).into_owned().into()
     }
 
     /// buf.Len() — number of unread bytes.

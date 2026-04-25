@@ -54,7 +54,7 @@ impl Writer {
 
     /// `tw.Flush()` — compute column widths across all buffered rows,
     /// pad each cell, and return the aligned output. Clears the buffer.
-    pub fn Flush(&mut self) -> String {
+    pub fn Flush(&mut self) -> crate::types::string {
         let input = std::mem::take(&mut self.buf);
         // Split into lines, keeping trailing newline behavior.
         let mut rows: Vec<Vec<&str>> = Vec::new();
@@ -100,7 +100,7 @@ impl Writer {
         // Reference the field once to quiet the unused warning in builds
         // where no padding is used.
         let _ = self.tabwidth;
-        out
+        out.into()
     }
 
     /// Return the buffered (not-yet-flushed) input.

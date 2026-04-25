@@ -8,13 +8,13 @@ use goish::prelude::*;
 use goish::text::template;
 use serde_json::json;
 
-fn exec(src: &str, data: &serde_json::Value) -> String {
+fn exec(src: &str, data: &serde_json::Value) -> string {
     let (t, err) = template::New("t").Parse(src);
     if err != nil { panic!("parse error: {}", err); }
     let mut out = String::new();
     let e = t.Execute(&mut out, data);
     if e != nil { panic!("exec error: {}", e); }
-    out
+    out.into()
 }
 
 test!{ fn TestPlainText(t) {

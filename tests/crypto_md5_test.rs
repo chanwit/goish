@@ -52,19 +52,11 @@ fn golden() -> slice<GoldenMd5> {
     ].into()
 }
 
-fn to_hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&Sprintf!("%02x", b));
-    }
-    s
-}
-
 test!{ fn TestGolden(t) {
     let __golden = golden();
     for (_, g) in range!(__golden) {
         let sum = crypto::md5::Sum(g.inp);
-        let hex = to_hex(&sum);
+        let hex = encoding::hex::EncodeToString(&sum);
         if hex != g.out {
             t.Errorf(Sprintf!("Sum function: md5(%s) = %s want %s", g.inp, hex, g.out));
             continue;
@@ -72,7 +64,7 @@ test!{ fn TestGolden(t) {
         // Streaming: write input, Sum, compare.
         let mut c = crypto::md5::New();
         c.Write(g.inp);
-        let s1 = to_hex(&c.Sum(&[]));
+        let s1 = encoding::hex::EncodeToString(&c.Sum(&[]));
         if s1 != g.out {
             t.Errorf(Sprintf!("streaming: md5(%s) = %s want %s", g.inp, s1, g.out));
         }
@@ -82,14 +74,14 @@ test!{ fn TestGolden(t) {
         c.Write(&g.inp[..half]);
         let _intermediate = c.Sum(&[]);  // Go tests this mid-Sum doesn't corrupt state
         c.Write(&g.inp[half..]);
-        let s2 = to_hex(&c.Sum(&[]));
+        let s2 = encoding::hex::EncodeToString(&c.Sum(&[]));
         if s2 != g.out {
             t.Errorf(Sprintf!("split write: md5(%s) = %s want %s", g.inp, s2, g.out));
         }
         // Reset + rewrite should give same result.
         c.Reset();
         c.Write(g.inp);
-        let s3 = to_hex(&c.Sum(&[]));
+        let s3 = encoding::hex::EncodeToString(&c.Sum(&[]));
         if s3 != g.out {
             t.Errorf(Sprintf!("post-reset: md5(%s) = %s want %s", g.inp, s3, g.out));
         }

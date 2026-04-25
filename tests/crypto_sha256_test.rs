@@ -47,24 +47,18 @@ fn golden() -> slice<Golden256> {
     ].into()
 }
 
-fn to_hex(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes { s.push_str(&Sprintf!("%02x", b)); }
-    s
-}
-
 test!{ fn TestGolden(t) {
     let __golden = golden();
     for (_, g) in range!(__golden) {
         let sum = crypto::sha256::Sum256(g.inp);
-        let hex = to_hex(&sum);
+        let hex = encoding::hex::EncodeToString(&sum);
         if hex != g.out {
             t.Errorf(Sprintf!("Sum: sha256(%s) = %s want %s", g.inp, hex, g.out));
             continue;
         }
         let mut c = crypto::sha256::New();
         c.Write(g.inp);
-        let s1 = to_hex(&c.Sum(&[]));
+        let s1 = encoding::hex::EncodeToString(&c.Sum(&[]));
         if s1 != g.out {
             t.Errorf(Sprintf!("streaming: sha256(%s) = %s want %s", g.inp, s1, g.out));
         }
@@ -73,7 +67,7 @@ test!{ fn TestGolden(t) {
         c.Write(&g.inp[..half]);
         let _ = c.Sum(&[]);
         c.Write(&g.inp[half..]);
-        let s2 = to_hex(&c.Sum(&[]));
+        let s2 = encoding::hex::EncodeToString(&c.Sum(&[]));
         if s2 != g.out {
             t.Errorf(Sprintf!("split write: sha256(%s) = %s want %s", g.inp, s2, g.out));
         }

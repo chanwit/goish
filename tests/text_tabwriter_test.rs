@@ -8,7 +8,7 @@
 use goish::prelude::*;
 use goish::text::tabwriter;
 
-fn run(input: &str, minwidth: i64, padding: i64, padchar: char) -> String {
+fn run(input: &str, minwidth: i64, padding: i64, padchar: char) -> string {
     let mut tw = tabwriter::NewWriter(minwidth, 8, padding, padchar, 0);
     tw.WriteString(input);
     tw.Flush()
