@@ -22,24 +22,22 @@ test!{ fn TestSortInts(t) {
 }}
 
 test!{ fn TestSortStrings(t) {
-    let mut data: Vec<string> = vec![
-        "Banana".into(), "apple".into(), "cherry".into(), "BANANA".into(), "".into(),
-    ];
+    let mut data: slice<string> = slice!([]string { "Banana", "apple", "cherry", "BANANA", "" });
     sort::Strings(&mut data);
-    for i in 1..data.len() {
+    for i in 1..(data.len() as int) {
         if data[i] < data[i-1] {
-            t.Errorf(Sprintf!("not sorted at %d", i as i64));
+            t.Errorf(Sprintf!("not sorted at %d", i));
             return;
         }
     }
 }}
 
 test!{ fn TestSortFloat64s(t) {
-    let mut data: Vec<f64> = vec![74.3, 59.0, 238.2, -784.0, 2.3, 9845.768];
+    let mut data: slice<float64> = slice!([]float64 { 74.3, 59.0, 238.2, -784.0, 2.3, 9845.768 });
     sort::Float64s(&mut data);
-    for i in 1..data.len() {
+    for i in 1..(data.len() as int) {
         if data[i] < data[i-1] {
-            t.Errorf(Sprintf!("not sorted at %d", i as i64));
+            t.Errorf(Sprintf!("not sorted at %d", i));
             return;
         }
     }
