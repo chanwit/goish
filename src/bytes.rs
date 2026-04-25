@@ -372,69 +372,71 @@ pub fn Count(s: &[byte], sep: &[byte]) -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn Split(s: &[byte], sep: &[byte]) -> Vec<Vec<byte>> {
+pub fn Split(s: &[byte], sep: &[byte]) -> crate::types::slice<crate::types::slice<byte>> {
     SplitN(s, sep, -1)
 }
 
 #[allow(non_snake_case)]
-pub fn SplitN(s: &[byte], sep: &[byte], n: int) -> Vec<Vec<byte>> {
+pub fn SplitN(s: &[byte], sep: &[byte], n: int) -> crate::types::slice<crate::types::slice<byte>> {
     if n == 0 {
-        return Vec::new();
+        return crate::types::slice::new();
     }
     if sep.is_empty() {
         // Go: splits after each UTF-8 rune. Our slices are raw bytes; split per-byte.
-        let iter = s.iter().map(|b| vec![*b]);
+        let mk = |bs: Vec<u8>| -> crate::types::slice<byte> { bs.into() };
         if n < 0 {
-            return iter.collect();
+            let v: Vec<crate::types::slice<byte>> = s.iter().map(|b| mk(vec![*b])).collect();
+            return v.into();
         }
-        let mut out: Vec<Vec<byte>> = iter.take((n - 1) as usize).collect();
+        let mut out: Vec<crate::types::slice<byte>> =
+            s.iter().take((n - 1) as usize).map(|b| mk(vec![*b])).collect();
         if (out.len() as int) < n {
             let consumed: usize = out.iter().map(|v| v.len()).sum();
             if consumed < s.len() {
-                out.push(s[consumed..].to_vec());
+                out.push(mk(s[consumed..].to_vec()));
             }
         }
-        return out;
+        return out.into();
     }
-    let mut out = Vec::new();
+    let mut out: Vec<crate::types::slice<byte>> = Vec::new();
     let mut start = 0usize;
     while (n < 0 || (out.len() as int) < n - 1) && start <= s.len() {
         match Index(&s[start..], sep) {
             -1 => break,
             i => {
                 let i = i as usize;
-                out.push(s[start..start + i].to_vec());
+                out.push(s[start..start + i].to_vec().into());
                 start += i + sep.len();
             }
         }
     }
-    out.push(s[start..].to_vec());
-    out
+    out.push(s[start..].to_vec().into());
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn Join(parts: &[Vec<byte>], sep: &[byte]) -> Vec<byte> {
+pub fn Join<P: AsRef<[byte]>>(parts: &[P], sep: &[byte]) -> crate::types::slice<byte> {
     if parts.is_empty() {
-        return Vec::new();
+        return crate::types::slice::new();
     }
-    let total: usize = parts.iter().map(|p| p.len()).sum::<usize>()
+    let total: usize = parts.iter().map(|p| p.as_ref().len()).sum::<usize>()
         + sep.len() * (parts.len().saturating_sub(1));
-    let mut out = Vec::with_capacity(total);
+    let mut out: Vec<byte> = Vec::with_capacity(total);
     for (i, p) in parts.iter().enumerate() {
         if i > 0 {
             out.extend_from_slice(sep);
         }
-        out.extend_from_slice(p);
+        out.extend_from_slice(p.as_ref());
     }
-    out
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn Replace(s: &[byte], old: &[byte], new: &[byte], n: int) -> Vec<byte> {
+pub fn Replace(s: &[byte], old: &[byte], new: &[byte], n: int) -> crate::types::slice<byte> {
     if old.is_empty() || n == 0 {
-        return s.to_vec();
+        return s.to_vec().into();
     }
-    let mut out = Vec::with_capacity(s.len());
+    let mut out: Vec<byte> = Vec::with_capacity(s.len());
     let mut i = 0usize;
     let mut replaced: int = 0;
     while i <= s.len() {
@@ -449,37 +451,39 @@ pub fn Replace(s: &[byte], old: &[byte], new: &[byte], n: int) -> Vec<byte> {
             break;
         }
     }
-    out
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn ReplaceAll(s: &[byte], old: &[byte], new: &[byte]) -> Vec<byte> {
+pub fn ReplaceAll(s: &[byte], old: &[byte], new: &[byte]) -> crate::types::slice<byte> {
     Replace(s, old, new, -1)
 }
 
 #[allow(non_snake_case)]
-pub fn ToUpper(s: &[byte]) -> Vec<byte> {
-    s.iter().map(|b| b.to_ascii_uppercase()).collect()
+pub fn ToUpper(s: &[byte]) -> crate::types::slice<byte> {
+    let v: Vec<byte> = s.iter().map(|b| b.to_ascii_uppercase()).collect();
+    v.into()
 }
 
 #[allow(non_snake_case)]
-pub fn ToLower(s: &[byte]) -> Vec<byte> {
-    s.iter().map(|b| b.to_ascii_lowercase()).collect()
+pub fn ToLower(s: &[byte]) -> crate::types::slice<byte> {
+    let v: Vec<byte> = s.iter().map(|b| b.to_ascii_lowercase()).collect();
+    v.into()
 }
 
 #[allow(non_snake_case)]
-pub fn TrimSpace(s: &[byte]) -> Vec<byte> {
+pub fn TrimSpace(s: &[byte]) -> crate::types::slice<byte> {
     let is_space = |b: byte| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c);
     let start = s.iter().position(|b| !is_space(*b)).unwrap_or(s.len());
     let end = s.iter().rposition(|b| !is_space(*b)).map(|i| i + 1).unwrap_or(start);
-    s[start..end].to_vec()
+    s[start..end].to_vec().into()
 }
 
 #[allow(non_snake_case)]
-pub fn Trim(s: &[byte], cutset: &[byte]) -> Vec<byte> {
+pub fn Trim(s: &[byte], cutset: &[byte]) -> crate::types::slice<byte> {
     let start = s.iter().position(|b| !cutset.contains(b)).unwrap_or(s.len());
     let end = s.iter().rposition(|b| !cutset.contains(b)).map(|i| i + 1).unwrap_or(start);
-    s[start..end].to_vec()
+    s[start..end].to_vec().into()
 }
 
 #[allow(non_snake_case)]
