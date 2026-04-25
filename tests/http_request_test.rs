@@ -38,8 +38,7 @@ test!{ fn TestRequestInvalidMethod(t) {
 }}
 
 test!{ fn TestNewRequestContentLength(t) {
-    let body = b"hello".to_vec();
-    let (req, err) = http::NewRequest("POST", "http://example.com/", body);
+    let (req, err) = http::NewRequest("POST", "http://example.com/", b"hello");
     if err != nil { t.Fatal(Sprintf!("err: %s", err)); }
     if req.ContentLength != 5 {
         t.Errorf(Sprintf!("ContentLength = %d, want 5", req.ContentLength));

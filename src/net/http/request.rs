@@ -109,9 +109,12 @@ pub trait IntoReqBody {
     fn into_req_body(self) -> Vec<u8>;
 }
 impl IntoReqBody for &[u8] { fn into_req_body(self) -> Vec<u8> { self.to_vec() } }
+impl<const N: usize> IntoReqBody for &[u8; N] { fn into_req_body(self) -> Vec<u8> { self.to_vec() } }
 impl IntoReqBody for Vec<u8> { fn into_req_body(self) -> Vec<u8> { self } }
+impl IntoReqBody for crate::types::slice<u8> { fn into_req_body(self) -> Vec<u8> { self.into() } }
 impl IntoReqBody for &str { fn into_req_body(self) -> Vec<u8> { self.as_bytes().to_vec() } }
 impl IntoReqBody for &String { fn into_req_body(self) -> Vec<u8> { self.as_bytes().to_vec() } }
+impl IntoReqBody for &crate::types::string { fn into_req_body(self) -> Vec<u8> { self.as_bytes().to_vec() } }
 // `nil` (errors::error with None payload) means "no body".
 impl IntoReqBody for crate::errors::error {
     fn into_req_body(self) -> Vec<u8> { Vec::new() }

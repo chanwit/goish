@@ -84,7 +84,7 @@ test!{ fn TestPostForm(t) {
         });
     });
 
-    let (mut resp, err) = http::Post(&url_, "text/plain", b"payload-bytes".to_vec());
+    let (mut resp, err) = http::Post(&url_, "text/plain", b"payload-bytes");
     if err != nil { t.Fatal(Sprintf!("Post err: %s", err)); }
     let body = resp.Body.String();
     if !strings::HasPrefix(&body, "POST body=") {
