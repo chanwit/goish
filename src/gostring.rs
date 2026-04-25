@@ -191,6 +191,17 @@ impl std::borrow::Borrow<str> for GoString {
     fn borrow(&self) -> &str { self.as_str() }
 }
 
+// Make `string` interchangeable with `&str` at network boundaries:
+// `std::net::TcpStream::connect(&addr)` where `addr: GoString` should
+// just work, so call sites can stay Goish (e.g. `Sprintf!("%v:%v", host, port)`)
+// instead of falling back to Rust `format!`.
+impl std::net::ToSocketAddrs for GoString {
+    type Iter = std::vec::IntoIter<std::net::SocketAddr>;
+    fn to_socket_addrs(&self) -> std::io::Result<Self::Iter> {
+        self.as_str().to_socket_addrs()
+    }
+}
+
 // ── Comparison ─────────────────────────────────────────────────────
 
 impl PartialEq for GoString {

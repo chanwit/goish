@@ -37,6 +37,8 @@ Where prior versions said "stop and ask," apply these instead:
 
 - **Memory says user dislikes X**: respect it; pick alternatives.
 
+- **Sweep migration breaks because the Goish wrapper lacks a trait the std type had** (e.g. `GoString` doesn't `impl ToSocketAddrs`, so `TcpStream::connect(&Sprintf!(...))` won't compile): **fix the library — add the missing impl. Do NOT revert the call site to the Rust idiom.** The library's job is to make Goish types interchangeable with the std types they replace at every reasonable boundary. `impl AsRef<...>`, `impl From<…>`, `impl Display`, `impl PartialEq<&str>`, `impl ToSocketAddrs`, `impl IntoIterator` etc. are all candidates. If the missing impl is genuinely impossible (e.g. orphan rule on a foreign trait + foreign type, or a sealed std trait), document it as a wontfix in REFERENCES.md §26 and *only then* revert the call site — never quietly drop a migration.
+
 ## Hard stops (non-negotiable)
 
 - **`cargo publish`** — never run; only `git push` + `git tag`.
