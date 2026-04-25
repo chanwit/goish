@@ -79,9 +79,9 @@ test!{ fn TestGolden(t) {
         // Split write: first half, Sum intermediate (discard), second half.
         c.Reset();
         let half = g.inp.len() / 2;
-        c.Write(&g.inp.as_bytes()[..half]);
+        c.Write(&g.inp[..half]);
         let _intermediate = c.Sum(&[]);  // Go tests this mid-Sum doesn't corrupt state
-        c.Write(&g.inp.as_bytes()[half..]);
+        c.Write(&g.inp[half..]);
         let s2 = to_hex(&c.Sum(&[]));
         if s2 != g.out {
             t.Errorf(Sprintf!("split write: md5(%s) = %s want %s", g.inp, s2, g.out));

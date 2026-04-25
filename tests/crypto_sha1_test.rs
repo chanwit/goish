@@ -72,9 +72,9 @@ test!{ fn TestGolden(t) {
         }
         c.Reset();
         let half = g.inp.len() / 2;
-        c.Write(&g.inp.as_bytes()[..half]);
+        c.Write(&g.inp[..half]);
         let _ = c.Sum(&[]);
-        c.Write(&g.inp.as_bytes()[half..]);
+        c.Write(&g.inp[half..]);
         let s2 = to_hex(&c.Sum(&[]));
         if s2 != g.out {
             t.Errorf(Sprintf!("split write: sha1(%s) = %s want %s", g.inp, s2, g.out));

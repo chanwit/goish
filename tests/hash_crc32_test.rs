@@ -64,8 +64,8 @@ test!{ fn TestStreaming(t) {
     for (_, g) in range!(__golden) {
         let mut h = hash::crc32::NewIEEE();
         let half = g.inp.len() / 2;
-        h.Write(&g.inp.as_bytes()[..half]);
-        h.Write(&g.inp.as_bytes()[half..]);
+        h.Write(&g.inp[..half]);
+        h.Write(&g.inp[half..]);
         let got = h.Sum32();
         if got != g.ieee {
             t.Errorf(Sprintf!("streaming(%q) = %x, want %x", g.inp, got as i64, g.ieee as i64));
