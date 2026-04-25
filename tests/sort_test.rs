@@ -49,7 +49,7 @@ test!{ fn TestSortFloat64s(t) {
 }}
 
 test!{ fn TestSortSlice(t) {
-    let mut data = vec![3i64, 1, 4, 1, 5, 9, 2, 6];
+    let mut data: slice<int> = slice!([]int { 3, 1, 4, 1, 5, 9, 2, 6 });
     sort::Slice(&mut data, |a, b| a < b);
     if data != vec![1i64, 1, 2, 3, 4, 5, 6, 9] {
         t.Errorf(Sprintf!("sort::Slice ascending failed"));
