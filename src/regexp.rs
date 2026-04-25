@@ -35,8 +35,8 @@ impl Regexp {
         self.inner.is_match(s.as_ref())
     }
 
-    pub fn Match(&self, b: &[crate::types::byte]) -> bool {
-        match std::str::from_utf8(b) {
+    pub fn Match(&self, b: impl AsRef<[crate::types::byte]>) -> bool {
+        match std::str::from_utf8(b.as_ref()) {
             Ok(s) => self.inner.is_match(s),
             Err(_) => false,
         }

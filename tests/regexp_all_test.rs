@@ -69,7 +69,7 @@ test!{ fn TestMatch(t) {
         if got != want {
             t.Errorf(Sprintf!("Match(%q, %q) = %v want %v", pat, text, got, want));
         }
-        let got_b = re.Match(text.as_bytes());
+        let got_b = re.Match(text);
         if got_b != want {
             t.Errorf(Sprintf!("Match[bytes](%q, %q) = %v want %v", pat, text, got_b, want));
         }

@@ -56,7 +56,7 @@ test!{ fn TestReaderReadBytes(t) {
 }}
 
 test!{ fn TestReaderReadRune(t) {
-    let mut r = bufio::NewReader(Cursor::new("aλb".as_bytes()));
+    let mut r = bufio::NewReader(Cursor::new("aλb"));
     let (rune, n, err) = r.ReadRune();
     if err != nil || n != 1 || rune != 'a' as i32 {
         t.Errorf(Sprintf!("ReadRune a: got (%d, %d, %s)", rune, n, err));
