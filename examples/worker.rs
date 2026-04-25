@@ -95,11 +95,17 @@ fn main() {
     // Summary.
     fmt::Println!();
     fmt::Println!("results by worker:");
-    let mut worker_ids: slice<&int> = by_worker.keys().collect();
+    let mut worker_ids: slice<&int> = slice::new();
+    for k in by_worker.keys() {
+        worker_ids.push(k);
+    }
     worker_ids.sort();
     for (_, wid) in range!(worker_ids) {
         let squares = &by_worker[*wid];
-        let as_strs: slice<string> = squares.iter().map(|n| strconv::Itoa(*n)).collect();
+        let mut as_strs: slice<string> = slice::new();
+        for n in squares.iter() {
+            as_strs.push(strconv::Itoa(*n));
+        }
         fmt::Printf!("  worker %d: %d squares [%s]\n",
             **wid, len!(squares), strings::Join(&as_strs, ", "));
     }

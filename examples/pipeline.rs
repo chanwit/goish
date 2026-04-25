@@ -57,7 +57,10 @@ fn main() {
     // Collect + sort by input value.
     let collected: slice<Metric> = {
         let g = results.Lock();
-        let mut v: slice<Metric> = g.values().cloned().collect();
+        let mut v: slice<Metric> = slice::new();
+        for m in g.values() {
+            v.push(m.clone());
+        }
         sort::Slice(&mut v, |a, b| a.n < b.n);
         v
     };
