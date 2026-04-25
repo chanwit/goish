@@ -254,7 +254,7 @@ fn handler_can_select_on_request_context() {
             wp.Send("done");
         };
         select!{
-            recv(worker) |v| => { let _ = w.Write(v.as_bytes()); },
+            recv(worker) |v| => { let _ = w.Write(v); },
             recv(ctx.Done()) => {
                 w.WriteHeader(net::http::StatusServiceUnavailable);
                 let _ = w.Write(b"cancelled");

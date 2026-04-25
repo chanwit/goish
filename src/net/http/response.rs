@@ -79,7 +79,8 @@ impl ResponseWriter {
     /// `w.Write(bytes)` — append to the response body. Implicitly sends
     /// status 200 on first call if `WriteHeader` wasn't used.
     #[allow(non_snake_case)]
-    pub fn Write(&mut self, p: &[byte]) -> (int, error) {
+    pub fn Write(&mut self, p: impl AsRef<[byte]>) -> (int, error) {
+        let p = p.as_ref();
         if !self.wrote_header { self.wrote_header = true; }
         self.body.extend_from_slice(p);
         (p.len() as int, nil)

@@ -80,7 +80,7 @@ test!{ fn TestPostForm(t) {
         http::HandleFunc("/echo", move |w, r| {
             let method = r.Method.clone();
             let body = r.Body.String();
-            let _ = w.Write(Sprintf!("%v body=%v", method, body).as_bytes());
+            let _ = w.Write(Sprintf!("%v body=%v", method, body));
         });
     });
 
@@ -131,7 +131,7 @@ test!{ fn TestDoCustomMethod(t) {
     let url_ = Sprintf!("http://%v/m", addr);
     start_server(&addr, move || {
         http::HandleFunc("/m", move |w, r| {
-            let _ = w.Write(r.Method.as_bytes());
+            let _ = w.Write(&r.Method);
         });
     });
 
