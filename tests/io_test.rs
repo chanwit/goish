@@ -14,30 +14,30 @@ use std::io::Cursor;
 
 test!{ fn TestCopy(t) {
     let mut src = Cursor::new(b"hello, world.");
-    let mut dst: Vec<u8> = Vec::new();
+    let mut dst = bytes::Buffer::new();
     let (n, err) = gio::Copy(&mut dst, &mut src);
     if err != nil { t.Errorf(Sprintf!("Copy err: %s", err)); }
     if n != 13 { t.Errorf(Sprintf!("Copy n = %d, want 13", n)); }
-    if dst != b"hello, world." {
-        t.Errorf(Sprintf!("dst content = %s, want hello, world.", bytes::String(&dst)));
+    if dst.Bytes() != b"hello, world." {
+        t.Errorf(Sprintf!("dst content = %s, want hello, world.", dst.String()));
     }
 }}
 
 test!{ fn TestCopyN(t) {
     let mut src = Cursor::new(b"0123456789");
-    let mut dst: Vec<u8> = Vec::new();
+    let mut dst = bytes::Buffer::new();
     let (n, err) = gio::CopyN(&mut dst, &mut src, 5);
     if err != nil { t.Errorf(Sprintf!("CopyN err: %s", err)); }
     if n != 5 { t.Errorf(Sprintf!("CopyN n = %d, want 5", n)); }
-    if dst != b"01234" {
-        t.Errorf(Sprintf!("CopyN dst = %s, want 01234", bytes::String(&dst)));
+    if dst.Bytes() != b"01234" {
+        t.Errorf(Sprintf!("CopyN dst = %s, want 01234", dst.String()));
     }
 }}
 
 test!{ fn TestCopyNEOF(t) {
     // Request 20 bytes from a 10-byte source — should return EOF and n=10.
     let mut src = Cursor::new(b"0123456789");
-    let mut dst: Vec<u8> = Vec::new();
+    let mut dst = bytes::Buffer::new();
     let (n, err) = gio::CopyN(&mut dst, &mut src, 20);
     if n != 10 { t.Errorf(Sprintf!("CopyN n = %d, want 10", n)); }
     // Should be EOF (not nil).
@@ -85,12 +85,12 @@ test!{ fn TestReadFull(t) {
 }}
 
 test!{ fn TestWriteString(t) {
-    let mut dst: Vec<u8> = Vec::new();
+    let mut dst = bytes::Buffer::new();
     let (n, err) = gio::WriteString(&mut dst, "hello");
     if err != nil { t.Errorf(Sprintf!("WriteString err: %s", err)); }
     if n != 5 { t.Errorf(Sprintf!("WriteString n = %d, want 5", n)); }
-    if dst != b"hello" {
-        t.Errorf(Sprintf!("WriteString dst = %s", bytes::String(&dst)));
+    if dst.Bytes() != b"hello" {
+        t.Errorf(Sprintf!("WriteString dst = %s", dst.String()));
     }
 }}
 
@@ -169,12 +169,12 @@ test!{ fn TestMultiReaderCopy(t) {
         Cursor::new(b"abc"),
         Cursor::new(b"def"),
     ]);
-    let mut dst: Vec<u8> = Vec::new();
+    let mut dst = bytes::Buffer::new();
     let (n, err) = gio::Copy(&mut dst, &mut mr);
     if err != nil { t.Errorf(Sprintf!("Copy err: %s", err)); }
     if n != 6 { t.Errorf(Sprintf!("Copy n = %d, want 6", n)); }
-    if dst != b"abcdef" {
-        t.Errorf(Sprintf!("MultiReader Copy content = %s", bytes::String(&dst)));
+    if dst.Bytes() != b"abcdef" {
+        t.Errorf(Sprintf!("MultiReader Copy content = %s", dst.String()));
     }
 }}
 
