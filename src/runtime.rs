@@ -55,9 +55,9 @@ pub fn NumGoroutine() -> int {
 }
 
 #[allow(non_snake_case)]
-pub fn Version() -> &'static str {
+pub fn Version() -> crate::types::string {
     // Not semantically the Go toolchain version; report goish crate + note.
-    concat!("goish-", env!("CARGO_PKG_VERSION"))
+    crate::types::string::from(concat!("goish-", env!("CARGO_PKG_VERSION")))
 }
 
 // ── Goexit ─────────────────────────────────────────────────────────────

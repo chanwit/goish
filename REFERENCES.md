@@ -1275,6 +1275,20 @@ or where the port deliberately simplifies:
   `sync::atomic::Int64::Add` returns the *new* value (Go convention);
   call sites that rely on the OLD value (test ordering probes,
   swap-style counters) keep `std::sync::atomic::AtomicI64` + `fetch_add`.
+- **`'static` lifetimes that are Goish-correct (not leaks).** Three
+  patterns where `'static` in a public signature mirrors Go's actual
+  surface and shouldn't be sealed: (a) **singleton returns** —
+  `net::http::DefaultClient() -> &'static Client`,
+  `hash::crc32::IEEETable() -> &'static Table` mirror Go's package-
+  level singletons (`http.DefaultClient`, `crc32.IEEETable`); (b)
+  **closure-storage bounds** — `time::AfterFunc<F: FnOnce() + Send + 'static>`,
+  `container::heap::New(less: impl Fn(...) + Send + 'static)` —
+  closures stored beyond the call need `'static`, and Go's runtime
+  pins the closure's captured env equivalently; (c) **internal-test
+  scaffolding** — `net::smtp::NullConn::with_reader<R: Read + Send + 'static>`
+  wraps the value in `Box<dyn Read + Send>` for storage. Only `'static`
+  on a *plain reference return* (e.g. `pub fn Foo() -> &'static str`)
+  is a leak — return Goish `string` instead.
 - **`std::thread::spawn` over `go!{}` in four categories.** `go!{}` is
   tokio-task-based, which is wrong for: (a) **panic capture via
   `JoinHandle::join() -> Result<_, _>`** — tokio task panics surface
