@@ -124,8 +124,7 @@ test!{ fn TestSplitList(t) {
     ];
     for tt in tests {
         let got = filepath::SplitList(tt.in_);
-        let got_refs: Vec<&str> = got.iter().map(|s| s.as_str()).collect();
-        if got_refs != tt.out {
+        if got != tt.out {
             t.Errorf(Sprintf!("SplitList(%q) got %d, want %d", tt.in_, got.len(), tt.out.len()));
         }
     }

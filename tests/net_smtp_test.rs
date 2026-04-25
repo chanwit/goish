@@ -26,7 +26,9 @@ fn start_mock(responses: &[&str]) -> MockServer {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let addr = listener.local_addr().unwrap().to_string();
     let (tx, rx) = mpsc::channel();
-    let responses: Vec<String> = responses.iter().map(|s| (*s).to_string()).collect();
+    let mut owned: Vec<string> = Vec::with_capacity(responses.len());
+    for s in responses { owned.push((*s).into()); }
+    let responses = owned;
 
     thread::spawn(move || {
         let (stream, _) = listener.accept().expect("accept");
@@ -63,8 +65,7 @@ fn start_mock(responses: &[&str]) -> MockServer {
 
             let resp = responses.get(idx).cloned().unwrap_or_else(|| "250 OK".into());
             idx += 1;
-            let mut full = resp.clone();
-            full.push_str("\r\n");
+            let full = Sprintf!("%v\r\n", resp);
             let _ = writer.write_all(full.as_bytes());
 
             if trimmed.eq_ignore_ascii_case("QUIT") { break; }
