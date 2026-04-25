@@ -155,7 +155,8 @@ test!{ fn TestDecodeRawURL(t) {
 
 test!{ fn TestRoundTrip(t) {
     // Fuzz-like round-trip: bytes 0..255 survive encode/decode intact.
-    let src: Vec<u8> = (0u8..=255u8).collect();
+    let mut src: slice<byte> = make!([]byte, 0, 256);
+    for b in 0u8..=255u8 { src.push(b); }
     let enc = encoding::base64::StdEncoding.EncodeToString(&src);
     let (dec, err) = encoding::base64::StdEncoding.DecodeString(&enc);
     if err != nil {

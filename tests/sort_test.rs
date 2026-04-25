@@ -110,7 +110,8 @@ test!{ fn TestSearchStrings(t) {
 
 test!{ fn TestStressRandom(t) {
     // Large sort: 1000 reverse-sorted ints.
-    let mut data: Vec<i64> = (0..1000i64).rev().collect();
+    let mut data: slice<int> = make!([]int, 0, 1000);
+    for i in (0..1000i64).rev() { data.push(i); }
     sort::Ints(&mut data);
     for i in 0..1000 {
         if data[i] != i as i64 {

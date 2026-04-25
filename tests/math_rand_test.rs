@@ -58,17 +58,17 @@ test!{ fn TestFloat64Range(t) {
 test!{ fn TestSeedDeterministic(t) {
     // Same seed -> same sequence.
     rand::Seed(42);
-    let mut seq1: Vec<i64> = Vec::with_capacity(10);
+    let mut seq1: slice<int> = make!([]int, 0, 10);
     for _ in 0..10 { seq1.push(rand::Int63()); }
     rand::Seed(42);
-    let mut seq2: Vec<i64> = Vec::with_capacity(10);
+    let mut seq2: slice<int> = make!([]int, 0, 10);
     for _ in 0..10 { seq2.push(rand::Int63()); }
     if seq1 != seq2 {
         t.Errorf(Sprintf!("Seed(42) produced different sequences"));
     }
     // Different seed -> different sequence (with overwhelming probability).
     rand::Seed(1);
-    let mut seq3: Vec<i64> = Vec::with_capacity(10);
+    let mut seq3: slice<int> = make!([]int, 0, 10);
     for _ in 0..10 { seq3.push(rand::Int63()); }
     if seq1 == seq3 {
         t.Errorf(Sprintf!("Seed(1) produced same sequence as Seed(42)"));
@@ -77,7 +77,8 @@ test!{ fn TestSeedDeterministic(t) {
 
 test!{ fn TestShuffleStability(t) {
     // Shuffle preserves the multiset of elements.
-    let mut v: Vec<i64> = (0..100).collect();
+    let mut v: slice<int> = make!([]int, 0, 100);
+    for i in 0..100i64 { v.push(i); }
     let sum_before: i64 = v.iter().sum();
     let len_before = v.len();
     // Shuffle uses thread-local rand; we need per-Rand for clean test.

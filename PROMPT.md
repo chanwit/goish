@@ -6,6 +6,8 @@ Goish (`/home/chanwit/Dropbox/projects/goro-workspace/`) ports Go's stdlib + syn
 
 When in doubt: "would a Go programmer recognize this line?" If no, it's a leak.
 
+**Particular trap**: `Vec<T>`, `HashMap<K,V>`, `String` are *Rust* shapes — Goish has `slice<T>`, `map<K,V>`, `string` for these. When migrating call sites, never reach for `Vec::with_capacity`, `Vec::new`, `vec![…]` typed as `Vec<…>`, `HashMap::new`, or std `String`. Use `slice::new()` / `make!([]T, 0, n)` / `make!(map[K]V)` / `string::from(...)` (or just `"...".into()` for owned `string`). Loop builders push into `slice<T>` exactly the same as `Vec<T>` — `s.push(x)` works on either.
+
 ## Per-iteration loop
 
 Every cycle:
@@ -61,7 +63,7 @@ Library bundles fall into these patterns; identify which apply this iteration:
 
 Tests/examples sweeps fall into these patterns:
 
-- **Pattern substitution** — `format!` → `Sprintf!`, `String::from_utf8` → `bytes::String`, `thread::spawn` → `go!{}`, raw atomics → `sync::atomic::*`, `.lock().unwrap()` → `sync::Mutex::Lock`, `Arc<Mutex<...>>` → `sync::Mutex`, `Box::new(closure)` → drop after lib widening.
+- **Pattern substitution** — `format!` → `Sprintf!`, `String::from_utf8` → `bytes::String`, `thread::spawn` → `go!{}`, raw atomics → `sync::atomic::*`, `.lock().unwrap()` → `sync::Mutex::Lock`, `Arc<Mutex<...>>` → `sync::Mutex`, `Box::new(closure)` → drop after lib widening, `Vec<T>` → `slice<T>`, `Vec::new()` / `Vec::with_capacity(n)` → `slice::new()` / `make!([]T, 0, n)`, `vec![…]` literal → `slice!([…])` (when available), `HashMap<K,V>` → `map<K,V>`, `HashMap::new()` → `make!(map[K]V)`, `String` (in tests) → `string` (Goish alias for GoString).
 - **Comma-ok call-site sweep** — only for genuinely-comma-ok APIs (`map::Get`, `Chan::Recv`, `if_as!`-style assertions). `Option<T>`-returning containers stay on `if let Some(x) = …` (analog of `if x := l.Front(); x != nil`).
 - **Smart-pointer drop** — drop `Arc::clone` / `.clone()` where Goish wrappers handle internal sharing transparently.
 
@@ -110,6 +112,7 @@ Mission "done" when an audit pass returns:
 - `Arc::new(...)` at call sites: < 5 (only test patterns where Goish wrappers don't fit — atomics, Notify)
 - `.lock().unwrap()` at call sites: 0 (all migrated to `sync::Mutex::Lock` which absorbs poison)
 - `.to_string()` at call sites: < 30 (remaining are at boundaries to std types Goish doesn't own)
+- `Vec<T>` / `HashMap<K,V>` / `String` at call sites in tests/examples: 0 (Goish has `slice<T>`, `map<K,V>`, `string`). Exceptions go in REFERENCES.md §26 (e.g., closure capture types where `slice<T>` doesn't fit, FFI boundaries to truly-std-only APIs).
 
 When all met, on next cycle: post a final report (`mission complete: leak counts X/Y/Z, last release vA.B.C, see git log v0.21.0..HEAD for shipped bundles`) and **omit the `ScheduleWakeup` call** to end the loop.
 
