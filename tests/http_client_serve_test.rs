@@ -21,7 +21,7 @@ fn next_port() -> u16 {
 fn start_server<F>(addr: &str, register: F)
 where F: FnOnce() + Send + 'static
 {
-    let addr_owned = addr.to_string();
+    let addr_owned: string = addr.into();
     std::thread::spawn(move || {
         register();
         let _ = http::ListenAndServe(&addr_owned, nil);

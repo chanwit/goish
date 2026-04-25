@@ -11,7 +11,9 @@ test!{ fn TestLessInt(t) {
 }}
 
 test!{ fn TestLessString(t) {
-    if !cmp::Less(&"abc".to_string(), &"abd".to_string()) {
+    let a: string = "abc".into();
+    let b: string = "abd".into();
+    if !cmp::Less(&a, &b) {
         t.Errorf(Sprintf!("Less(abc, abd) = false"));
     }
 }}

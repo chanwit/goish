@@ -78,13 +78,13 @@ test!{ fn TestWithDeadline(t) {
 
 test!{ fn TestWithValue(t) {
     let ctx = context::Background();
-    let ctx = context::WithValue(ctx, "user", "alice".to_string());
-    let got: Option<String> = ctx.Value("user");
+    let ctx = context::WithValue(ctx, "user", string::from("alice"));
+    let got: Option<string> = ctx.Value("user");
     if got.as_deref() != Some("alice") {
         t.Errorf(Sprintf!("Value(user) = %v", got.is_some()));
     }
     // Missing key returns None.
-    let missing: Option<String> = ctx.Value("missing");
+    let missing: Option<string> = ctx.Value("missing");
     if missing.is_some() {
         t.Errorf(Sprintf!("missing key got Some"));
     }

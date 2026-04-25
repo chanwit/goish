@@ -9,11 +9,11 @@
 #![allow(non_snake_case)]
 use goish::prelude::*;
 
-fn tempdir() -> String {
+fn tempdir() -> string {
     let base = std::env::temp_dir().to_string_lossy().into_owned();
     let ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    Sprintf!("%v/goish_test_%v", base, ns).to_string()
+    Sprintf!("%v/goish_test_%v", base, ns)
 }
 
 test!{ fn TestMkdirReadFileWriteFile(t) {

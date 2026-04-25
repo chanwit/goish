@@ -101,7 +101,7 @@ test!{ fn TestReaderAt(t) {
         if got != tt.want {
             t.Errorf(Sprintf!("%d. got %q; want %q", i, got, tt.want));
         }
-        let got_err = if err == nil { "".to_string() } else { Sprintf!("%v", err).to_string() };
+        let got_err: string = if err == nil { "".into() } else { Sprintf!("%v", err) };
         if got_err != tt.want_err {
             t.Errorf(Sprintf!("%d. err = %q; want %q", i, got_err, tt.want_err));
         }

@@ -37,15 +37,15 @@ fn pairs() -> slice<Pair> {
     ].into()
 }
 
-fn url_ref(s: &str) -> String {
-    s.replace('+', "-").replace('/', "_")
+fn url_ref(s: &str) -> string {
+    s.replace('+', "-").replace('/', "_").into()
 }
 
-fn raw_ref(s: &str) -> String {
-    s.trim_end_matches('=').to_string()
+fn raw_ref(s: &str) -> string {
+    s.trim_end_matches('=').into()
 }
 
-fn raw_url_ref(s: &str) -> String {
+fn raw_url_ref(s: &str) -> string {
     raw_ref(&url_ref(s))
 }
 
