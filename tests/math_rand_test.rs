@@ -58,15 +58,18 @@ test!{ fn TestFloat64Range(t) {
 test!{ fn TestSeedDeterministic(t) {
     // Same seed -> same sequence.
     rand::Seed(42);
-    let seq1: Vec<i64> = (0..10).map(|_| rand::Int63()).collect();
+    let mut seq1: Vec<i64> = Vec::with_capacity(10);
+    for _ in 0..10 { seq1.push(rand::Int63()); }
     rand::Seed(42);
-    let seq2: Vec<i64> = (0..10).map(|_| rand::Int63()).collect();
+    let mut seq2: Vec<i64> = Vec::with_capacity(10);
+    for _ in 0..10 { seq2.push(rand::Int63()); }
     if seq1 != seq2 {
         t.Errorf(Sprintf!("Seed(42) produced different sequences"));
     }
     // Different seed -> different sequence (with overwhelming probability).
     rand::Seed(1);
-    let seq3: Vec<i64> = (0..10).map(|_| rand::Int63()).collect();
+    let mut seq3: Vec<i64> = Vec::with_capacity(10);
+    for _ in 0..10 { seq3.push(rand::Int63()); }
     if seq1 == seq3 {
         t.Errorf(Sprintf!("Seed(1) produced same sequence as Seed(42)"));
     }
