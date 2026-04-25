@@ -487,53 +487,53 @@ pub fn Trim(s: &[byte], cutset: &[byte]) -> crate::types::slice<byte> {
 }
 
 #[allow(non_snake_case)]
-pub fn TrimLeft(s: &[byte], cutset: &[byte]) -> Vec<byte> {
+pub fn TrimLeft(s: &[byte], cutset: &[byte]) -> crate::types::slice<byte> {
     let start = s.iter().position(|b| !cutset.contains(b)).unwrap_or(s.len());
-    s[start..].to_vec()
+    s[start..].to_vec().into()
 }
 
 #[allow(non_snake_case)]
-pub fn TrimRight(s: &[byte], cutset: &[byte]) -> Vec<byte> {
+pub fn TrimRight(s: &[byte], cutset: &[byte]) -> crate::types::slice<byte> {
     let end = s.iter().rposition(|b| !cutset.contains(b)).map(|i| i + 1).unwrap_or(0);
-    s[..end].to_vec()
+    s[..end].to_vec().into()
 }
 
 #[allow(non_snake_case)]
-pub fn TrimPrefix(s: &[byte], prefix: &[byte]) -> Vec<byte> {
-    if s.starts_with(prefix) { s[prefix.len()..].to_vec() } else { s.to_vec() }
+pub fn TrimPrefix(s: &[byte], prefix: &[byte]) -> crate::types::slice<byte> {
+    if s.starts_with(prefix) { s[prefix.len()..].to_vec().into() } else { s.to_vec().into() }
 }
 
 #[allow(non_snake_case)]
-pub fn TrimSuffix(s: &[byte], suffix: &[byte]) -> Vec<byte> {
-    if s.ends_with(suffix) { s[..s.len() - suffix.len()].to_vec() } else { s.to_vec() }
+pub fn TrimSuffix(s: &[byte], suffix: &[byte]) -> crate::types::slice<byte> {
+    if s.ends_with(suffix) { s[..s.len() - suffix.len()].to_vec().into() } else { s.to_vec().into() }
 }
 
 #[allow(non_snake_case)]
-pub fn Fields(s: &[byte]) -> Vec<Vec<byte>> {
+pub fn Fields(s: &[byte]) -> crate::types::slice<crate::types::slice<byte>> {
     let is_space = |b: byte| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c);
-    let mut out = Vec::new();
+    let mut out: Vec<crate::types::slice<byte>> = Vec::new();
     let mut i = 0usize;
     while i < s.len() {
         while i < s.len() && is_space(s[i]) { i += 1; }
         let start = i;
         while i < s.len() && !is_space(s[i]) { i += 1; }
         if start < i {
-            out.push(s[start..i].to_vec());
+            out.push(s[start..i].to_vec().into());
         }
     }
-    out
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn Repeat(s: &[byte], n: int) -> Vec<byte> {
+pub fn Repeat(s: &[byte], n: int) -> crate::types::slice<byte> {
     if n < 0 {
         panic!("bytes: negative Repeat count");
     }
-    let mut out = Vec::with_capacity(s.len() * n as usize);
+    let mut out: Vec<byte> = Vec::with_capacity(s.len() * n as usize);
     for _ in 0..n {
         out.extend_from_slice(s);
     }
-    out
+    out.into()
 }
 
 #[allow(non_snake_case)]
