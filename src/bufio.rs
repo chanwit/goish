@@ -32,7 +32,7 @@ pub const MaxScanTokenSize: usize = 64 * 1024;
 /// - advance: number of bytes to consume from the buffer
 /// - token: the token for this call (None if nothing yet; need more data)
 /// - err: non-nil halts the scan
-pub type SplitFunc = fn(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error);
+pub type SplitFunc = fn(data: &[byte], at_eof: bool) -> (int, Option<crate::types::slice<byte>>, error);
 
 pub struct Scanner<R: Read> {
     reader: R,
@@ -96,7 +96,7 @@ impl<R: Read> Scanner<R> {
                 self.last_err = err;
                 self.done = true;
                 if let Some(tok) = token {
-                    self.token = tok;
+                    self.token = tok.into();
                     return true;
                 }
                 return false;
@@ -108,7 +108,7 @@ impl<R: Read> Scanner<R> {
             }
             self.start += advance as usize;
             if let Some(tok) = token {
-                self.token = tok;
+                self.token = tok.into();
                 if advance > 0 { self.empties = 0; }
                 else {
                     self.empties += 1;
@@ -146,7 +146,7 @@ impl<R: Read> Scanner<R> {
                     let (_, token2, err2) = (self.split)(data, true);
                     if err2 != nil { self.last_err = err2; }
                     if let Some(tok) = token2 {
-                        self.token = tok;
+                        self.token = tok.into();
                         self.start = self.end;
                         return true;
                     }
@@ -184,17 +184,17 @@ impl<R: Read> Scanner<R> {
 
 /// ScanBytes is a split function that returns each byte as a token.
 #[allow(non_snake_case)]
-pub fn ScanBytes(data: &[byte], _at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+pub fn ScanBytes(data: &[byte], _at_eof: bool) -> (int, Option<crate::types::slice<byte>>, error) {
     if data.is_empty() { return (0, None, nil); }
-    (1, Some(vec![data[0]]), nil)
+    (1, Some(vec![data[0]].into()), nil)
 }
 
 /// ScanRunes is a split function that yields each UTF-8 rune as a token.
 #[allow(non_snake_case)]
-pub fn ScanRunes(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+pub fn ScanRunes(data: &[byte], at_eof: bool) -> (int, Option<crate::types::slice<byte>>, error) {
     if data.is_empty() { return (0, None, nil); }
     // ASCII fast path.
-    if data[0] < 0x80 { return (1, Some(vec![data[0]]), nil); }
+    if data[0] < 0x80 { return (1, Some(vec![data[0]].into()), nil); }
     let width = match data[0] {
         0xC0..=0xDF => 2,
         0xE0..=0xEF => 3,
@@ -204,7 +204,7 @@ pub fn ScanRunes(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error)
             let mut buf = vec![0u8; 4];
             let n = crate::unicode::utf8::EncodeRune(&mut buf, crate::unicode::RuneError);
             buf.truncate(n as usize);
-            buf
+            buf.into()
         }), nil);
         }
     };
@@ -214,7 +214,7 @@ pub fn ScanRunes(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error)
             let mut buf = vec![0u8; 4];
             let n = crate::unicode::utf8::EncodeRune(&mut buf, crate::unicode::RuneError);
             buf.truncate(n as usize);
-            buf
+            buf.into()
         }), nil);
         }
         return (0, None, nil);
@@ -226,32 +226,32 @@ pub fn ScanRunes(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error)
             let mut buf = vec![0u8; 4];
             let n = crate::unicode::utf8::EncodeRune(&mut buf, crate::unicode::RuneError);
             buf.truncate(n as usize);
-            buf
+            buf.into()
         }), nil);
         }
     }
-    (width as int, Some(data[..width].to_vec()), nil)
+    (width as int, Some(data[..width].to_vec().into()), nil)
 }
 
 /// ScanLines is a split function that yields each line of text, stripped of
 /// any trailing \r\n or \n marker.
 #[allow(non_snake_case)]
-pub fn ScanLines(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+pub fn ScanLines(data: &[byte], at_eof: bool) -> (int, Option<crate::types::slice<byte>>, error) {
     if at_eof && data.is_empty() { return (0, None, nil); }
     if let Some(i) = data.iter().position(|&b| b == b'\n') {
         // Drop the trailing \r if present.
         let tok_end = if i > 0 && data[i-1] == b'\r' { i - 1 } else { i };
-        return ((i + 1) as int, Some(data[..tok_end].to_vec()), nil);
+        return ((i + 1) as int, Some(data[..tok_end].to_vec().into()), nil);
     }
     if at_eof {
-        return (data.len() as int, Some(data.to_vec()), nil);
+        return (data.len() as int, Some(data.to_vec().into()), nil);
     }
     (0, None, nil)
 }
 
 /// ScanWords is a split function that yields each whitespace-separated word.
 #[allow(non_snake_case)]
-pub fn ScanWords(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error) {
+pub fn ScanWords(data: &[byte], at_eof: bool) -> (int, Option<crate::types::slice<byte>>, error) {
     // Skip leading whitespace.
     let mut start = 0usize;
     while start < data.len() {
@@ -264,12 +264,12 @@ pub fn ScanWords(data: &[byte], at_eof: bool) -> (int, Option<Vec<byte>>, error)
     while i < data.len() {
         let (r, size) = decode_rune(&data[i..]);
         if IsSpace(r) {
-            return ((i + next_rune_size(&data[i..])) as int, Some(data[start..i].to_vec()), nil);
+            return ((i + next_rune_size(&data[i..])) as int, Some(data[start..i].to_vec().into()), nil);
         }
         i += size;
     }
     if at_eof && data.len() > start {
-        return (data.len() as int, Some(data[start..].to_vec()), nil);
+        return (data.len() as int, Some(data[start..].to_vec().into()), nil);
     }
     // Need more data.
     (start as int, None, nil)
