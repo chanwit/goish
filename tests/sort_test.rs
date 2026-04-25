@@ -60,12 +60,12 @@ test!{ fn TestSortSlice(t) {
 
 test!{ fn TestSortSliceStable(t) {
     // Stable: equal-keyed items preserve original order.
-    let mut data: Vec<(i64, &'static str)> = vec![
-        (1, "a"), (2, "b"), (1, "c"), (2, "d"), (1, "e"),
-    ];
+    let mut data: slice<(int, &'static str)> = vec![
+        (1i64, "a"), (2, "b"), (1, "c"), (2, "d"), (1, "e"),
+    ].into();
     sort::SliceStable(&mut data, |a, b| a.0 < b.0);
     // All 1s first (in original order a, c, e), then 2s (b, d).
-    let mut tags: Vec<&str> = Vec::with_capacity(data.len());
+    let mut tags: slice<&str> = slice::with_capacity(data.len());
     for p in &data { tags.push(p.1); }
     if tags != vec!["a", "c", "e", "b", "d"] {
         t.Errorf(Sprintf!("SliceStable did not preserve order"));
