@@ -55,7 +55,7 @@ test!{ fn TestEncodeStd(t) {
         let got = encoding::base64::StdEncoding.EncodeToString(p.decoded);
         if got != p.encoded {
             t.Errorf(Sprintf!("StdEncoding.EncodeToString(%q) = %q, want %q",
-                String::from_utf8_lossy(p.decoded).to_string(), got, p.encoded));
+                bytes::String(p.decoded), got, p.encoded));
         }
     }
 }}

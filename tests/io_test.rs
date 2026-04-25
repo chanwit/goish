@@ -19,7 +19,7 @@ test!{ fn TestCopy(t) {
     if err != nil { t.Errorf(Sprintf!("Copy err: %s", err)); }
     if n != 13 { t.Errorf(Sprintf!("Copy n = %d, want 13", n)); }
     if dst != b"hello, world." {
-        t.Errorf(Sprintf!("dst content = %s, want hello, world.", String::from_utf8_lossy(&dst)));
+        t.Errorf(Sprintf!("dst content = %s, want hello, world.", bytes::String(&dst)));
     }
 }}
 
@@ -30,7 +30,7 @@ test!{ fn TestCopyN(t) {
     if err != nil { t.Errorf(Sprintf!("CopyN err: %s", err)); }
     if n != 5 { t.Errorf(Sprintf!("CopyN n = %d, want 5", n)); }
     if dst != b"01234" {
-        t.Errorf(Sprintf!("CopyN dst = %s, want 01234", String::from_utf8_lossy(&dst)));
+        t.Errorf(Sprintf!("CopyN dst = %s, want 01234", bytes::String(&dst)));
     }
 }}
 
@@ -80,7 +80,7 @@ test!{ fn TestReadFull(t) {
     if err != nil { t.Errorf(Sprintf!("ReadFull err: %s", err)); }
     if n != 5 { t.Errorf(Sprintf!("ReadFull n = %d, want 5", n)); }
     if &buf != b"abcde" {
-        t.Errorf(Sprintf!("ReadFull buf = %s, want abcde", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("ReadFull buf = %s, want abcde", bytes::String(&buf)));
     }
 }}
 
@@ -90,7 +90,7 @@ test!{ fn TestWriteString(t) {
     if err != nil { t.Errorf(Sprintf!("WriteString err: %s", err)); }
     if n != 5 { t.Errorf(Sprintf!("WriteString n = %d, want 5", n)); }
     if dst != b"hello" {
-        t.Errorf(Sprintf!("WriteString dst = %s", String::from_utf8_lossy(&dst)));
+        t.Errorf(Sprintf!("WriteString dst = %s", bytes::String(&dst)));
     }
 }}
 
@@ -113,10 +113,10 @@ test!{ fn TestTeeReader(t) {
     let (buf, err) = gio::ReadAll(&mut tr);
     if err != nil { t.Errorf(Sprintf!("ReadAll err: %s", err)); }
     if buf != b"hello" {
-        t.Errorf(Sprintf!("TeeReader ReadAll = %s", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("TeeReader ReadAll = %s", bytes::String(&buf)));
     }
     if mirror != b"hello" {
-        t.Errorf(Sprintf!("TeeReader mirror = %s", String::from_utf8_lossy(&mirror)));
+        t.Errorf(Sprintf!("TeeReader mirror = %s", bytes::String(&mirror)));
     }
 }}
 
@@ -128,7 +128,7 @@ test!{ fn TestSectionReader_ReadAt(t) {
     if err != nil { t.Errorf(Sprintf!("ReadAt err: %s", err)); }
     if n != 5 { t.Errorf(Sprintf!("ReadAt n = %d, want 5", n)); }
     if &buf != b"23456" {
-        t.Errorf(Sprintf!("SectionReader content = %s, want 23456", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("SectionReader content = %s, want 23456", bytes::String(&buf)));
     }
 }}
 
@@ -148,7 +148,7 @@ test!{ fn TestSectionReader_Seek(t) {
     let mut buf = [0u8; 3];
     let (n, _) = sr.Read(&mut buf);
     if n != 3 || &buf != b"345" {
-        t.Errorf(Sprintf!("after Seek, Read = %s n=%d", String::from_utf8_lossy(&buf), n));
+        t.Errorf(Sprintf!("after Seek, Read = %s n=%d", bytes::String(&buf), n));
     }
 }}
 
@@ -160,7 +160,7 @@ test!{ fn TestMultiReader(t) {
     let (out, err) = gio::ReadAll(&mut mr);
     if err != nil { t.Errorf(Sprintf!("ReadAll err: %s", err)); }
     if out != b"hello world" {
-        t.Errorf(Sprintf!("MultiReader content = %s", String::from_utf8_lossy(&out)));
+        t.Errorf(Sprintf!("MultiReader content = %s", bytes::String(&out)));
     }
 }}
 
@@ -174,7 +174,7 @@ test!{ fn TestMultiReaderCopy(t) {
     if err != nil { t.Errorf(Sprintf!("Copy err: %s", err)); }
     if n != 6 { t.Errorf(Sprintf!("Copy n = %d, want 6", n)); }
     if dst != b"abcdef" {
-        t.Errorf(Sprintf!("MultiReader Copy content = %s", String::from_utf8_lossy(&dst)));
+        t.Errorf(Sprintf!("MultiReader Copy content = %s", bytes::String(&dst)));
     }
 }}
 
@@ -206,7 +206,7 @@ test!{ fn TestNopCloserReadable(t) {
     let (buf, err) = gio::ReadAll(&mut nc);
     if err != nil { t.Errorf(Sprintf!("NopCloser ReadAll err: %s", err)); }
     if buf != b"abc" {
-        t.Errorf(Sprintf!("NopCloser content = %s", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("NopCloser content = %s", bytes::String(&buf)));
     }
 }}
 

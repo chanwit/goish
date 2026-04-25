@@ -74,7 +74,7 @@ test!{ fn TestEscape(t) {
         let mut v = Value::Null;
         let err = json::Unmarshal(tt.r#in, &mut v);
         if err != nil {
-            t.Errorf(Sprintf!("Unmarshal(%s) err: %s", String::from_utf8_lossy(tt.r#in), err));
+            t.Errorf(Sprintf!("Unmarshal(%s) err: %s", bytes::String(tt.r#in), err));
             continue;
         }
         if v.String() != tt.want {
@@ -94,7 +94,7 @@ test!{ fn TestUnmarshalSyntax(t) {
         let mut v = Value::Null;
         let err = json::Unmarshal(b, &mut v);
         if err == nil {
-            t.Errorf(Sprintf!("Unmarshal(%s) = nil, want error", String::from_utf8_lossy(b)));
+            t.Errorf(Sprintf!("Unmarshal(%s) = nil, want error", bytes::String(b)));
         }
     }
 }}
@@ -107,7 +107,7 @@ test!{ fn TestValid(t) {
     ];
     for b in good {
         if !json::Valid(b) {
-            t.Errorf(Sprintf!("Valid(%s) = false, want true", String::from_utf8_lossy(b)));
+            t.Errorf(Sprintf!("Valid(%s) = false, want true", bytes::String(b)));
         }
     }
     let bad = vec![
@@ -115,7 +115,7 @@ test!{ fn TestValid(t) {
     ];
     for b in bad {
         if json::Valid(b) {
-            t.Errorf(Sprintf!("Valid(%s) = true, want false", String::from_utf8_lossy(b)));
+            t.Errorf(Sprintf!("Valid(%s) = true, want false", bytes::String(b)));
         }
     }
 }}

@@ -53,7 +53,7 @@ test!{ fn TestGolden32(t) {
         let got = h.Sum32();
         if got != g.out {
             t.Errorf(Sprintf!("New32().Write(%q).Sum32() = %x, want %x",
-                String::from_utf8_lossy(g.inp).to_string(),
+                bytes::String(g.inp),
                 got as i64, g.out as i64));
         }
     }
@@ -67,7 +67,7 @@ test!{ fn TestGolden32a(t) {
         let got = h.Sum32();
         if got != g.out {
             t.Errorf(Sprintf!("New32a().Write(%q).Sum32() = %x, want %x",
-                String::from_utf8_lossy(g.inp).to_string(),
+                bytes::String(g.inp),
                 got as i64, g.out as i64));
         }
     }
@@ -81,8 +81,8 @@ test!{ fn TestGolden64(t) {
         let got = h.Sum64();
         if got != g.out {
             t.Errorf(Sprintf!("New64().Write(%q).Sum64() mismatch for %q",
-                String::from_utf8_lossy(g.inp).to_string(),
-                String::from_utf8_lossy(g.inp).to_string()));
+                bytes::String(g.inp),
+                bytes::String(g.inp)));
         }
     }
 }}
@@ -95,8 +95,8 @@ test!{ fn TestGolden64a(t) {
         let got = h.Sum64();
         if got != g.out {
             t.Errorf(Sprintf!("New64a().Write(%q).Sum64() mismatch for %q",
-                String::from_utf8_lossy(g.inp).to_string(),
-                String::from_utf8_lossy(g.inp).to_string()));
+                bytes::String(g.inp),
+                bytes::String(g.inp)));
         }
     }
 }}

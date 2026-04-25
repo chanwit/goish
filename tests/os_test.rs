@@ -28,7 +28,7 @@ test!{ fn TestMkdirReadFileWriteFile(t) {
     let (data, err) = os::ReadFile(&p);
     if err != nil { t.Fatal(Sprintf!("ReadFile: %s", err)); }
     if data != b"hello, world" {
-        t.Errorf(Sprintf!("ReadFile content = %s", String::from_utf8_lossy(&data)));
+        t.Errorf(Sprintf!("ReadFile content = %s", bytes::String(&data)));
     }
     os::Remove(&p);
     os::Remove(&dir);
@@ -73,7 +73,7 @@ test!{ fn TestCreateWriteReadBack(t) {
     let (data, err) = os::ReadFile(&path);
     if err != nil { t.Fatal(Sprintf!("ReadFile: %s", err)); }
     if data != b"payload" {
-        t.Errorf(Sprintf!("back = %s", String::from_utf8_lossy(&data)));
+        t.Errorf(Sprintf!("back = %s", bytes::String(&data)));
     }
     os::Remove(&path);
     os::Remove(&dir);

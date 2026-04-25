@@ -83,7 +83,7 @@ test!{ fn TestWriterWriteString(t) {
         }
     }
     if buf != b"hello, world" {
-        t.Errorf(Sprintf!("buf = %q", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("buf = %q", bytes::String(&buf)));
     }
 }}
 
@@ -95,7 +95,7 @@ test!{ fn TestWriterWriteByte(t) {
         let _ = w.Flush();
     }
     if buf != b"abcdef" {
-        t.Errorf(Sprintf!("buf = %q", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("buf = %q", bytes::String(&buf)));
     }
 }}
 
@@ -112,7 +112,7 @@ test!{ fn TestWriterFlushRequired(t) {
     if err != nil { t.Errorf(Sprintf!("Flush: %s", err)); }
     drop(w);
     if buf != b"abc" {
-        t.Errorf(Sprintf!("buf after Flush = %q", String::from_utf8_lossy(&buf)));
+        t.Errorf(Sprintf!("buf after Flush = %q", bytes::String(&buf)));
     }
 }}
 
