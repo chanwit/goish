@@ -31,7 +31,7 @@ pub struct Client<C: Read + Write> {
     // Since our test conn is a simple Vec pair, keep a secondary handle.
     localName: string,
     didHello: bool,
-    pub Ext: HashMap<string, string>,
+    pub Ext: crate::types::map<string, string>,
 }
 
 /// Wrap a Read + Write so the BufReader owns a handle while Write stays
@@ -73,7 +73,7 @@ pub fn Dial(addr: &str) -> (Client<TcpStream>, error) {
         r: BufReader::new(boxed),
         localName: "localhost".into(),
         didHello: false,
-        Ext: HashMap::new(),
+        Ext: crate::make!(map[string]string),
     };
     // Read greeting: expect 220.
     let (_code, _msg, err) = c.read_response(220);
@@ -100,7 +100,7 @@ impl Client<TcpStream> {
             r: BufReader::new(boxed),
             localName: "".into(),
             didHello: false,
-            Ext: HashMap::new(),
+            Ext: crate::make!(map[string]string),
         }
     }
 }
@@ -126,7 +126,7 @@ impl<C: Read + Write + Send + 'static> Client<C> {
             r: BufReader::new(boxed),
             localName: "localhost".into(),
             didHello: false,
-            Ext: HashMap::new(),
+            Ext: crate::make!(map[string]string),
         };
         let (_code, _msg, err) = c.read_response(220);
         (c, err)
@@ -190,7 +190,7 @@ impl<C: Read + Write> Client<C> {
         let line = format!("EHLO {}", self.localName);
         let (_code, msg, err) = self.cmd(250, &line);
         if err != nil { return Err(()); }
-        let mut ext = HashMap::new();
+        let mut ext: crate::types::map<string, string> = crate::make!(map[string]string);
         let lines: Vec<&str> = msg.split('\n').collect();
         if lines.len() > 1 {
             for line in &lines[1..] {
