@@ -107,6 +107,9 @@ Mission "done" when an audit pass returns:
 - Unmigrateable sites: each documented in `REFERENCES.md` with one-line rationale
 - `cargo test`: 1052+/0 failed
 - `cargo build --tests --examples`: warning-clean for new code
+- `Arc::new(...)` at call sites: < 5 (only test patterns where Goish wrappers don't fit — atomics, Notify)
+- `.lock().unwrap()` at call sites: 0 (all migrated to `sync::Mutex::Lock` which absorbs poison)
+- `.to_string()` at call sites: < 30 (remaining are at boundaries to std types Goish doesn't own)
 
 When all met, on next cycle: post a final report (`mission complete: leak counts X/Y/Z, last release vA.B.C, see git log v0.21.0..HEAD for shipped bundles`) and **omit the `ScheduleWakeup` call** to end the loop.
 

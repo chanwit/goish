@@ -8,7 +8,6 @@
 // site. If any of those reappears here, it's a Rust-leak regression.
 
 use goish::prelude::*;
-use std::sync::{Arc, Mutex};
 
 // zapcore-shape `Core` interface — With returns a fresh Core, the call
 // site needs to clone / share it freely without seeing Rust plumbing.
@@ -23,14 +22,14 @@ Interface!{
 #[derive(Clone)]
 struct InMem {
     tags: Vec<&'static str>,
-    sink: Arc<Mutex<Vec<String>>>,
+    sink: sync::Mutex<Vec<string>>,
 }
 
 Interface!{
     impl Core for InMem {
         fn Write(&self, msg: &str) {
-            let line = Sprintf!("[%v] %v", self.tags.join("/"), msg).to_string();
-            self.sink.lock().unwrap().push(line);
+            let line = Sprintf!("[%v] %v", self.tags.join("/"), msg);
+            self.sink.Lock().push(line);
         }
         fn With(&self, tag: &'static str) -> Core {
             let mut tags = self.tags.clone();
@@ -42,7 +41,7 @@ Interface!{
 }
 
 test!{ fn TestCore_Clones(t) {
-    let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
     let base: Core = InMem {
         tags: vec!["base"],
         sink: sink.clone(),
@@ -56,7 +55,7 @@ test!{ fn TestCore_Clones(t) {
     b.Write("B");
     c.Write("C");
 
-    let logged = sink.lock().unwrap().clone();
+    let logged = sink.Lock().clone();
     if len!(logged) != 3 {
         t.Errorf(Sprintf!("want 3 lines, got %d", len!(logged)));
     }
@@ -73,7 +72,7 @@ test!{ fn TestCore_Clones(t) {
 }}
 
 test!{ fn TestCore_WithDoesntMutateOriginal(t) {
-    let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
     let base: Core = InMem { tags: vec!["root"], sink }.into();
     let child = base.With("leaf");
 
@@ -102,7 +101,7 @@ Interface!{
 }
 
 #[derive(Clone)]
-struct ThresholdCore { min_lvl: i32, sink: Arc<Mutex<Vec<String>>> }
+struct ThresholdCore { min_lvl: i32, sink: sync::Mutex<Vec<string>> }
 
 Interface!{
     impl LevelEnabler for ThresholdCore {
@@ -114,21 +113,21 @@ Interface!{
     impl TraceCore for ThresholdCore {
         fn Emit(&self, lvl: i32, msg: &str) {
             if self.Enabled(lvl) {
-                self.sink.lock().unwrap().push(Sprintf!("L%v:%v", lvl, msg).to_string());
+                self.sink.Lock().push(Sprintf!("L%v:%v", lvl, msg));
             }
         }
     }
 }
 
 test!{ fn TestInterface_SupertraitBound(t) {
-    let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
     let tc: TraceCore = ThresholdCore { min_lvl: 1, sink: sink.clone() }.into();
 
     tc.Emit(0, "below");
     tc.Emit(1, "at");
     tc.Emit(2, "above");
 
-    let out = sink.lock().unwrap().clone();
+    let out = sink.Lock().clone();
     if len!(out) != 2 {
         t.Errorf(Sprintf!("supertrait filtering: want 2 lines, got %d", len!(out)));
     }
@@ -153,25 +152,25 @@ mod decl_mod {
 mod impl_mod {
     use super::*;
     #[derive(Clone)]
-    pub struct Capture { pub sink: Arc<Mutex<Vec<String>>> }
+    pub struct Capture { pub sink: sync::Mutex<Vec<string>> }
 
     // Path form — user never types `__LoggerTrait`.
     Interface!{
         impl super::decl_mod::Logger for Capture {
             fn Log(&self, msg: &str) {
-                self.sink.lock().unwrap().push(msg.to_string());
+                self.sink.Lock().push(msg.into());
             }
         }
     }
 }
 
 test!{ fn TestInterface_CrossModuleImpl(t) {
-    let sink: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
     let lg: decl_mod::Logger = impl_mod::Capture { sink: sink.clone() }.into();
     lg.Log("hello");
     lg.Log("world");
 
-    let out = sink.lock().unwrap().clone();
+    let out = sink.Lock().clone();
     if len!(out) != 2 {
         t.Errorf(Sprintf!("cross-module Interface! impl: want 2 lines, got %d", len!(out)));
     }
