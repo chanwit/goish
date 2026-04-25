@@ -119,7 +119,7 @@ test!{ fn TestChan_MPMCBigFanout(t) {
         let c = chan!(i32, chanCap);
 
         // Producers.
-        let mut producers = Vec::new();
+        let mut producers: slice<Goroutine> = slice::new();
         for _ in 0..P {
             let cp = c.clone();
             producers.push(go!{
@@ -130,7 +130,7 @@ test!{ fn TestChan_MPMCBigFanout(t) {
         // Consumers — each reads L values into its own hashmap,
         // then pushes the map out via `done`.
         let done = chan!(map<i32, i32>, P as usize);
-        let mut consumers = Vec::new();
+        let mut consumers: slice<Goroutine> = slice::new();
         for _ in 0..P {
             let cc = c.clone();
             let dc = done.clone();
@@ -259,7 +259,7 @@ test!{ fn TestChan_ManyGoroutines(t) {
         }
     };
 
-    let mut producers = Vec::new();
+    let mut producers: slice<Goroutine> = slice::new();
     for i in 0..N {
         let cp = c.clone();
         producers.push(go!{ let _ = cp.Send(i); });
