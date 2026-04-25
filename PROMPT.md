@@ -27,7 +27,7 @@ Where prior versions said "stop and ask," apply these instead:
 - **Design with multiple valid options**: pick the option that most closely matches Go's surface syntax. Tiebreaker: pick the option that adds *less* surface area to Goish's public API (fewer new public types/macros). Document under a `Design choice:` line in the commit message so future iterations can reverse it cheaply if wrong.
 
 - **Breaking API change**: allowed if (a) the lib change + tests/examples sweep ship in the **same bundle** so `cargo test` stays green, (b) version bump is appropriate (`0.minor` for an open public API, `0.major` once 1.0 lands), (c) commit message has a `Breaking:` section listing affected APIs and migration path.
-  Auto-qualifies: comma-ok pass for `Option`-returning APIs, dropping `Option` middle-return from `bufio::Scan*`, return-type reshaping for cleanup.
+  Auto-qualifies: dropping `Option` middle-return from `bufio::Scan*`, return-type reshaping for cleanup.
 
 - **Friction count fails to drop after a sweep**: investigate the skipped sites. If they're genuinely unmigrateable (`AtomicUsize` with no Goish wrapper, `format!` for Debug `{:?}`, `static` const-fn contexts, intentional benchmarks), document a one-line *wontfix rationale* in `REFERENCES.md` and exclude from the Done Condition mental model.
 
@@ -54,7 +54,7 @@ Library bundles fall into these patterns; identify which apply this iteration:
 
 - **Newtype seals** — wrap a public std-type leak (`Arc<dyn Fn>`, `Box<dyn Trait>`, `StdMutexGuard`, `std::io::*Lock`, `std::result::Result`) in an opaque Goish struct with delegating impls.
 - **Signature widenings** — generic-ize public function inputs (`impl AsRef<[u8]>`, `impl Into<T>`, `impl Read + Send + 'static`) so callers don't need explicit conversions or boxing.
-- **Comma-ok pass** — replace `Option<T>` returns with `(T, bool)` on container / error-recovery / lookup APIs to match Go's `if x, ok := …`.
+- **Comma-ok pass** — `(V, bool)` is **only** the Goish shape for APIs that Go itself comma-oks: `map[k]` (already shipped as `map<K,V>::Get`), `<-ch` (already `Chan::Recv`), and type assertions (`x.(T)` → consider `if_as!`). Go's `container/list.Front() → *Element`, `container/heap.Pop() → interface{}`, `slice[i]`, `errors.As(err, &target) → bool` (target written via pointer) all return single values — Goish maps these to `Option<T>` (the closest Rust analog of "*T or nil"). **Do NOT** rewrite container/heap/slice `Option<T>` to `(T, bool)` — it makes the API *less* Go-shaped.
 - **Macro additions** — when turbofish or generic-bound burden has no clean signature fix, ship a Goish-shape macro (`slice!`, `map!`, `list!`, `if_as!`, `ctx_value!`).
 - **Prelude pruning** — anything Rust-named in `src/lib.rs` prelude is a leak; mangle to `__Name` or `pub(crate)`.
 - **Doc cleanup** — `REFERENCES.md` examples must read like Go (no turbofish, no lifetimes, no `Arc::new`, no `Box::new`).
@@ -62,7 +62,7 @@ Library bundles fall into these patterns; identify which apply this iteration:
 Tests/examples sweeps fall into these patterns:
 
 - **Pattern substitution** — `format!` → `Sprintf!`, `String::from_utf8` → `bytes::String`, `thread::spawn` → `go!{}`, raw atomics → `sync::atomic::*`, `.lock().unwrap()` → `sync::Mutex::Lock`, `Arc<Mutex<...>>` → `sync::Mutex`, `Box::new(closure)` → drop after lib widening.
-- **Comma-ok migration** — after a comma-ok lib change, sweep `match Some/None` / `if let Some` → `if x, ok := …`.
+- **Comma-ok call-site sweep** — only for genuinely-comma-ok APIs (`map::Get`, `Chan::Recv`, `if_as!`-style assertions). `Option<T>`-returning containers stay on `if let Some(x) = …` (analog of `if x := l.Front(); x != nil`).
 - **Smart-pointer drop** — drop `Arc::clone` / `.clone()` where Goish wrappers handle internal sharing transparently.
 
 ## Workflow rules (must follow)
@@ -100,7 +100,8 @@ Mission "done" when an audit pass returns:
 - Raw `AtomicXxx` (test/example): only `AtomicUsize` or `static` contexts
 - `Box<dyn …>` in public API: only inside `#[doc(hidden)]` fields
 - `Arc<dyn …>` in public API: only inside `#[doc(hidden)]` fields
-- Public APIs returning `Option<T>` for container/error recovery: 0 (all comma-ok)
+- Public APIs that should be comma-ok (per Go's actual surface — `map[k]`, `<-ch`, type assertions) all return `(V, bool)`: ✓ already shipped.
+  Container/heap/slice `Option<T>` returns are the *correct* Goish shape for Go's nullable-pointer APIs (`*Element`) and stay as-is.
 - Visible turbofish or lifetimes in public function signatures (rustdoc): 0
 - `REFERENCES.md`: zero Rust-only syntax in user-facing examples
 - Unmigrateable sites: each documented in `REFERENCES.md` with one-line rationale
