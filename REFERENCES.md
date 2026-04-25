@@ -1275,6 +1275,16 @@ or where the port deliberately simplifies:
   `sync::atomic::Int64::Add` returns the *new* value (Go convention);
   call sites that rely on the OLD value (test ordering probes,
   swap-style counters) keep `std::sync::atomic::AtomicI64` + `fetch_add`.
+- **`std::thread::spawn` over `go!{}` in four categories.** `go!{}` is
+  tokio-task-based, which is wrong for: (a) **panic capture via
+  `JoinHandle::join() -> Result<_, _>`** — tokio task panics surface
+  through different machinery; (b) **mock servers using sync std I/O**
+  (`TcpListener::accept`, `BufReader::read_line`) — blocking calls park
+  a worker thread indefinitely, fine on `thread::spawn`; (c) **explicit
+  thread-vs-task benchmarks** (`tests/chan_bench.rs`); (d) **hyper-owned
+  runtime tests** (`tests/http_client_serve_test.rs`) — hyper drives its
+  own runtime, mixing in tokio-tasks dead-locks. All four keep
+  `std::thread::spawn`.
 
 ---
 
