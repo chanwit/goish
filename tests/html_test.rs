@@ -7,7 +7,7 @@
 use goish::prelude::*;
 
 test!{ fn TestEscape(t) {
-    let cases: Vec<(&str, &str)> = vec![
+    let cases: slice<(&str, &str)> = vec![
         ("", ""),
         ("abc", "abc"),
         ("<", "&lt;"),
@@ -16,7 +16,7 @@ test!{ fn TestEscape(t) {
         ("\"", "&#34;"),
         ("'", "&#39;"),
         ("<script>alert('x')</script>", "&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;"),
-    ];
+    ].into();
     for (inp, want) in cases {
         let got = html::EscapeString(inp);
         if got != want {
@@ -26,7 +26,7 @@ test!{ fn TestEscape(t) {
 }}
 
 test!{ fn TestUnescapeNamed(t) {
-    let cases: Vec<(&str, &str)> = vec![
+    let cases: slice<(&str, &str)> = vec![
         ("", ""),
         ("abc", "abc"),
         ("&lt;", "<"),
@@ -35,7 +35,7 @@ test!{ fn TestUnescapeNamed(t) {
         ("&quot;", "\""),
         ("&apos;", "'"),
         ("a&lt;b&amp;c&gt;d", "a<b&c>d"),
-    ];
+    ].into();
     for (inp, want) in cases {
         let got = html::UnescapeString(inp);
         if got != want {
