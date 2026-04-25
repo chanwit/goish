@@ -46,9 +46,9 @@ test!{ fn TestEncodeString(t) {
 test!{ fn TestHTMLEscape(t) {
     let m = "{\"M\":\"<html>foo &\u{2028} \u{2029}</html>\"}";
     let want = "{\"M\":\"\\u003chtml\\u003efoo \\u0026\\u2028 \\u2029\\u003c/html\\u003e\"}";
-    let mut b: Vec<u8> = Vec::new();
-    json::HTMLEscape(&mut b, m.as_bytes());
-    let got = bytes::String(&b);
+    let mut b = bytes::Buffer::new();
+    json::HTMLEscape(&mut b, m);
+    let got = b.String();
     if got != want {
         t.Errorf(Sprintf!("HTMLEscape:\n\tgot:  %s\n\twant: %s", got, want));
     }
@@ -132,10 +132,10 @@ test!{ fn TestMarshalIndent(t) {
 
 test!{ fn TestCompact(t) {
     let pretty = b"{\n  \"x\" : 1,\n  \"y\" : 2\n}";
-    let mut out = Vec::new();
+    let mut out = bytes::Buffer::new();
     let err = json::Compact(&mut out, pretty);
     if err != nil { t.Errorf(Sprintf!("Compact error: %s", err)); }
-    let got = bytes::String(&out);
+    let got = out.String();
     if got != "{\"x\":1,\"y\":2}" {
         t.Errorf(Sprintf!("Compact = %q, want compact form", got));
     }
@@ -143,10 +143,10 @@ test!{ fn TestCompact(t) {
 
 test!{ fn TestIndent(t) {
     let compact = b"{\"a\":1,\"b\":[2,3]}";
-    let mut out = Vec::new();
+    let mut out = bytes::Buffer::new();
     let err = json::Indent(&mut out, compact, "", "  ");
     if err != nil { t.Errorf(Sprintf!("Indent error: %s", err)); }
-    let got = bytes::String(&out);
+    let got = out.String();
     if !got.contains("\n  \"a\"") {
         t.Errorf(Sprintf!("Indent did not produce pretty output: %q", got));
     }

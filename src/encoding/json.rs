@@ -207,37 +207,40 @@ pub fn Valid(data: impl AsRef<[byte]>) -> bool {
 /// HTMLEscape writes to dst the JSON-encoded src with <, >, &, U+2028, U+2029
 /// characters replaced by their Unicode-escape equivalents inside JSON strings.
 #[allow(non_snake_case)]
-pub fn HTMLEscape(dst: &mut Vec<byte>, src: &[byte]) {
+pub fn HTMLEscape(dst: &mut crate::bytes::Buffer, src: impl AsRef<[byte]>) {
+    let src = src.as_ref();
     let n = src.len();
     let mut i = 0;
+    let mut buf: Vec<byte> = Vec::with_capacity(n);
     while i < n {
         let c = src[i];
         if c == b'<' || c == b'>' || c == b'&' {
-            dst.extend_from_slice(&[b'\\', b'u', b'0', b'0']);
+            buf.extend_from_slice(&[b'\\', b'u', b'0', b'0']);
             const HEX: &[u8] = b"0123456789abcdef";
-            dst.push(HEX[(c >> 4) as usize]);
-            dst.push(HEX[(c & 0xf) as usize]);
+            buf.push(HEX[(c >> 4) as usize]);
+            buf.push(HEX[(c & 0xf) as usize]);
             i += 1;
             continue;
         }
         // U+2028 = E2 80 A8, U+2029 = E2 80 A9 — emit \u2028 / \u2029.
         if i + 2 < n && src[i] == 0xe2 && src[i+1] == 0x80 && (src[i+2] == 0xa8 || src[i+2] == 0xa9) {
-            dst.extend_from_slice(b"\\u202");
-            dst.push(if src[i+2] == 0xa8 { b'8' } else { b'9' });
+            buf.extend_from_slice(b"\\u202");
+            buf.push(if src[i+2] == 0xa8 { b'8' } else { b'9' });
             i += 3;
             continue;
         }
-        dst.push(c);
+        buf.push(c);
         i += 1;
     }
+    let _ = dst.Write(&buf);
 }
 
 /// Compact appends to dst the JSON-encoded src with insignificant whitespace elided.
 #[allow(non_snake_case)]
-pub fn Compact(dst: &mut Vec<byte>, src: &[byte]) -> error {
-    match serde_json::from_slice::<RawValue>(src) {
+pub fn Compact(dst: &mut crate::bytes::Buffer, src: impl AsRef<[byte]>) -> error {
+    match serde_json::from_slice::<RawValue>(src.as_ref()) {
         Ok(raw) => match serde_json::to_vec(&raw) {
-            Ok(bs) => { dst.extend_from_slice(&bs); nil }
+            Ok(bs) => { let _ = dst.Write(&bs); nil }
             Err(e) => New(&e.to_string()),
         },
         Err(e) => New(&e.to_string()),
@@ -247,15 +250,15 @@ pub fn Compact(dst: &mut Vec<byte>, src: &[byte]) -> error {
 /// Indent appends to dst a pretty-printed JSON value read from src, using
 /// `prefix` and `indent` for each newline-initiated line.
 #[allow(non_snake_case)]
-pub fn Indent(dst: &mut Vec<byte>, src: &[byte], _prefix: impl AsRef<str>, indent: impl AsRef<str>) -> error {
+pub fn Indent(dst: &mut crate::bytes::Buffer, src: impl AsRef<[byte]>, _prefix: impl AsRef<str>, indent: impl AsRef<str>) -> error {
     let indent_bytes = indent.as_ref().as_bytes().to_vec();
-    match serde_json::from_slice::<RawValue>(src) {
+    match serde_json::from_slice::<RawValue>(src.as_ref()) {
         Ok(raw) => {
             let formatter = serde_json::ser::PrettyFormatter::with_indent(&indent_bytes);
             let mut ser = serde_json::Serializer::with_formatter(Vec::<u8>::new(), formatter);
             use serde::Serialize;
             match raw.serialize(&mut ser) {
-                Ok(()) => { dst.extend_from_slice(&ser.into_inner()); nil }
+                Ok(()) => { let _ = dst.Write(&ser.into_inner()); nil }
                 Err(e) => New(&e.to_string()),
             }
         }
