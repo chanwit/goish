@@ -13,7 +13,7 @@ use goish::io as gio;
 use std::io::Cursor;
 
 test!{ fn TestCopy(t) {
-    let mut src = Cursor::new(b"hello, world.".to_vec());
+    let mut src = Cursor::new(b"hello, world.");
     let mut dst: Vec<u8> = Vec::new();
     let (n, err) = gio::Copy(&mut dst, &mut src);
     if err != nil { t.Errorf(Sprintf!("Copy err: %s", err)); }
@@ -24,7 +24,7 @@ test!{ fn TestCopy(t) {
 }}
 
 test!{ fn TestCopyN(t) {
-    let mut src = Cursor::new(b"0123456789".to_vec());
+    let mut src = Cursor::new(b"0123456789");
     let mut dst: Vec<u8> = Vec::new();
     let (n, err) = gio::CopyN(&mut dst, &mut src, 5);
     if err != nil { t.Errorf(Sprintf!("CopyN err: %s", err)); }
@@ -36,7 +36,7 @@ test!{ fn TestCopyN(t) {
 
 test!{ fn TestCopyNEOF(t) {
     // Request 20 bytes from a 10-byte source — should return EOF and n=10.
-    let mut src = Cursor::new(b"0123456789".to_vec());
+    let mut src = Cursor::new(b"0123456789");
     let mut dst: Vec<u8> = Vec::new();
     let (n, err) = gio::CopyN(&mut dst, &mut src, 20);
     if n != 10 { t.Errorf(Sprintf!("CopyN n = %d, want 10", n)); }
@@ -45,7 +45,7 @@ test!{ fn TestCopyNEOF(t) {
 }}
 
 test!{ fn TestReadAtLeast(t) {
-    let mut src = Cursor::new(b"hello".to_vec());
+    let mut src = Cursor::new(b"hello");
     let mut buf = [0u8; 5];
     let (n, err) = gio::ReadAtLeast(&mut src, &mut buf, 3);
     if err != nil { t.Errorf(Sprintf!("ReadAtLeast err: %s", err)); }
@@ -53,7 +53,7 @@ test!{ fn TestReadAtLeast(t) {
 }}
 
 test!{ fn TestReadAtLeastShortBuffer(t) {
-    let mut src = Cursor::new(b"hello".to_vec());
+    let mut src = Cursor::new(b"hello");
     let mut buf = [0u8; 2];
     let (_, err) = gio::ReadAtLeast(&mut src, &mut buf, 4);
     if err == nil {
@@ -63,7 +63,7 @@ test!{ fn TestReadAtLeastShortBuffer(t) {
 
 test!{ fn TestReadAtLeastUnexpectedEOF(t) {
     // Source has 2 bytes, need at least 4 → unexpected EOF.
-    let mut src = Cursor::new(b"ab".to_vec());
+    let mut src = Cursor::new(b"ab");
     let mut buf = [0u8; 4];
     let (n, err) = gio::ReadAtLeast(&mut src, &mut buf, 4);
     if err == nil { t.Errorf(Sprintf!("expected err, got nil (n=%d)", n)); }
@@ -74,7 +74,7 @@ test!{ fn TestReadAtLeastUnexpectedEOF(t) {
 }}
 
 test!{ fn TestReadFull(t) {
-    let mut src = Cursor::new(b"abcdefgh".to_vec());
+    let mut src = Cursor::new(b"abcdefgh");
     let mut buf = [0u8; 5];
     let (n, err) = gio::ReadFull(&mut src, &mut buf);
     if err != nil { t.Errorf(Sprintf!("ReadFull err: %s", err)); }
@@ -95,7 +95,7 @@ test!{ fn TestWriteString(t) {
 }}
 
 test!{ fn TestLimitReader(t) {
-    let src = Cursor::new(b"0123456789".to_vec());
+    let src = Cursor::new(b"0123456789");
     let mut lr = gio::LimitReader(src, 4);
     let mut buf = [0u8; 10];
     let (n, _) = lr.Read(&mut buf);
@@ -107,7 +107,7 @@ test!{ fn TestLimitReader(t) {
 }}
 
 test!{ fn TestTeeReader(t) {
-    let src = Cursor::new(b"hello".to_vec());
+    let src = Cursor::new(b"hello");
     let mut mirror: Vec<u8> = Vec::new();
     let mut tr = gio::TeeReader(src, &mut mirror);
     let (buf, err) = gio::ReadAll(&mut tr);
@@ -154,8 +154,8 @@ test!{ fn TestSectionReader_Seek(t) {
 
 test!{ fn TestMultiReader(t) {
     let mut mr = gio::MultiReader(vec![
-        Cursor::new(b"hello ".to_vec()),
-        Cursor::new(b"world".to_vec()),
+        Cursor::new(b"hello " as &[u8]),
+        Cursor::new(b"world" as &[u8]),
     ]);
     let (out, err) = gio::ReadAll(&mut mr);
     if err != nil { t.Errorf(Sprintf!("ReadAll err: %s", err)); }
@@ -166,8 +166,8 @@ test!{ fn TestMultiReader(t) {
 
 test!{ fn TestMultiReaderCopy(t) {
     let mut mr = gio::MultiReader(vec![
-        Cursor::new(b"abc".to_vec()),
-        Cursor::new(b"def".to_vec()),
+        Cursor::new(b"abc"),
+        Cursor::new(b"def"),
     ]);
     let mut dst: Vec<u8> = Vec::new();
     let (n, err) = gio::Copy(&mut dst, &mut mr);
@@ -202,7 +202,7 @@ test!{ fn TestMultiWriter(t) {
 }}
 
 test!{ fn TestNopCloserReadable(t) {
-    let mut nc = gio::NopCloser(Cursor::new(b"abc".to_vec()));
+    let mut nc = gio::NopCloser(Cursor::new(b"abc"));
     let (buf, err) = gio::ReadAll(&mut nc);
     if err != nil { t.Errorf(Sprintf!("NopCloser ReadAll err: %s", err)); }
     if buf != b"abc" {

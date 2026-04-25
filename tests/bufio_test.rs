@@ -17,7 +17,7 @@ use goish::bufio;
 use std::io::Cursor;
 
 test!{ fn TestReaderReadByte(t) {
-    let mut r = bufio::NewReader(Cursor::new(b"hello".to_vec()));
+    let mut r = bufio::NewReader(Cursor::new(b"hello"));
     let expected = [b'h', b'e', b'l', b'l', b'o'];
     for &want in &expected {
         let (got, err) = r.ReadByte();
@@ -29,7 +29,7 @@ test!{ fn TestReaderReadByte(t) {
 }}
 
 test!{ fn TestReaderReadString(t) {
-    let mut r = bufio::NewReader(Cursor::new(b"alpha,beta,gamma".to_vec()));
+    let mut r = bufio::NewReader(Cursor::new(b"alpha,beta,gamma"));
     let (s, err) = r.ReadString(b',');
     if err != nil { t.Errorf(Sprintf!("1st: %s", err)); }
     if s != "alpha," { t.Errorf(Sprintf!("got %q want 'alpha,'", s)); }
@@ -43,7 +43,7 @@ test!{ fn TestReaderReadString(t) {
 }}
 
 test!{ fn TestReaderReadBytes(t) {
-    let mut r = bufio::NewReader(Cursor::new(b"x|y|z".to_vec()));
+    let mut r = bufio::NewReader(Cursor::new(b"x|y|z"));
     let (b, err) = r.ReadBytes(b'|');
     if err != nil { t.Errorf(Sprintf!("1st: %s", err)); }
     if b != b"x|" { t.Errorf(Sprintf!("got %v", b.len())); }
