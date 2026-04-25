@@ -1267,6 +1267,14 @@ or where the port deliberately simplifies:
 - **Nil-for-every-type (`NilValue`).** Deferred. `nil` is `error`-typed;
   cross-type comparisons work where we've added `PartialEq<error>`
   (currently `Chan<T>`; more coming).
+- **`static AtomicBool` / `static AtomicI64`.** Goish's
+  `sync::atomic::{Bool,Int64}` are `Arc`-backed (`Clone`, no const-fn
+  constructor). Static contexts that need a const initializer keep
+  `std::sync::atomic::*` directly — no Goish wrapper applies.
+- **`AtomicI64::fetch_add` for OLD-value semantics.** Goish's
+  `sync::atomic::Int64::Add` returns the *new* value (Go convention);
+  call sites that rely on the OLD value (test ordering probes,
+  swap-style counters) keep `std::sync::atomic::AtomicI64` + `fetch_add`.
 
 ---
 

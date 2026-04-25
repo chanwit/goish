@@ -119,7 +119,7 @@ impl<C: Read + Write + Send + 'static> Client<C> {
         W: Write + Send + 'static,
     {
         let boxed = BoxedConn {
-            inner: NullConn::with_reader(Box::new(r)),
+            inner: NullConn::with_reader(r),
             writer: Some(Box::new(w) as Box<dyn Write + Send>),
         };
         let mut c = Client::<NullConn> {
@@ -133,9 +133,19 @@ impl<C: Read + Write + Send + 'static> Client<C> {
     }
 }
 
-// Placeholder type for tests' split-IO constructor.
-pub struct NullConn { r: Box<dyn Read + Send> }
-impl NullConn { pub fn with_reader(r: Box<dyn Read + Send>) -> NullConn { NullConn { r } } }
+// Placeholder type for tests' split-IO constructor. Inner field is
+// `Box<dyn Read + Send>` for storage but never user-typed (private).
+pub struct NullConn {
+    #[doc(hidden)]
+    r: Box<dyn Read + Send>,
+}
+impl NullConn {
+    /// Take any `Read + Send + 'static`; box internally so the call
+    /// site doesn't have to type `Box::new(...)`.
+    pub fn with_reader<R: Read + Send + 'static>(r: R) -> NullConn {
+        NullConn { r: Box::new(r) }
+    }
+}
 impl Read for NullConn {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> { self.r.read(buf) }
 }

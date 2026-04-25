@@ -3,7 +3,7 @@ members = ["goish-macros"]
 
 [package]
 name = "goish"
-version = "0.21.5"
+version = "0.21.6"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Chanwit Kaewkasi <chanwit@gmail.com>"]
@@ -25,6 +25,7 @@ exclude = [
     "transpiler/*",       # ~100 KiB — Go program, not part of the Rust crate
     "target/*",
     ".github/*",
+    "PROMPT.md",          # autonomous-loop instructions — internal
 ]
 
 [dependencies]
