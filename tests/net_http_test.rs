@@ -30,7 +30,7 @@ fn spawn_server(srv: net::http::Server) -> Goroutine {
 }
 
 fn wait_listener(port: u16) {
-    let addr = format!("127.0.0.1:{}", port);
+    let addr = Sprintf!("127.0.0.1:%v", port);
     for _ in 0..100 {
         if std::net::TcpStream::connect(&addr).is_ok() { return; }
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -44,11 +44,11 @@ fn get_simple_200() {
     mux.HandleFunc("/hello", |w, r| {
         let _ = Fprintf!(w, "hello %s", r.URL.Path);
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/hello", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/hello", port));
     assert!(err == nil, "Get err: {}", err);
     assert_eq!(resp.StatusCode, 200);
     assert_eq!(resp.Body.String(), "hello /hello");
@@ -59,11 +59,11 @@ fn not_found_on_unregistered_path() {
     let port = free_port();
     let mux = net::http::ServeMux::new();
     mux.HandleFunc("/known", |w, _r| { let _ = w.Write(b"ok"); });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/other", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/other", port));
     assert!(err == nil);
     assert_eq!(resp.StatusCode, 404);
 }
@@ -77,12 +77,12 @@ fn post_echoes_body() {
         w.Header().Set("Content-Type", "application/octet-stream");
         let _ = w.Write(&body);
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
     let (resp, err) = net::http::Post(
-        &format!("http://127.0.0.1:{}/echo", port),
+        &Sprintf!("http://127.0.0.1:%v/echo", port),
         "text/plain",
         "hello world",   // &str body — no explicit b"…" / .as_bytes() needed
     );
@@ -100,11 +100,11 @@ fn handler_sets_custom_status() {
         w.WriteHeader(net::http::StatusTeapot);
         let _ = w.Write(b"I'm a teapot");
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/teapot", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/teapot", port));
     assert!(err == nil);
     assert_eq!(resp.StatusCode, 418);
     assert_eq!(resp.Body.String(), "I'm a teapot");
@@ -118,11 +118,11 @@ fn query_string_propagates_to_handler() {
         let name = r.FormValue("name");
         let _ = Fprintf!(w, "hi %s", name);
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/q?name=alice", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/q?name=alice", port));
     assert!(err == nil);
     assert_eq!(resp.Body.String(), "hi alice");
 }
@@ -133,14 +133,14 @@ fn longest_prefix_wins_on_serve_mux() {
     let mux = net::http::ServeMux::new();
     mux.HandleFunc("/api/", |w, _r| { let _ = w.Write(b"root"); });
     mux.HandleFunc("/api/users/", |w, _r| { let _ = w.Write(b"users"); });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let url_base = format!("http://127.0.0.1:{}", port);
-    let (r1, _) = net::http::Get(&format!("{}/api/other", url_base));
+    let url_base = Sprintf!("http://127.0.0.1:%v", port);
+    let (r1, _) = net::http::Get(&Sprintf!("%v/api/other", url_base));
     assert_eq!(r1.Body.String(), "root");
-    let (r2, _) = net::http::Get(&format!("{}/api/users/42", url_base));
+    let (r2, _) = net::http::Get(&Sprintf!("%v/api/users/42", url_base));
     assert_eq!(r2.Body.String(), "users");
 }
 
@@ -153,11 +153,11 @@ fn client_sees_server_headers_and_custom_content_type() {
         w.Header().Set("X-Custom", "yes");
         let _ = w.Write(b"{\"ok\":true}");
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (resp, _) = net::http::Get(&format!("http://127.0.0.1:{}/j", port));
+    let (resp, _) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/j", port));
     assert_eq!(resp.Header.Get("Content-Type"), "application/json");
     assert_eq!(resp.Header.Get("X-Custom"), "yes");
     assert_eq!(resp.Body.String(), "{\"ok\":true}");
@@ -169,13 +169,13 @@ fn shutdown_stops_the_accept_loop() {
     let port = free_port();
     let mux = net::http::ServeMux::new();
     mux.HandleFunc("/ping", |w, _r| { let _ = w.Write(b"pong"); });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let srv_handle = srv.clone();
     let server_goroutine = go!{ let _ = srv_handle.ListenAndServe(); };
     wait_listener(port);
 
     // Happy request while server is up.
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ping", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/ping", port));
     assert!(err == nil);
     assert_eq!(resp.Body.String(), "pong");
 
@@ -184,7 +184,7 @@ fn shutdown_stops_the_accept_loop() {
     time::Sleep(time::Millisecond * 100i64);
 
     // New connection should fail now (refused, reset, or empty).
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ping", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/ping", port));
     assert!(
         err != nil || resp.StatusCode == 0,
         "expected failure after shutdown; got {} {}", resp.StatusCode, resp.Body.String()
@@ -210,7 +210,7 @@ fn client_context_deadline_aborts_request() {
         time::Sleep(time::Millisecond * 300i64);
         let _ = w.Write(b"too late");
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
@@ -218,7 +218,7 @@ fn client_context_deadline_aborts_request() {
     let (req, err) = net::http::NewRequestWithContext(
         ctx,
         "GET",
-        &format!("http://127.0.0.1:{}/slow", port),
+        &Sprintf!("http://127.0.0.1:%v/slow", port),
         nil,
     );
     assert!(err == nil);
@@ -231,7 +231,7 @@ fn client_context_deadline_aborts_request() {
     assert!(err != nil, "expected timeout error");
     assert!(elapsed < std::time::Duration::from_millis(250), "cancelled quickly; got {:?}", elapsed);
     assert!(
-        format!("{}", err).contains("deadline") || format!("{}", err).contains("canceled"),
+        Sprintf!("%v", err).contains("deadline") || Sprintf!("%v", err).contains("canceled"),
         "error should mention deadline/canceled: {}",
         err
     );
@@ -261,11 +261,11 @@ fn handler_can_select_on_request_context() {
             },
         }
     });
-    let srv = net::http::Server::new(&format!("127.0.0.1:{}", port), mux);
+    let srv = net::http::Server::new(&Sprintf!("127.0.0.1:%v", port), mux);
     let _h = spawn_server(srv);
     wait_listener(port);
 
-    let (resp, err) = net::http::Get(&format!("http://127.0.0.1:{}/ctx", port));
+    let (resp, err) = net::http::Get(&Sprintf!("http://127.0.0.1:%v/ctx", port));
     assert!(err == nil);
     assert_eq!(resp.StatusCode, 200);
     assert_eq!(resp.Body.String(), "done");

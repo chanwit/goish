@@ -13,7 +13,7 @@ fn tempdir() -> String {
     let base = std::env::temp_dir().to_string_lossy().into_owned();
     let ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    format!("{}/goish_test_{}", base, ns)
+    Sprintf!("%v/goish_test_%v", base, ns).to_string()
 }
 
 test!{ fn TestMkdirReadFileWriteFile(t) {

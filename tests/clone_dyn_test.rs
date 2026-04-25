@@ -29,7 +29,7 @@ struct InMem {
 Interface!{
     impl Core for InMem {
         fn Write(&self, msg: &str) {
-            let line = format!("[{}] {}", self.tags.join("/"), msg);
+            let line = Sprintf!("[%v] %v", self.tags.join("/"), msg).to_string();
             self.sink.lock().unwrap().push(line);
         }
         fn With(&self, tag: &'static str) -> Core {
@@ -114,7 +114,7 @@ Interface!{
     impl TraceCore for ThresholdCore {
         fn Emit(&self, lvl: i32, msg: &str) {
             if self.Enabled(lvl) {
-                self.sink.lock().unwrap().push(format!("L{}:{}", lvl, msg));
+                self.sink.lock().unwrap().push(Sprintf!("L%v:%v", lvl, msg).to_string());
             }
         }
     }
