@@ -8,11 +8,11 @@
 use goish::prelude::*;
 
 test!{ fn TestSortInts(t) {
-    let mut data: Vec<i64> = vec![74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586];
+    let mut data: slice<int> = slice!([]int { 74, 59, 238, -784, 9845, 959, 905, 0, 0, 42, 7586, -5467984, 7586 });
     sort::Ints(&mut data);
-    for i in 1..data.len() {
+    for i in 1..(data.len() as int) {
         if data[i] < data[i-1] {
-            t.Errorf(Sprintf!("not sorted at %d", i as i64));
+            t.Errorf(Sprintf!("not sorted at %d", i));
             return;
         }
     }
