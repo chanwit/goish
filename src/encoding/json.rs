@@ -163,31 +163,31 @@ fn from_raw(v: &RawValue) -> Value {
 // ── Marshal / Unmarshal ──────────────────────────────────────────────
 
 #[allow(non_snake_case)]
-pub fn Marshal(v: &Value) -> (Vec<byte>, error) {
+pub fn Marshal(v: &Value) -> (crate::types::slice<byte>, error) {
     match serde_json::to_vec(&to_raw(v)) {
-        Ok(b) => (b, nil),
-        Err(e) => (Vec::new(), New(&e.to_string())),
+        Ok(b) => (b.into(), nil),
+        Err(e) => (crate::types::slice::new(), New(&e.to_string())),
     }
 }
 
 #[allow(non_snake_case)]
-pub fn MarshalIndent(v: &Value, _prefix: impl AsRef<str>, indent: impl AsRef<str>) -> (Vec<byte>, error) {
+pub fn MarshalIndent(v: &Value, _prefix: impl AsRef<str>, indent: impl AsRef<str>) -> (crate::types::slice<byte>, error) {
     // serde_json doesn't directly expose prefix support; emit with to_string_pretty
     // using the given indent width (spaces only; tab if indent=="\t").
     let indent = indent.as_ref();
-    let mut buf = Vec::new();
+    let mut buf: Vec<byte> = Vec::new();
     let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes());
     let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
     use serde::Serialize;
     match to_raw(v).serialize(&mut ser) {
-        Ok(()) => (buf, nil),
-        Err(e) => (Vec::new(), New(&e.to_string())),
+        Ok(()) => (buf.into(), nil),
+        Err(e) => (crate::types::slice::new(), New(&e.to_string())),
     }
 }
 
 #[allow(non_snake_case)]
-pub fn Unmarshal(data: &[byte], v: &mut Value) -> error {
-    match serde_json::from_slice::<RawValue>(data) {
+pub fn Unmarshal(data: impl AsRef<[byte]>, v: &mut Value) -> error {
+    match serde_json::from_slice::<RawValue>(data.as_ref()) {
         Ok(raw) => {
             *v = from_raw(&raw);
             nil
@@ -198,8 +198,8 @@ pub fn Unmarshal(data: &[byte], v: &mut Value) -> error {
 
 /// json.Valid(data) — returns true if data is valid JSON.
 #[allow(non_snake_case)]
-pub fn Valid(data: &[byte]) -> bool {
-    serde_json::from_slice::<RawValue>(data).is_ok()
+pub fn Valid(data: impl AsRef<[byte]>) -> bool {
+    serde_json::from_slice::<RawValue>(data.as_ref()).is_ok()
 }
 
 // ── HTMLEscape / Compact / Indent ────────────────────────────────────
@@ -288,7 +288,7 @@ mod tests {
         v.Set("age", Value::Number(30.0));
         let (data, err) = Marshal(&v);
         assert_eq!(err, nil);
-        let s = String::from_utf8(data).unwrap();
+        let s = crate::bytes::String(&data);
         assert!(s.contains("\"name\":\"alice\""));
         assert!(s.contains("\"age\":30"));
     }
@@ -319,7 +319,7 @@ mod tests {
         v.Set("x", Value::Number(1.0));
         let (data, err) = MarshalIndent(&v, "", "  ");
         assert_eq!(err, nil);
-        let s = String::from_utf8(data).unwrap();
+        let s = crate::bytes::String(&data);
         assert!(s.contains('\n'));
         assert!(s.contains("  \"x\""));
     }
