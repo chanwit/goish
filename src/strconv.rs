@@ -348,9 +348,10 @@ pub fn AppendInt(mut dst: Vec<crate::types::byte>, n: int64, base: int) -> Vec<c
 }
 
 #[allow(non_snake_case)]
-pub fn AppendUint(mut dst: Vec<crate::types::byte>, n: u64, base: int) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(FormatUint(n, base).as_bytes());
-    dst
+pub fn AppendUint(dst: crate::types::slice<crate::types::byte>, n: u64, base: int) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.into();
+    out.extend_from_slice(FormatUint(n, base).as_bytes());
+    out.into()
 }
 
 /// `strconv.FormatFloat(f, fmt, prec, bitSize)` — format a float into a
