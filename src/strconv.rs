@@ -342,14 +342,15 @@ pub fn FormatUint(n: u64, base: int) -> string {
 /// AppendInt appends the string form of n in base, to dst, and returns the
 /// extended buffer.
 #[allow(non_snake_case)]
-pub fn AppendInt(mut dst: Vec<crate::types::byte>, n: int64, base: int) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(FormatInt(n, base).as_bytes());
-    dst
+pub fn AppendInt(dst: impl AsRef<[crate::types::byte]>, n: int64, base: int) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(FormatInt(n, base).as_bytes());
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn AppendUint(dst: crate::types::slice<crate::types::byte>, n: u64, base: int) -> crate::types::slice<crate::types::byte> {
-    let mut out: Vec<crate::types::byte> = dst.into();
+pub fn AppendUint(dst: impl AsRef<[crate::types::byte]>, n: u64, base: int) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
     out.extend_from_slice(FormatUint(n, base).as_bytes());
     out.into()
 }
@@ -382,9 +383,10 @@ pub fn FormatFloat(f: float64, fmt: u8, prec: int, bit_size: int) -> string {
 
 /// `strconv.AppendFloat(dst, f, fmt, prec, bitSize)`
 #[allow(non_snake_case)]
-pub fn AppendFloat(mut dst: Vec<crate::types::byte>, f: float64, fmtc: u8, prec: int, bit_size: int) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(FormatFloat(f, fmtc, prec, bit_size).as_bytes());
-    dst
+pub fn AppendFloat(dst: impl AsRef<[crate::types::byte]>, f: float64, fmtc: u8, prec: int, bit_size: int) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(FormatFloat(f, fmtc, prec, bit_size).as_bytes());
+    out.into()
 }
 
 // ── FormatFloat subroutines ───────────────────────────────────────────
@@ -668,9 +670,10 @@ pub fn FormatBool(b: bool) -> string {
 
 /// `strconv.AppendBool(dst, b)` — appends `"true"` or `"false"` to dst.
 #[allow(non_snake_case)]
-pub fn AppendBool(mut dst: Vec<crate::types::byte>, b: bool) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(if b { b"true" } else { b"false" });
-    dst
+pub fn AppendBool(dst: impl AsRef<[crate::types::byte]>, b: bool) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(if b { b"true" } else { b"false" });
+    out.into()
 }
 
 /// `strconv.Quote(s)` — double-quoted Go-syntax string literal. Printable
@@ -696,23 +699,26 @@ pub fn QuoteToGraphic(s: impl AsRef<str>) -> string {
 
 /// `strconv.AppendQuote(dst, s)` — append Quote(s) to dst.
 #[allow(non_snake_case)]
-pub fn AppendQuote(mut dst: Vec<crate::types::byte>, s: impl AsRef<str>) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(Quote(s).as_bytes());
-    dst
+pub fn AppendQuote(dst: impl AsRef<[crate::types::byte]>, s: impl AsRef<str>) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(Quote(s).as_bytes());
+    out.into()
 }
 
 /// `strconv.AppendQuoteToASCII(dst, s)`
 #[allow(non_snake_case)]
-pub fn AppendQuoteToASCII(mut dst: Vec<crate::types::byte>, s: impl AsRef<str>) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(QuoteToASCII(s).as_bytes());
-    dst
+pub fn AppendQuoteToASCII(dst: impl AsRef<[crate::types::byte]>, s: impl AsRef<str>) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(QuoteToASCII(s).as_bytes());
+    out.into()
 }
 
 /// `strconv.AppendQuoteToGraphic(dst, s)`
 #[allow(non_snake_case)]
-pub fn AppendQuoteToGraphic(mut dst: Vec<crate::types::byte>, s: impl AsRef<str>) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(QuoteToGraphic(s).as_bytes());
-    dst
+pub fn AppendQuoteToGraphic(dst: impl AsRef<[crate::types::byte]>, s: impl AsRef<str>) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(QuoteToGraphic(s).as_bytes());
+    out.into()
 }
 
 /// `strconv.QuoteRune(r)` — single-quoted Go rune literal.
@@ -735,21 +741,24 @@ pub fn QuoteRuneToGraphic(r: crate::types::rune) -> string {
 
 /// `strconv.AppendQuoteRune(dst, r)`
 #[allow(non_snake_case)]
-pub fn AppendQuoteRune(mut dst: Vec<crate::types::byte>, r: crate::types::rune) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(QuoteRune(r).as_bytes());
-    dst
+pub fn AppendQuoteRune(dst: impl AsRef<[crate::types::byte]>, r: crate::types::rune) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(QuoteRune(r).as_bytes());
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn AppendQuoteRuneToASCII(mut dst: Vec<crate::types::byte>, r: crate::types::rune) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(QuoteRuneToASCII(r).as_bytes());
-    dst
+pub fn AppendQuoteRuneToASCII(dst: impl AsRef<[crate::types::byte]>, r: crate::types::rune) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(QuoteRuneToASCII(r).as_bytes());
+    out.into()
 }
 
 #[allow(non_snake_case)]
-pub fn AppendQuoteRuneToGraphic(mut dst: Vec<crate::types::byte>, r: crate::types::rune) -> Vec<crate::types::byte> {
-    dst.extend_from_slice(QuoteRuneToGraphic(r).as_bytes());
-    dst
+pub fn AppendQuoteRuneToGraphic(dst: impl AsRef<[crate::types::byte]>, r: crate::types::rune) -> crate::types::slice<crate::types::byte> {
+    let mut out: Vec<crate::types::byte> = dst.as_ref().to_vec();
+    out.extend_from_slice(QuoteRuneToGraphic(r).as_bytes());
+    out.into()
 }
 
 /// `strconv.IsPrint(r)` — true iff r is a printable rune as defined by

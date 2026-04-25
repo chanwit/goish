@@ -89,7 +89,7 @@ fn appendBoolTests() -> slice<AppendBoolTest> {
 
 test!{ fn TestAppendBool(t) {
     for test in appendBoolTests() {
-        let b = strconv::AppendBool(test.In.to_vec(), test.B);
+        let b = strconv::AppendBool(test.In, test.B);
         if !bytes::Equal(&b, test.Out) {
             t.Errorf(Sprintf!("AppendBool(%q, %v) = %q; want %q",
                 std::str::from_utf8(test.In).unwrap(), test.B,

@@ -30,7 +30,7 @@ test!{ fn TestQuote(t) {
         if out != tt.out {
             t.Errorf(Sprintf!("Quote(%q) = %s, want %s", tt.r#in, out, tt.out));
         }
-        let ab = strconv::AppendQuote(b"abc".to_vec(), tt.r#in);
+        let ab = strconv::AppendQuote(b"abc", tt.r#in);
         let got = std::str::from_utf8(&ab).unwrap();
         let want = Sprintf!("abc%v", tt.out);
         if got != want {
@@ -45,7 +45,7 @@ test!{ fn TestQuoteToASCII(t) {
         if out != tt.ascii {
             t.Errorf(Sprintf!("QuoteToASCII(%q) = %s, want %s", tt.r#in, out, tt.ascii));
         }
-        let ab = strconv::AppendQuoteToASCII(b"abc".to_vec(), tt.r#in);
+        let ab = strconv::AppendQuoteToASCII(b"abc", tt.r#in);
         let got = std::str::from_utf8(&ab).unwrap();
         let want = Sprintf!("abc%v", tt.ascii);
         if got != want {

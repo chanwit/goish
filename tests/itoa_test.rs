@@ -64,7 +64,7 @@ test!{ fn TestItoa(t) {
             t.Errorf(Sprintf!("FormatInt(%v, %v) = %v want %v",
                 test.in_, test.base, s, test.out));
         }
-        let x = strconv::AppendInt(b"abc".to_vec(), test.in_, test.base);
+        let x = strconv::AppendInt(b"abc", test.in_, test.base);
         let xs = bytes::String(&x);
         let want = Sprintf!("abc%v", test.out);
         if xs != want {
@@ -78,7 +78,7 @@ test!{ fn TestItoa(t) {
                 t.Errorf(Sprintf!("FormatUint(%v, %v) = %v want %v",
                     test.in_, test.base, s, test.out));
             }
-            let x = strconv::AppendUint(slice::new(), test.in_ as u64, test.base);
+            let x = strconv::AppendUint(b"", test.in_ as u64, test.base);
             let xs = bytes::String(&x);
             if xs != test.out {
                 t.Errorf(Sprintf!("AppendUint(%q, %v, %v) = %q want %v",
@@ -129,7 +129,7 @@ test!{ fn TestUitoa(t) {
             t.Errorf(Sprintf!("FormatUint(%v, %v) = %v want %v",
                 test.in_, test.base, s, test.out));
         }
-        let x = strconv::AppendUint(b"abc".to_vec().into(), test.in_, test.base);
+        let x = strconv::AppendUint(b"abc", test.in_, test.base);
         let xs = bytes::String(&x);
         let want = Sprintf!("abc%v", test.out);
         if xs != want {

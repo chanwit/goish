@@ -106,7 +106,7 @@ test!{ fn TestFtoaInfNaN(t) {
 
 // AppendFloat round-trip.
 test!{ fn TestAppendFloat(t) {
-    let out = strconv::AppendFloat(b"x=".to_vec(), 3.14, b'g', -1, 64);
+    let out = strconv::AppendFloat(b"x=", 3.14, b'g', -1, 64);
     let got = std::str::from_utf8(&out).unwrap();
     if got != "x=3.14" {
         t.Errorf(Sprintf!("AppendFloat = %q; want %q", got, "x=3.14"));
