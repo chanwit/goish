@@ -55,14 +55,14 @@ test!{ fn TestBadCompile(t) {
 }}
 
 test!{ fn TestMatch(t) {
-    let cases: Vec<(&str, &str, bool)> = vec![
+    let cases: slice<(&str, &str, bool)> = vec![
         ("^abcdefg", "abcdefg", true),
         ("a+", "baaab", true),
         ("^abcd$", "abcde", false),
         ("[a-z]+", "abcd", true),
         ("x", "y", false),
         ("日本語+", "日本語", true),
-    ];
+    ].into();
     for (pat, text, want) in cases {
         let re = regexp::MustCompile(pat);
         let got = re.MatchString(text);

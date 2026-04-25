@@ -196,13 +196,13 @@ test!{ fn TestExt(t) {
 }}
 
 test!{ fn TestIsAbs(t) {
-    let cases: Vec<(&str, bool)> = vec![
+    let cases: slice<(&str, bool)> = vec![
         ("/a", true),
         ("a", false),
         ("", false),
         ("/", true),
         ("./a", false),
-    ];
+    ].into();
     for (p, want) in cases {
         let got = filepath::IsAbs(p);
         if got != want {
