@@ -38,8 +38,8 @@ test!{ fn TestSelfSelect(t) {
 
 test!{ fn TestChanSendInterface(t) {
     // Send an arbitrary value type through a channel; receive the same.
-    let c: Chan<Vec<i64>> = chan!(Vec<i64>, 1);
-    c.Send(vec![1, 2, 3]);
+    let c: Chan<slice<int>> = chan!(slice<int>, 1);
+    c.Send(slice!([]int { 1, 2, 3 }));
     let (got, _) = c.Recv();
     if got != vec![1, 2, 3] {
         t.Errorf(Sprintf!("got len %d, want 3", got.len()));

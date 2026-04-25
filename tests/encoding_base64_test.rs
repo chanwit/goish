@@ -12,7 +12,7 @@ struct Pair {
     encoded: &'static str,
 }
 
-fn pairs() -> Vec<Pair> {
+fn pairs() -> slice<Pair> {
     vec![
         // RFC 3548
         Pair { decoded: b"\x14\xfb\x9c\x03\xd9\x7e", encoded: "FPucA9l+" },
@@ -34,7 +34,7 @@ fn pairs() -> Vec<Pair> {
         Pair { decoded: b"leasure.", encoded: "bGVhc3VyZS4=" },
         Pair { decoded: b"easure.",  encoded: "ZWFzdXJlLg==" },
         Pair { decoded: b"asure.",   encoded: "YXN1cmUu" },
-    ]
+    ].into()
 }
 
 fn url_ref(s: &str) -> String {

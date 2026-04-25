@@ -12,7 +12,7 @@ use goish::filepath;
 
 struct PathTest { path: &'static str, result: &'static str }
 
-fn clean_tests() -> Vec<PathTest> { vec![
+fn clean_tests() -> slice<PathTest> { vec![
     // Already clean
     PathTest { path: "abc", result: "abc" },
     PathTest { path: "abc/def", result: "abc/def" },
@@ -51,7 +51,7 @@ fn clean_tests() -> Vec<PathTest> { vec![
     PathTest { path: "abc/./../def", result: "def" },
     PathTest { path: "abc//./../def", result: "def" },
     PathTest { path: "abc/../../././../def", result: "../../def" },
-]}
+].into()}
 
 test!{ fn TestClean(t) {
     for test in clean_tests() {

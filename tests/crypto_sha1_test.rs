@@ -11,7 +11,7 @@ struct GoldenSha1 {
     inp: &'static str,
 }
 
-fn golden() -> Vec<GoldenSha1> {
+fn golden() -> slice<GoldenSha1> {
     vec![
         GoldenSha1 { out: "76245dbf96f661bd221046197ab8b9f063f11bad",
             inp: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n" },
@@ -46,7 +46,7 @@ fn golden() -> Vec<GoldenSha1> {
         GoldenSha1 { out: "32b0377f2687eb88e22106f133c586ab314d5279", inp: "Even if I could be Shakespeare, I think I should still choose to be Faraday. - A. Huxley" },
         GoldenSha1 { out: "0885aaf99b569542fd165fa44e322718f4a984e0", inp: "The fugacity of a constituent in a mixture of gases at a given temperature is proportional to its mole fraction.  Lewis-Randall Rule" },
         GoldenSha1 { out: "6627d6904d71420b0bf3886ab629623538689f45", inp: "How can you write a big system without C++?  -Paul Glick" },
-    ]
+    ].into()
 }
 
 fn to_hex(bytes: &[u8]) -> String {

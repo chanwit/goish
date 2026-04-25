@@ -60,14 +60,14 @@ test!{ fn TestFindAllString(t) {
     }
 }}
 
-struct FSI { pat: &'static str, text: &'static str, want: Vec<i64> }
+struct FSI { pat: &'static str, text: &'static str, want: slice<int> }
 
 test!{ fn TestFindStringIndex(t) {
     let tests = vec![
-        FSI { pat: "a+",     text: "baaab",   want: vec![1, 4] },
-        FSI { pat: "abcd",   text: "abcdef",  want: vec![0, 4] },
-        FSI { pat: "x",      text: "y",       want: vec![] },
-        FSI { pat: "ab$",    text: "cab",     want: vec![1, 3] },
+        FSI { pat: "a+",     text: "baaab",   want: slice!([]int { 1, 4 }) },
+        FSI { pat: "abcd",   text: "abcdef",  want: slice!([]int { 0, 4 }) },
+        FSI { pat: "x",      text: "y",       want: slice::new() },
+        FSI { pat: "ab$",    text: "cab",     want: slice!([]int { 1, 3 }) },
     ];
     for tt in tests {
         let re = regexp::MustCompile(tt.pat);

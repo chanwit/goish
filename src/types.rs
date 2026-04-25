@@ -523,6 +523,15 @@ macro_rules! make {
             m
         }
     };
+    // make(map[K]V, n) — empty map with hint capacity, mirrors
+    // Go's `make(map[K]V, n)`.
+    (map [$k:ty] $v:ty, $n:expr) => {
+        {
+            let m: $crate::types::map<$k, $v> =
+                $crate::types::map::with_capacity($crate::types::__goish_len($n));
+            m
+        }
+    };
     // make([]T, 0, cap) — empty slice with capacity; no Default needed
     ([] $t:ty, 0, $cap:expr) => {
         {

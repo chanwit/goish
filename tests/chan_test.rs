@@ -129,13 +129,13 @@ test!{ fn TestChan_MPMCBigFanout(t) {
 
         // Consumers — each reads L values into its own hashmap,
         // then pushes the map out via `done`.
-        let done = chan!(std::collections::HashMap<i32, i32>, P as usize);
+        let done = chan!(map<i32, i32>, P as usize);
         let mut consumers = Vec::new();
         for _ in 0..P {
             let cc = c.clone();
             let dc = done.clone();
             consumers.push(go!{
-                let mut recv: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+                let mut recv: map<i32, i32> = make!(map[i32]i32);
                 for _ in 0..L {
                     let (v, _) = cc.Recv();
                     *recv.entry(v).or_insert(0) += 1;
@@ -145,7 +145,7 @@ test!{ fn TestChan_MPMCBigFanout(t) {
         }
 
         // Merge consumer maps.
-        let mut total: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+        let mut total: map<i32, i32> = make!(map[i32]i32);
         for _ in 0..P {
             let (m, _) = done.Recv();
             for (k, v) in m { *total.entry(k).or_insert(0) += v; }

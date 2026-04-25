@@ -1307,6 +1307,29 @@ or where the port deliberately simplifies:
   wraps the value in `Box<dyn Read + Send>` for storage. Only `'static`
   on a *plain reference return* (e.g. `pub fn Foo() -> &'static str`)
   is a leak — return Goish `string` instead.
+- **`Vec<T>` left in tests where Goish has no slice-equivalent
+  surface.** Sweep policy: tests/examples should read like Go, but
+  five categories keep `Vec<T>`:
+  (a) `Vec<&'static str>` and `Vec<&str>` — Goish has no `slice<&str>`
+  form (the slice<T> Owned model assumes T owns); static borrowed
+  string literals stay in `Vec<&str>`.
+  (b) Tuple-element vecs (`Vec<(K, V)>`, `Vec<(&str, bool)>`) — the
+  `slice!([]T { ... })` macro doesn't compose cleanly through tuple
+  constructors; bare `Vec<(...)>` stays.
+  (c) `Vec<u8>` as an `io::Writer` sink — `slice<byte>` doesn't
+  implement `std::io::Write`, only `Vec<u8>` and `bytes::Buffer` do.
+  Test sinks that pass `&mut dst` to `gio::Copy/CopyN/WriteString`
+  etc. keep `Vec<u8>`. Affects `tests/io_test.rs`,
+  `tests/bufio_test.rs`, `tests/json_encode_test.rs`.
+  (d) `String::with_capacity(n) + push_str` — Goish `string` is
+  immutable; the build-by-pushing pattern (hex digits, etc.) keeps
+  `String`. Affects `tests/crypto_{md5,sha1,sha256}_test.rs`.
+  (e) Index-by-`usize` callers — `slice<T>` indexes by `i64`, not
+  `usize`, so loops like `for i in 1..data.len() { data[i] }` cannot
+  migrate without rewriting the loop. Affects most of
+  `tests/sort_test.rs` and `tests/container_heap_test.rs::drain_to_vec`.
+  Per-callsite library widening (Index<usize>) would unblock them but
+  is out of scope for the sweep.
 - **`std::thread::spawn` over `go!{}` in four categories.** `go!{}` is
   tokio-task-based, which is wrong for: (a) **panic capture via
   `JoinHandle::join() -> Result<_, _>`** — tokio task panics surface

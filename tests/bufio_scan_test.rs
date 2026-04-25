@@ -22,8 +22,8 @@ test!{ fn TestScanLines(t) {
     for (input, want) in cases {
         let mut sc = bufio::NewScanner(Cursor::new(input));
         sc.Split(bufio::ScanLines);
-        let mut got: Vec<String> = Vec::new();
-        while sc.Scan() { got.push(sc.Text().to_string()); }
+        let mut got: slice<string> = slice::new();
+        while sc.Scan() { got.push(sc.Text().into()); }
         if sc.Err() != &nil { t.Errorf(Sprintf!("unexpected err: %s", sc.Err())); }
         if got != want {
             t.Errorf(Sprintf!("ScanLines(%q) got %v want %v", input, got.len(), want.len()));
@@ -97,8 +97,8 @@ test!{ fn TestScanWords(t) {
     for (input, want) in tests {
         let mut sc = bufio::NewScanner(Cursor::new(input));
         sc.Split(bufio::ScanWords);
-        let mut got: Vec<String> = Vec::new();
-        while sc.Scan() { got.push(sc.Text().to_string()); }
+        let mut got: slice<string> = slice::new();
+        while sc.Scan() { got.push(sc.Text().into()); }
         if got != want {
             t.Errorf(Sprintf!("ScanWords(%q) got %v-count, want %v-count",
                 input, got.len(), want.len()));
@@ -130,8 +130,8 @@ test!{ fn TestScanNoNewline(t) {
     let input = "last-line-no-newline";
     let mut sc = bufio::NewScanner(Cursor::new(input));
     sc.Split(bufio::ScanLines);
-    let mut got: Vec<String> = Vec::new();
-    while sc.Scan() { got.push(sc.Text().to_string()); }
+    let mut got: slice<string> = slice::new();
+    while sc.Scan() { got.push(sc.Text().into()); }
     if got != vec!["last-line-no-newline"] {
         t.Errorf(Sprintf!("no-newline last line got %v", got.len()));
     }
@@ -142,8 +142,8 @@ test!{ fn TestScanBlankLines(t) {
     let input = "one\n\ntwo\n\n\nthree";
     let mut sc = bufio::NewScanner(Cursor::new(input));
     sc.Split(bufio::ScanLines);
-    let mut got: Vec<String> = Vec::new();
-    while sc.Scan() { got.push(sc.Text().to_string()); }
+    let mut got: slice<string> = slice::new();
+    while sc.Scan() { got.push(sc.Text().into()); }
     let want = vec!["one", "", "two", "", "", "three"];
     if got != want {
         t.Errorf(Sprintf!("ScanLines(blank) got %d tokens, want %d", got.len(), want.len()));

@@ -11,7 +11,7 @@ struct Golden {
     inp: &'static str,
 }
 
-fn golden() -> Vec<Golden> {
+fn golden() -> slice<Golden> {
     // From Go's src/hash/crc32/crc32_test.go.
     vec![
         Golden { ieee: 0x0,        inp: "" },
@@ -45,7 +45,7 @@ fn golden() -> Vec<Golden> {
         Golden { ieee: 0x8c79fd79, inp: "Even if I could be Shakespeare, I think I should still choose to be Faraday. - A. Huxley" },
         Golden { ieee: 0xa20b7167, inp: "The fugacity of a constituent in a mixture of gases at a given temperature is proportional to its mole fraction.  Lewis-Randall Rule" },
         Golden { ieee: 0x8e0bb443, inp: "How can you write a big system without C++?  -Paul Glick" },
-    ]
+    ].into()
 }
 
 test!{ fn TestGolden(t) {

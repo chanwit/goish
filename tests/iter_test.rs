@@ -46,7 +46,7 @@ test!{ fn TestSeq2Pairs(t) {
 }}
 
 test!{ fn TestSeqEmpty(t) {
-    let seq = iter::FromIterator::<Vec<i64>>(vec![]);
+    let seq = iter::FromIterator::<slice<int>>(slice::new());
     let out = iter::Collect(seq);
     if !out.is_empty() { t.Errorf(Sprintf!("empty Seq collected %d items", out.len() as i64)); }
 }}

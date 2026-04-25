@@ -9,40 +9,40 @@ use goish::prelude::*;
 struct GoldenFnv32 { out: u32, inp: &'static [u8] }
 struct GoldenFnv64 { out: u64, inp: &'static [u8] }
 
-fn golden32() -> Vec<GoldenFnv32> {
+fn golden32() -> slice<GoldenFnv32> {
     vec![
         GoldenFnv32 { out: 0x811c9dc5, inp: b"" },
         GoldenFnv32 { out: 0x050c5d7e, inp: b"a" },
         GoldenFnv32 { out: 0x70772d38, inp: b"ab" },
         GoldenFnv32 { out: 0x439c2f4b, inp: b"abc" },
-    ]
+    ].into()
 }
 
-fn golden32a() -> Vec<GoldenFnv32> {
+fn golden32a() -> slice<GoldenFnv32> {
     vec![
         GoldenFnv32 { out: 0x811c9dc5, inp: b"" },
         GoldenFnv32 { out: 0xe40c292c, inp: b"a" },
         GoldenFnv32 { out: 0x4d2505ca, inp: b"ab" },
         GoldenFnv32 { out: 0x1a47e90b, inp: b"abc" },
-    ]
+    ].into()
 }
 
-fn golden64() -> Vec<GoldenFnv64> {
+fn golden64() -> slice<GoldenFnv64> {
     vec![
         GoldenFnv64 { out: 0xcbf29ce484222325, inp: b"" },
         GoldenFnv64 { out: 0xaf63bd4c8601b7be, inp: b"a" },
         GoldenFnv64 { out: 0x08326707b4eb37b8, inp: b"ab" },
         GoldenFnv64 { out: 0xd8dcca186bafadcb, inp: b"abc" },
-    ]
+    ].into()
 }
 
-fn golden64a() -> Vec<GoldenFnv64> {
+fn golden64a() -> slice<GoldenFnv64> {
     vec![
         GoldenFnv64 { out: 0xcbf29ce484222325, inp: b"" },
         GoldenFnv64 { out: 0xaf63dc4c8601ec8c, inp: b"a" },
         GoldenFnv64 { out: 0x089c4407b545986a, inp: b"ab" },
         GoldenFnv64 { out: 0xe71fa2190541574b, inp: b"abc" },
-    ]
+    ].into()
 }
 
 test!{ fn TestGolden32(t) {

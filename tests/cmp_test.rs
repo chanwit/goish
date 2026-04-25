@@ -52,7 +52,7 @@ test!{ fn TestOr(t) {
     if cmp::Or::<i64>(&[0, 0, 0]) != 0 {
         t.Errorf(Sprintf!("Or all zero"));
     }
-    let s = cmp::Or::<String>(&[String::new(), "first".into(), "second".into()]);
+    let s = cmp::Or::<string>(&[string::default(), "first".into(), "second".into()]);
     if s != "first" {
         t.Errorf(Sprintf!("Or string: %q", s));
     }

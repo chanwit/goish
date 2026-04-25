@@ -15,7 +15,7 @@ use goish::prelude::*;
 
 struct IxT { s: &'static str, sep: &'static str, out: i64 }
 
-fn indexTests() -> Vec<IxT> { vec![
+fn indexTests() -> slice<IxT> { vec![
     IxT { s: "",        sep: "",    out: 0 },
     IxT { s: "",        sep: "a",   out: -1 },
     IxT { s: "",        sep: "foo", out: -1 },
@@ -42,7 +42,7 @@ fn indexTests() -> Vec<IxT> { vec![
     IxT { s: "oxoxoxoxoxoxoxoxoxoxoxoy", sep: "oy", out: 22 },
     IxT { s: "oxoxoxoxoxoxoxoxoxoxoxox", sep: "oy", out: -1 },
     IxT { s: "oxoxoxoxoxoxoxoxoxoxox☺", sep: "☺", out: 22 },
-]}
+].into()}
 
 test!{ fn TestIndex(t) {
     for tc in indexTests() {
@@ -53,7 +53,7 @@ test!{ fn TestIndex(t) {
     }
 }}
 
-fn lastIndexTests() -> Vec<IxT> { vec![
+fn lastIndexTests() -> slice<IxT> { vec![
     IxT { s: "",    sep: "",    out: 0 },
     IxT { s: "",    sep: "a",   out: -1 },
     IxT { s: "",    sep: "foo", out: -1 },
@@ -67,7 +67,7 @@ fn lastIndexTests() -> Vec<IxT> { vec![
     IxT { s: "foo", sep: "o",   out: 2 },
     IxT { s: "abcABCabc", sep: "A", out: 3 },
     IxT { s: "abcABCabc", sep: "a", out: 6 },
-]}
+].into()}
 
 test!{ fn TestLastIndex(t) {
     for tc in lastIndexTests() {
@@ -78,7 +78,7 @@ test!{ fn TestLastIndex(t) {
     }
 }}
 
-fn indexAnyTests() -> Vec<IxT> { vec![
+fn indexAnyTests() -> slice<IxT> { vec![
     IxT { s: "",        sep: "",     out: -1 },
     IxT { s: "",        sep: "a",    out: -1 },
     IxT { s: "",        sep: "abc",  out: -1 },
@@ -91,7 +91,7 @@ fn indexAnyTests() -> Vec<IxT> { vec![
     IxT { s: "ab☺c",    sep: "x☺yz", out: 2 },
     IxT { s: "a☺b☻c☹d", sep: "cx",   out: 8 },
     IxT { s: "aRegExp*", sep: ".(|)*+?^$[]", out: 7 },
-]}
+].into()}
 
 test!{ fn TestIndexAny(t) {
     for tc in indexAnyTests() {
@@ -104,13 +104,13 @@ test!{ fn TestIndexAny(t) {
 
 struct SC { s: &'static str, sub: &'static str, out: bool }
 
-fn containsTests() -> Vec<SC> { vec![
+fn containsTests() -> slice<SC> { vec![
     SC { s: "abc",     sub: "bc",  out: true  },
     SC { s: "abc",     sub: "bcd", out: false },
     SC { s: "abc",     sub: "",    out: true  },
     SC { s: "",        sub: "a",   out: false },
     SC { s: "\u{263A}",     sub: "\u{263A}", out: true  }, // ☺ / ☺
-]}
+].into()}
 
 test!{ fn TestContains(t) {
     for tc in containsTests() {
@@ -123,7 +123,7 @@ test!{ fn TestContains(t) {
 
 struct CA { s: &'static str, chars: &'static str, out: bool }
 
-fn containsAnyTests() -> Vec<CA> { vec![
+fn containsAnyTests() -> slice<CA> { vec![
     CA { s: "",     chars: "",     out: false },
     CA { s: "",     chars: "a",    out: false },
     CA { s: "",     chars: "abc",  out: false },
@@ -135,7 +135,7 @@ fn containsAnyTests() -> Vec<CA> { vec![
     CA { s: "a☺b☻c☹d", chars: "uvw☻xyz", out: true },
     CA { s: "aRegExp*", chars: ".(|)*+?^$[]", out: true },
     CA { s: "1....2....3....4", chars: "xyz", out: false },
-]}
+].into()}
 
 test!{ fn TestContainsAny(t) {
     for tc in containsAnyTests() {
@@ -148,7 +148,7 @@ test!{ fn TestContainsAny(t) {
 
 struct CT { s: &'static str, sub: &'static str, out: i64 }
 
-fn countTests() -> Vec<CT> { vec![
+fn countTests() -> slice<CT> { vec![
     CT { s: "",     sub: "",    out: 1 },
     CT { s: "",     sub: "notempty", out: 0 },
     CT { s: "notempty", sub: "", out: 9 }, // len+1
@@ -159,7 +159,7 @@ fn countTests() -> Vec<CT> { vec![
     CT { s: "equal",    sub: "equal",    out: 1 },
     CT { s: "abc1231231123q", sub: "123", out: 3 },
     CT { s: "11111", sub: "11", out: 2 },
-]}
+].into()}
 
 test!{ fn TestCount(t) {
     for tc in countTests() {
@@ -172,7 +172,7 @@ test!{ fn TestCount(t) {
 
 struct TRM { f: &'static str, r#in: &'static str, arg: &'static str, out: &'static str }
 
-fn trimTests() -> Vec<TRM> { vec![
+fn trimTests() -> slice<TRM> { vec![
     TRM { f: "Trim",       r#in: "abba",   arg: "a",  out: "bb"   },
     TRM { f: "Trim",       r#in: "abba",   arg: "ab", out: ""     },
     TRM { f: "TrimLeft",   r#in: "abba",   arg: "ab", out: ""     },
@@ -194,7 +194,7 @@ fn trimTests() -> Vec<TRM> { vec![
     TRM { f: "TrimPrefix", r#in: "aabb",   arg: "b",  out: "aabb" },
     TRM { f: "TrimSuffix", r#in: "aabb",   arg: "a",  out: "aabb" },
     TRM { f: "TrimSuffix", r#in: "aabb",   arg: "b",  out: "aab"  },
-]}
+].into()}
 
 test!{ fn TestTrim(t) {
     for tc in trimTests() {
@@ -214,7 +214,7 @@ test!{ fn TestTrim(t) {
 
 struct RP { r#in: &'static str, count: i64, out: &'static str }
 
-fn repeatTests() -> Vec<RP> { vec![
+fn repeatTests() -> slice<RP> { vec![
     RP { r#in: "",   count: 0, out: "" },
     RP { r#in: "",   count: 1, out: "" },
     RP { r#in: "",   count: 2, out: "" },
@@ -222,7 +222,7 @@ fn repeatTests() -> Vec<RP> { vec![
     RP { r#in: "-",  count: 1, out: "-" },
     RP { r#in: "-",  count: 10, out: "----------" },
     RP { r#in: "abc", count: 3, out: "abcabcabc" },
-]}
+].into()}
 
 test!{ fn TestRepeat(t) {
     for tc in repeatTests() {
@@ -235,7 +235,7 @@ test!{ fn TestRepeat(t) {
 
 struct REP { r#in: &'static str, old: &'static str, new: &'static str, n: i64, out: &'static str }
 
-fn replaceTests() -> Vec<REP> { vec![
+fn replaceTests() -> slice<REP> { vec![
     REP { r#in: "hello",   old: "l", new: "L", n: 0, out: "hello" },
     REP { r#in: "hello",   old: "l", new: "L", n: -1, out: "heLLo" },
     REP { r#in: "hello",   old: "x", new: "X", n: -1, out: "hello" },
@@ -255,7 +255,7 @@ fn replaceTests() -> Vec<REP> { vec![
     REP { r#in: "banana",  old: "a",  new: "a",  n: -1, out: "banana" },
     REP { r#in: "banana",  old: "a",  new: "a",  n: 1,  out: "banana" },
     REP { r#in: "☺☻☹",   old: "", new: "<>", n: -1, out: "<>☺<>☻<>☹<>" },
-]}
+].into()}
 
 test!{ fn TestReplace(t) {
     for tc in replaceTests() {
@@ -269,7 +269,7 @@ test!{ fn TestReplace(t) {
 
 struct CUT { s: &'static str, sep: &'static str, before: &'static str, after: &'static str, found: bool }
 
-fn cutTests() -> Vec<CUT> { vec![
+fn cutTests() -> slice<CUT> { vec![
     CUT { s: "abc",  sep: "b",  before: "a",   after: "c",    found: true  },
     CUT { s: "abc",  sep: "a",  before: "",    after: "bc",   found: true  },
     CUT { s: "abc",  sep: "c",  before: "ab",  after: "",     found: true  },
@@ -278,7 +278,7 @@ fn cutTests() -> Vec<CUT> { vec![
     CUT { s: "abc",  sep: "d",  before: "abc", after: "",     found: false },
     CUT { s: "",     sep: "d",  before: "",    after: "",     found: false },
     CUT { s: "",     sep: "",   before: "",    after: "",     found: true  },
-]}
+].into()}
 
 test!{ fn TestCut(t) {
     for tc in cutTests() {
@@ -292,14 +292,14 @@ test!{ fn TestCut(t) {
 
 struct CP { s: &'static str, sep: &'static str, after: &'static str, found: bool }
 
-fn cutPrefixTests() -> Vec<CP> { vec![
+fn cutPrefixTests() -> slice<CP> { vec![
     CP { s: "abc",  sep: "a",  after: "bc",   found: true  },
     CP { s: "abc",  sep: "abc", after: "",    found: true  },
     CP { s: "abc",  sep: "",   after: "abc",  found: true  },
     CP { s: "abc",  sep: "d",  after: "abc",  found: false },
     CP { s: "",     sep: "d",  after: "",     found: false },
     CP { s: "",     sep: "",   after: "",     found: true  },
-]}
+].into()}
 
 test!{ fn TestCutPrefix(t) {
     for tc in cutPrefixTests() {
@@ -311,14 +311,14 @@ test!{ fn TestCutPrefix(t) {
     }
 }}
 
-fn cutSuffixTests() -> Vec<CP> { vec![
+fn cutSuffixTests() -> slice<CP> { vec![
     CP { s: "abc",  sep: "bc", after: "a",    found: true  },
     CP { s: "abc",  sep: "abc", after: "",    found: true  },
     CP { s: "abc",  sep: "",   after: "abc",  found: true  },
     CP { s: "abc",  sep: "d",  after: "abc",  found: false },
     CP { s: "",     sep: "d",  after: "",     found: false },
     CP { s: "",     sep: "",   after: "",     found: true  },
-]}
+].into()}
 
 test!{ fn TestCutSuffix(t) {
     for tc in cutSuffixTests() {
@@ -332,7 +332,7 @@ test!{ fn TestCutSuffix(t) {
 
 struct EF { s: &'static str, t: &'static str, out: bool }
 
-fn equalFoldTests() -> Vec<EF> { vec![
+fn equalFoldTests() -> slice<EF> { vec![
     EF { s: "abc",         t: "abc",       out: true  },
     EF { s: "ABcd",        t: "ABcd",      out: true  },
     EF { s: "123abc",      t: "123ABC",    out: true  },
@@ -343,7 +343,7 @@ fn equalFoldTests() -> Vec<EF> { vec![
     EF { s: "",            t: "",          out: true  },
     EF { s: "abcd",        t: "abcde",     out: false },
     EF { s: "K",           t: "K",         out: true  },
-]}
+].into()}
 
 test!{ fn TestEqualFold(t) {
     for tc in equalFoldTests() {

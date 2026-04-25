@@ -10,7 +10,7 @@
 use goish::prelude::*;
 use goish::container::list;
 
-fn values(l: &list::List<i64>) -> Vec<i64> {
+fn values(l: &list::List<i64>) -> slice<int> {
     l.Iter().cloned().collect()
 }
 

@@ -15,7 +15,7 @@ struct FtoaCase {
     s: &'static str,
 }
 
-fn ftoatests() -> Vec<FtoaCase> { vec![
+fn ftoatests() -> slice<FtoaCase> { vec![
     FtoaCase { f: 1.0,        fmt: b'e', prec: 5, s: "1.00000e+00" },
     FtoaCase { f: 1.0,        fmt: b'f', prec: 5, s: "1.00000" },
     FtoaCase { f: 1.0,        fmt: b'g', prec: 5, s: "1" },
@@ -74,7 +74,7 @@ fn ftoatests() -> Vec<FtoaCase> { vec![
     // Uppercase E
     FtoaCase { f: 12345.0,    fmt: b'E', prec: 3, s: "1.235E+04" },
     FtoaCase { f: 12345.0,    fmt: b'G', prec: 3, s: "1.23E+04" },
-]}
+].into()}
 
 test!{ fn TestFtoa(t) {
     for tt in ftoatests() {

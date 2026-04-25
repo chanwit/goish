@@ -6,16 +6,16 @@
 use goish::prelude::*;
 use goish::text::scanner::{self, Scanner};
 
-fn scan_all(src: &str) -> (Vec<i32>, Vec<String>) {
+fn scan_all(src: &str) -> (slice<rune>, slice<string>) {
     let mut s = Scanner::new();
     s.Init(src);
-    let mut kinds = Vec::new();
-    let mut texts = Vec::new();
+    let mut kinds: slice<rune> = slice::new();
+    let mut texts: slice<string> = slice::new();
     loop {
         let k = s.Scan();
         if k == scanner::EOF { break; }
         kinds.push(k);
-        texts.push(s.TokenText());
+        texts.push(s.TokenText().into());
     }
     (kinds, texts)
 }
@@ -62,7 +62,7 @@ test!{ fn TestChar(t) {
 
 test!{ fn TestPunctuation(t) {
     let (k, _) = scan_all("+ - = { }");
-    let want: Vec<i32> = vec!['+' as i32, '-' as i32, '=' as i32, '{' as i32, '}' as i32];
+    let want: slice<rune> = vec!['+' as i32, '-' as i32, '=' as i32, '{' as i32, '}' as i32].into();
     if k != want {
         t.Errorf(Sprintf!("punctuation kinds mismatch"));
     }

@@ -75,7 +75,7 @@ test!{ fn TestSortSliceStable(t) {
 }}
 
 test!{ fn TestSearchInts(t) {
-    let data: Vec<i64> = vec![0, 42, 59, 74, 238, 905, 959];
+    let data: slice<int> = slice!([]int { 0, 42, 59, 74, 238, 905, 959 });
     // exact matches
     for (v, want) in [(0, 0), (42, 1), (59, 2), (959, 6)] {
         let got = sort::SearchInts(&data, v);
@@ -95,9 +95,7 @@ test!{ fn TestSearchInts(t) {
 }}
 
 test!{ fn TestSearchStrings(t) {
-    let data: Vec<string> = vec![
-        "alice".into(), "bob".into(), "carol".into(), "dave".into(),
-    ];
+    let data: slice<string> = slice!([]string { "alice", "bob", "carol", "dave" });
     let got = sort::SearchStrings(&data, "carol");
     if got != 2 {
         t.Errorf(Sprintf!("SearchStrings(carol) = %d, want 2", got));
@@ -122,7 +120,7 @@ test!{ fn TestStressRandom(t) {
 }}
 
 test!{ fn TestSortedEmpty(t) {
-    let mut empty: Vec<i64> = Vec::new();
+    let mut empty: slice<int> = slice::new();
     sort::Ints(&mut empty);
     if !sort::IntsAreSorted(&empty) {
         t.Errorf(Sprintf!("empty slice not sorted?"));

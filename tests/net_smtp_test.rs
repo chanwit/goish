@@ -26,7 +26,7 @@ fn start_mock(responses: &[&str]) -> MockServer {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let addr = listener.local_addr().unwrap().to_string();
     let (tx, rx) = mpsc::channel();
-    let mut owned: Vec<string> = Vec::with_capacity(responses.len());
+    let mut owned: slice<string> = make!([]string, 0, responses.len());
     for s in responses { owned.push((*s).into()); }
     let responses = owned;
 

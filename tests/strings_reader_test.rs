@@ -22,7 +22,7 @@ struct ReadCase {
 
 test!{ fn TestReader(t) {
     let mut r = strings::NewReader("0123456789");
-    let cases: Vec<ReadCase> = vec![
+    let cases: slice<ReadCase> = vec![
         ReadCase { seek: SEEK_START,   off: 0, n: 20, want: "0123456789", wantpos: 0, read_eof: false, seek_err: "" },
         ReadCase { seek: SEEK_START,   off: 1, n: 1,  want: "1",         wantpos: 0, read_eof: false, seek_err: "" },
         ReadCase { seek: SEEK_CURRENT, off: 1, n: 2,  want: "34",        wantpos: 3, read_eof: false, seek_err: "" },
@@ -32,7 +32,7 @@ test!{ fn TestReader(t) {
         ReadCase { seek: SEEK_START,   off: 0, n: 5, want: "01234",      wantpos: 0, read_eof: false, seek_err: "" },
         ReadCase { seek: SEEK_CURRENT, off: 0, n: 5, want: "56789",      wantpos: 0, read_eof: false, seek_err: "" },
         ReadCase { seek: SEEK_END,     off: -1, n: 1, want: "9",         wantpos: 9, read_eof: false, seek_err: "" },
-    ];
+    ].into();
 
     for (i, tt) in cases.iter().enumerate() {
         let (pos, err) = r.Seek(tt.off, tt.seek);
@@ -86,14 +86,14 @@ test!{ fn TestReadAfterBigSeek(t) {
 test!{ fn TestReaderAt(t) {
     let r = strings::NewReader("0123456789");
     struct AtCase { off: i64, n: usize, want: &'static str, want_err: &'static str }
-    let cases: Vec<AtCase> = vec![
+    let cases: slice<AtCase> = vec![
         AtCase { off: 0,  n: 10, want: "0123456789", want_err: "" },
         AtCase { off: 1,  n: 10, want: "123456789",  want_err: "EOF" },
         AtCase { off: 1,  n: 9,  want: "123456789",  want_err: "" },
         AtCase { off: 11, n: 10, want: "",           want_err: "EOF" },
         AtCase { off: 0,  n: 0,  want: "",           want_err: "" },
         AtCase { off: -1, n: 0,  want: "",           want_err: "strings.Reader.ReadAt: negative offset" },
-    ];
+    ].into();
     for (i, tt) in cases.iter().enumerate() {
         let mut b = vec![0u8; tt.n];
         let (rn, err) = r.ReadAt(&mut b, tt.off);

@@ -11,7 +11,7 @@ struct Golden256 {
     inp: &'static str,
 }
 
-fn golden() -> Vec<Golden256> {
+fn golden() -> slice<Golden256> {
     vec![
         Golden256 { out: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", inp: "" },
         Golden256 { out: "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb", inp: "a" },
@@ -44,7 +44,7 @@ fn golden() -> Vec<Golden256> {
         Golden256 { out: "1fb2eb3688093c4a3f80cd87a5547e2ce940a4f923243a79a2a1e242220693ac", inp: "Even if I could be Shakespeare, I think I should still choose to be Faraday. - A. Huxley" },
         Golden256 { out: "395585ce30617b62c80b93e8208ce866d4edc811a177fdb4b82d3911d8696423", inp: "The fugacity of a constituent in a mixture of gases at a given temperature is proportional to its mole fraction.  Lewis-Randall Rule" },
         Golden256 { out: "4f9b189a13d030838269dce846b16a1ce9ce81fe63e65de2f636863336a98fe6", inp: "How can you write a big system without C++?  -Paul Glick" },
-    ]
+    ].into()
 }
 
 fn to_hex(bytes: &[u8]) -> String {

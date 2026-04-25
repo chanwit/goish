@@ -17,7 +17,7 @@ struct AtobTest {
     Err: Option<error>, // None == nil, Some(...) == expected sentinel
 }
 
-fn atobtests() -> Vec<AtobTest> {
+fn atobtests() -> slice<AtobTest> {
     vec![
         AtobTest { In: "",      Out: false, Err: Some(strconv::ErrSyntax()) },
         AtobTest { In: "asdf",  Out: false, Err: Some(strconv::ErrSyntax()) },
@@ -33,7 +33,7 @@ fn atobtests() -> Vec<AtobTest> {
         AtobTest { In: "TRUE",  Out: true,  Err: None },
         AtobTest { In: "true",  Out: true,  Err: None },
         AtobTest { In: "True",  Out: true,  Err: None },
-    ]
+    ].into()
 }
 
 test!{ fn TestParseBool(t) {
@@ -80,11 +80,11 @@ struct AppendBoolTest {
     Out: &'static [u8],
 }
 
-fn appendBoolTests() -> Vec<AppendBoolTest> {
+fn appendBoolTests() -> slice<AppendBoolTest> {
     vec![
         AppendBoolTest { B: true,  In: b"foo ", Out: b"foo true"  },
         AppendBoolTest { B: false, In: b"foo ", Out: b"foo false" },
-    ]
+    ].into()
 }
 
 test!{ fn TestAppendBool(t) {

@@ -11,7 +11,7 @@ use goish::prelude::*;
 
 struct QuoteTest { r#in: &'static str, out: &'static str, ascii: &'static str, graphic: &'static str }
 
-fn quotetests() -> Vec<QuoteTest> { vec![
+fn quotetests() -> slice<QuoteTest> { vec![
     QuoteTest { r#in: "\x07\x08\x0c\r\n\t\x0b", out: r#""\a\b\f\r\n\t\v""#, ascii: r#""\a\b\f\r\n\t\v""#, graphic: r#""\a\b\f\r\n\t\v""# },
     QuoteTest { r#in: "\\",                     out: r#""\\""#,               ascii: r#""\\""#,               graphic: r#""\\""# },
     // "abc\xffdef" — not valid UTF-8 so we substitute a valid test case
@@ -22,7 +22,7 @@ fn quotetests() -> Vec<QuoteTest> { vec![
     QuoteTest { r#in: "\x04",                   out: r#""\x04""#,             ascii: r#""\x04""#,            graphic: r#""\x04""# },
     QuoteTest { r#in: "!\u{00a0}!\u{2000}!\u{3000}!", out: r#""!\u00a0!\u2000!\u3000!""#, ascii: r#""!\u00a0!\u2000!\u3000!""#, graphic: "\"!\u{00a0}!\u{2000}!\u{3000}!\"" },
     QuoteTest { r#in: "\x7f",                   out: r#""\x7f""#,             ascii: r#""\x7f""#,            graphic: r#""\x7f""# },
-]}
+].into()}
 
 test!{ fn TestQuote(t) {
     for tt in quotetests() {
@@ -67,7 +67,7 @@ test!{ fn TestQuoteToGraphic(t) {
 
 struct QuoteRuneTest { r#in: i32, out: &'static str, ascii: &'static str, graphic: &'static str }
 
-fn quoterunetests() -> Vec<QuoteRuneTest> { vec![
+fn quoterunetests() -> slice<QuoteRuneTest> { vec![
     QuoteRuneTest { r#in: 'a' as i32,  out: "'a'",  ascii: "'a'",  graphic: "'a'" },
     QuoteRuneTest { r#in: '\x07' as i32, out: r#"'\a'"#, ascii: r#"'\a'"#, graphic: r#"'\a'"# },
     QuoteRuneTest { r#in: '\\' as i32, out: r#"'\\'"#, ascii: r#"'\\'"#, graphic: r#"'\\'"# },
@@ -81,7 +81,7 @@ fn quoterunetests() -> Vec<QuoteRuneTest> { vec![
     QuoteRuneTest { r#in: 0x00a0,      out: r#"'\u00a0'"#, ascii: r#"'\u00a0'"#, graphic: "'\u{00a0}'" },
     QuoteRuneTest { r#in: 0x2000,      out: r#"'\u2000'"#, ascii: r#"'\u2000'"#, graphic: "'\u{2000}'" },
     QuoteRuneTest { r#in: 0x3000,      out: r#"'\u3000'"#, ascii: r#"'\u3000'"#, graphic: "'\u{3000}'" },
-]}
+].into()}
 
 test!{ fn TestQuoteRune(t) {
     for tt in quoterunetests() {
@@ -114,7 +114,7 @@ test!{ fn TestQuoteRuneToGraphic(t) {
 
 struct CanBackquoteTest { r#in: &'static str, out: bool }
 
-fn canbackquotetests() -> Vec<CanBackquoteTest> { vec![
+fn canbackquotetests() -> slice<CanBackquoteTest> { vec![
     CanBackquoteTest { r#in: "`",                 out: false },
     CanBackquoteTest { r#in: "\x00",              out: false },
     CanBackquoteTest { r#in: "\x09", /* tab */    out: true  },
@@ -125,7 +125,7 @@ fn canbackquotetests() -> Vec<CanBackquoteTest> { vec![
     CanBackquoteTest { r#in: "hello world",       out: true  },
     CanBackquoteTest { r#in: "back`quote",        out: false },
     CanBackquoteTest { r#in: "\x7f",              out: false },
-]}
+].into()}
 
 test!{ fn TestCanBackquote(t) {
     for tt in canbackquotetests() {

@@ -11,7 +11,7 @@ struct Pair {
     encoded: &'static str,
 }
 
-fn pairs() -> Vec<Pair> {
+fn pairs() -> slice<Pair> {
     vec![
         Pair { decoded: &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7],         encoded: "0001020304050607" },
         Pair { decoded: &[0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf],         encoded: "08090a0b0c0d0e0f" },
@@ -19,7 +19,7 @@ fn pairs() -> Vec<Pair> {
         Pair { decoded: &[0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff], encoded: "f8f9fafbfcfdfeff" },
         Pair { decoded: b"",                                                encoded: "" },
         Pair { decoded: b"\x67",                                            encoded: "67" },
-    ]
+    ].into()
 }
 
 test!{ fn TestEncode(t) {

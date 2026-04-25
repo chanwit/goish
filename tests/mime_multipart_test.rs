@@ -69,7 +69,7 @@ test!{ fn TestWriter(t) {
 
 test!{ fn TestWriterSetBoundary(t) {
     struct Case { b: string, ok: bool }
-    let cases: Vec<Case> = vec![
+    let cases: slice<Case> = vec![
         Case { b: "abc".into(),                ok: true },
         Case { b: "".into(),                    ok: false },
         Case { b: "!".into(),                   ok: false },
@@ -79,7 +79,7 @@ test!{ fn TestWriterSetBoundary(t) {
         Case { b: "with space".into(),          ok: true },
         Case { b: "badspace ".into(),           ok: false },
         Case { b: "(boundary)".into(),          ok: true },
-    ];
+    ].into();
     for (i, c) in range!(cases) {
         let mut buf = bytes::Buffer::new();
         let mut w = multipart::NewWriter(&mut buf);

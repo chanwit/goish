@@ -35,7 +35,7 @@ impl std::fmt::Display for Arg<'_> {
     }
 }
 
-fn cases() -> Vec<C<'static>> {
+fn cases() -> slice<C<'static>> {
     use Arg::*;
     vec![
         // ── basic verbs ─────────────────────────────────────────
@@ -79,7 +79,7 @@ fn cases() -> Vec<C<'static>> {
         // ── percent literal / misc ───────────────────────────
         C { f: "100%%",  v: I(0), w: "100%" }, // no args consumed
         C { f: "hi %s",  v: S("x"), w: "hi x" },
-    ]
+    ].into()
 }
 
 test!{ fn TestSprintf(t) {

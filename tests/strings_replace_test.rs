@@ -34,7 +34,7 @@ fn capital_letters() -> strings::Replacer {
 struct Case { r: strings::Replacer, r#in: string, out: string }
 
 test!{ fn TestReplacer(t) {
-    let cases: Vec<Case> = vec![
+    let cases: slice<Case> = vec![
         Case { r: capital_letters(), r#in: "brad".into(),                out: "BrAd".into() },
         Case { r: capital_letters(),
                r#in: strings::Repeat("a", (32 << 10) + 123),
@@ -54,7 +54,7 @@ test!{ fn TestReplacer(t) {
         Case { r: html_unescaper(),
                r#in:  "&lt;b&gt;hi&lt;/b&gt;".into(),
                out:   "<b>hi</b>".into() },
-    ];
+    ].into();
 
     for c in cases {
         let got = c.r.Replace(&c.r#in);

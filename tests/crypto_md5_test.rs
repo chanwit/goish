@@ -16,7 +16,7 @@ struct GoldenMd5 {
     inp: &'static str,
 }
 
-fn golden() -> Vec<GoldenMd5> {
+fn golden() -> slice<GoldenMd5> {
     vec![
         GoldenMd5 { out: "d41d8cd98f00b204e9800998ecf8427e", inp: "" },
         GoldenMd5 { out: "0cc175b9c0f1b6a831c399e269772661", inp: "a" },
@@ -49,7 +49,7 @@ fn golden() -> Vec<GoldenMd5> {
         GoldenMd5 { out: "63eb3a2f466410104731c4b037600110", inp: "Even if I could be Shakespeare, I think I should still choose to be Faraday. - A. Huxley" },
         GoldenMd5 { out: "72c2ed7592debca1c90fc0100f931a2f", inp: "The fugacity of a constituent in a mixture of gases at a given temperature is proportional to its mole fraction.  Lewis-Randall Rule" },
         GoldenMd5 { out: "132f7619d33b523b1d9e5bd8e0928355", inp: "How can you write a big system without C++?  -Paul Glick" },
-    ]
+    ].into()
 }
 
 fn to_hex(bytes: &[u8]) -> String {

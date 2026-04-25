@@ -27,11 +27,11 @@ test!{ fn TestIndex(t) {
 }}
 
 test!{ fn TestContains(t) {
-    let s = vec!["a".to_string(), "b".into(), "c".into()];
-    if !slices::Contains(&s, &"b".to_string()) {
+    let s = slice!([]string { "a", "b", "c" });
+    if !slices::Contains(&s, &"b".into()) {
         t.Errorf(Sprintf!("Contains(b) = false"));
     }
-    if slices::Contains(&s, &"z".to_string()) {
+    if slices::Contains(&s, &"z".into()) {
         t.Errorf(Sprintf!("Contains(z) = true"));
     }
 }}
@@ -77,7 +77,7 @@ test!{ fn TestMinMax(t) {
 }}
 
 test!{ fn TestMinPanicsOnEmpty(t) {
-    let empty: Vec<i64> = vec![];
+    let empty: slice<int> = slice::new();
     let r = recover!{ slices::Min(&empty) };
     if r.is_none() { t.Errorf(Sprintf!("Min(empty) should panic")); }
 }}
@@ -111,11 +111,11 @@ test!{ fn TestCompactCompactFunc(t) {
 }}
 
 test!{ fn TestConcatRepeat(t) {
-    let c: Vec<i64> = slices::Concat(&[&[1, 2], &[3, 4], &[5]]);
+    let c: slice<int> = slices::Concat(&[&[1, 2], &[3, 4], &[5]]).into();
     if c != vec![1i64, 2, 3, 4, 5] {
         t.Errorf(Sprintf!("Concat mismatch"));
     }
-    let r: Vec<i64> = slices::Repeat(&[1, 2], 3);
+    let r: slice<int> = slices::Repeat(&[1, 2], 3).into();
     if r != vec![1i64, 2, 1, 2, 1, 2] {
         t.Errorf(Sprintf!("Repeat mismatch"));
     }

@@ -22,7 +22,7 @@ Interface!{
 #[derive(Clone)]
 struct InMem {
     tags: Vec<&'static str>,
-    sink: sync::Mutex<Vec<string>>,
+    sink: sync::Mutex<slice<string>>,
 }
 
 Interface!{
@@ -41,7 +41,7 @@ Interface!{
 }
 
 test!{ fn TestCore_Clones(t) {
-    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
+    let sink: sync::Mutex<slice<string>> = sync::Mutex::new(slice::new());
     let base: Core = InMem {
         tags: vec!["base"],
         sink: sink.clone(),
@@ -72,7 +72,7 @@ test!{ fn TestCore_Clones(t) {
 }}
 
 test!{ fn TestCore_WithDoesntMutateOriginal(t) {
-    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
+    let sink: sync::Mutex<slice<string>> = sync::Mutex::new(slice::new());
     let base: Core = InMem { tags: vec!["root"], sink }.into();
     let child = base.With("leaf");
 
@@ -101,7 +101,7 @@ Interface!{
 }
 
 #[derive(Clone)]
-struct ThresholdCore { min_lvl: i32, sink: sync::Mutex<Vec<string>> }
+struct ThresholdCore { min_lvl: i32, sink: sync::Mutex<slice<string>> }
 
 Interface!{
     impl LevelEnabler for ThresholdCore {
@@ -120,7 +120,7 @@ Interface!{
 }
 
 test!{ fn TestInterface_SupertraitBound(t) {
-    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
+    let sink: sync::Mutex<slice<string>> = sync::Mutex::new(slice::new());
     let tc: TraceCore = ThresholdCore { min_lvl: 1, sink: sink.clone() }.into();
 
     tc.Emit(0, "below");
@@ -152,7 +152,7 @@ mod decl_mod {
 mod impl_mod {
     use super::*;
     #[derive(Clone)]
-    pub struct Capture { pub sink: sync::Mutex<Vec<string>> }
+    pub struct Capture { pub sink: sync::Mutex<slice<string>> }
 
     // Path form — user never types `__LoggerTrait`.
     Interface!{
@@ -165,7 +165,7 @@ mod impl_mod {
 }
 
 test!{ fn TestInterface_CrossModuleImpl(t) {
-    let sink: sync::Mutex<Vec<string>> = sync::Mutex::new(Vec::new());
+    let sink: sync::Mutex<slice<string>> = sync::Mutex::new(slice::new());
     let lg: decl_mod::Logger = impl_mod::Capture { sink: sink.clone() }.into();
     lg.Log("hello");
     lg.Log("world");

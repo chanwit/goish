@@ -21,7 +21,7 @@ fn pst() -> time::Location { FixedZone("PST", -8 * 3600) }
 
 struct TimeFormatTest { time: time::Time, formatted: &'static str }
 
-fn rfc3339_formats() -> Vec<TimeFormatTest> {
+fn rfc3339_formats() -> slice<TimeFormatTest> {
     vec![
         TimeFormatTest { time: time::Date(2008, time::September, 17, 20, 4, 26, 0, UTC),
                          formatted: "2008-09-17T20:04:26Z" },
@@ -29,7 +29,7 @@ fn rfc3339_formats() -> Vec<TimeFormatTest> {
                          formatted: "1994-09-17T20:04:26-05:00" },
         TimeFormatTest { time: time::Date(2000, time::December, 26, 1, 15, 6, 0, FixedZone("OTO", 15600)),
                          formatted: "2000-12-26T01:15:06+04:20" },
-    ]
+    ].into()
 }
 
 test!{ fn TestRFC3339Conversion(t) {
@@ -44,7 +44,7 @@ test!{ fn TestRFC3339Conversion(t) {
 struct AiTest { r#in: i32, width: i32, want: &'static str }
 
 test!{ fn TestAppendInt(t) {
-    let tests: Vec<AiTest> = vec![
+    let tests: slice<AiTest> = vec![
         AiTest { r#in: 0, width: 0, want: "0" },
         AiTest { r#in: 0, width: 1, want: "0" },
         AiTest { r#in: 0, width: 2, want: "00" },
@@ -69,7 +69,7 @@ test!{ fn TestAppendInt(t) {
         AiTest { r#in: 0, width: 9, want: "000000000" },
         AiTest { r#in: 123, width: 9, want: "000000123" },
         AiTest { r#in: 123456789, width: 9, want: "123456789" },
-    ];
+    ].into();
     for tt in &tests {
         let got = time::AppendInt(Vec::new(), tt.r#in as i64, tt.width as i64);
         let got_s = bytes::String(&got);
@@ -87,7 +87,7 @@ test!{ fn TestFormat(t) {
     // the MST-slot replacement in UnixDate yields "PST".
     let tm = time::Date(2009, February, 4, 21, 0, 57, 12_345_600, pst());
 
-    let tests: Vec<FormatTest> = vec![
+    let tests: slice<FormatTest> = vec![
         FormatTest { name: "ANSIC", format: ANSIC, result: "Wed Feb  4 21:00:57 2009" },
         FormatTest { name: "UnixDate", format: UnixDate, result: "Wed Feb  4 21:00:57 PST 2009" },
         FormatTest { name: "RubyDate", format: RubyDate, result: "Wed Feb 04 21:00:57 -0800 2009" },
@@ -117,7 +117,7 @@ test!{ fn TestFormat(t) {
         FormatTest { name: "Hour", format: "15 3 03 _3", result: "21 9 09 _9" },
         FormatTest { name: "Minute", format: "4 04 _4", result: "0 00 _0" },
         FormatTest { name: "Second", format: "5 05 _5", result: "57 57 _57" },
-    ];
+    ].into();
 
     for test in &tests {
         let got = tm.Format(test.format);
@@ -167,7 +167,7 @@ struct ParseTest {
     has_tz: bool, has_wd: bool, year_sign: i32, frac_digits: usize,
 }
 
-fn parse_tests() -> Vec<ParseTest> {
+fn parse_tests() -> slice<ParseTest> {
     vec![
         ParseTest { name:"ANSIC", format:ANSIC, value:"Thu Feb  4 21:00:57 2010", has_tz:false, has_wd:true, year_sign:1, frac_digits:0 },
         ParseTest { name:"UnixDate", format:UnixDate, value:"Thu Feb  4 21:00:57 PST 2010", has_tz:true, has_wd:true, year_sign:1, frac_digits:0 },
@@ -206,7 +206,7 @@ fn parse_tests() -> Vec<ParseTest> {
         ParseTest { name:"Z0700:00-Z", format:"2006-01-02T15:04:05Z07:00", value:"2010-02-04T21:00:57Z", has_tz:false, has_wd:false, year_sign:1, frac_digits:0 },
         ParseTest { name:"Z0700:00-+0800", format:"2006-01-02T15:04:05Z07:00", value:"2010-02-04T21:00:57+08:00", has_tz:false, has_wd:false, year_sign:1, frac_digits:0 },
         ParseTest { name:"Z0700:00-m0800", format:"2006-01-02T15:04:05Z07:00", value:"2010-02-04T21:00:57-08:00", has_tz:true, has_wd:false, year_sign:1, frac_digits:0 },
-    ]
+    ].into()
 }
 
 fn check_time(tm: &time::Time, test: &ParseTest, t: &testing::T) {
@@ -259,7 +259,7 @@ test!{ fn TestParse(t) {
 struct DayORTest { date: &'static str, ok: bool }
 
 test!{ fn TestParseDayOutOfRange(t) {
-    let tests: Vec<DayORTest> = vec![
+    let tests: slice<DayORTest> = vec![
         DayORTest { date: "Thu Jan 99 21:00:57 2010", ok: false },
         DayORTest { date: "Thu Jan 31 21:00:57 2010", ok: true },
         DayORTest { date: "Thu Jan 32 21:00:57 2010", ok: false },
@@ -273,7 +273,7 @@ test!{ fn TestParseDayOutOfRange(t) {
         DayORTest { date: "Thu Dec 31 21:00:57 2010", ok: true },
         DayORTest { date: "Thu Dec 32 21:00:57 2010", ok: false },
         DayORTest { date: "Thu Dec 00 21:00:57 2010", ok: false },
-    ];
+    ].into();
     for test in &tests {
         let (_, err) = time::Parse(ANSIC, test.date);
         match (test.ok, err == nil) {
@@ -348,7 +348,7 @@ test!{ fn TestMinutesInTimeZone(t) {
 
 struct SecTzTest { format: &'static str, value: &'static str, expected_offset: i64 }
 
-fn seconds_tz_tests() -> Vec<SecTzTest> {
+fn seconds_tz_tests() -> slice<SecTzTest> {
     vec![
         SecTzTest { format: "2006-01-02T15:04:05-070000", value: "1871-01-01T05:33:02-003408", expected_offset: -(34*60 + 8) },
         SecTzTest { format: "2006-01-02T15:04:05-07:00:00", value: "1871-01-01T05:33:02-00:34:08", expected_offset: -(34*60 + 8) },
@@ -359,7 +359,7 @@ fn seconds_tz_tests() -> Vec<SecTzTest> {
         SecTzTest { format: "2006-01-02T15:04:05-07", value: "1871-01-01T05:33:02+01", expected_offset: 1 * 60 * 60 },
         SecTzTest { format: "2006-01-02T15:04:05-07", value: "1871-01-01T05:33:02-02", expected_offset: -2 * 60 * 60 },
         SecTzTest { format: "2006-01-02T15:04:05Z07", value: "1871-01-01T05:33:02-02", expected_offset: -2 * 60 * 60 },
-    ]
+    ].into()
 }
 
 test!{ fn TestParseSecondsInTimeZone(t) {
@@ -399,11 +399,11 @@ test!{ fn TestUnderscoreTwoThousand(t) {
 struct MonthORTest { value: &'static str, ok: bool }
 
 test!{ fn TestParseMonthOutOfRange(t) {
-    let tests: Vec<MonthORTest> = vec![
+    let tests: slice<MonthORTest> = vec![
         MonthORTest { value: "00-01", ok: false },
         MonthORTest { value: "13-01", ok: false },
         MonthORTest { value: "01-01", ok: true },
-    ];
+    ].into();
     for test in &tests {
         let (_, err) = time::Parse("01-02", test.value);
         match (test.ok, err == nil) {

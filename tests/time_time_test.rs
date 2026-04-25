@@ -26,7 +26,7 @@ struct ParsedTime {
 }
 struct TimeTest { seconds: i64, golden: ParsedTime }
 
-fn utctests() -> Vec<TimeTest> { vec![
+fn utctests() -> slice<TimeTest> { vec![
     TimeTest { seconds: 0, golden: ParsedTime {
         Year: 1970, Month: January, Day: 1, Hour: 0, Minute: 0, Second: 0, Nanosecond: 0,
         Weekday: Thursday, ZoneOffset: 0, Zone: "UTC" }},
@@ -45,7 +45,7 @@ fn utctests() -> Vec<TimeTest> { vec![
     TimeTest { seconds: 978220860, golden: ParsedTime {
         Year: 2000, Month: December, Day: 31, Hour: 0, Minute: 1, Second: 0, Nanosecond: 0,
         Weekday: Sunday, ZoneOffset: 0, Zone: "UTC" }},
-]}
+].into()}
 
 fn same(t: &time::Time, u: &ParsedTime) -> bool {
     let (y, mo, d) = t.Date();
@@ -143,7 +143,7 @@ test!{ fn TestUnixMicro(t) {
 
 struct ISOWeekTest { year: i64, month: i64, day: i64, yex: i64, wex: i64 }
 
-fn iso_week_tests() -> Vec<ISOWeekTest> { vec![
+fn iso_week_tests() -> slice<ISOWeekTest> { vec![
     ISOWeekTest { year: 1981, month: 1, day: 1, yex: 1981, wex: 1 },
     ISOWeekTest { year: 1982, month: 1, day: 1, yex: 1981, wex: 53 },
     ISOWeekTest { year: 1983, month: 1, day: 1, yex: 1982, wex: 52 },
@@ -169,7 +169,7 @@ fn iso_week_tests() -> Vec<ISOWeekTest> { vec![
     ISOWeekTest { year: 2013, month: 12, day: 30, yex: 2014, wex: 1 },
     ISOWeekTest { year: 2020, month: 1, day: 1, yex: 2020, wex: 1 },
     ISOWeekTest { year: 2026, month: 1, day: 1, yex: 2026, wex: 1 },
-]}
+].into()}
 
 test!{ fn TestISOWeek(t) {
     for wt in iso_week_tests() {
@@ -191,7 +191,7 @@ test!{ fn TestISOWeek(t) {
 
 struct YearDayTest { year: i64, month: i64, day: i64, yday: i64 }
 
-fn year_day_tests() -> Vec<YearDayTest> { vec![
+fn year_day_tests() -> slice<YearDayTest> { vec![
     YearDayTest { year: 2007, month: 1, day: 1, yday: 1 },
     YearDayTest { year: 2007, month: 1, day: 15, yday: 15 },
     YearDayTest { year: 2007, month: 2, day: 1, yday: 32 },
@@ -204,7 +204,7 @@ fn year_day_tests() -> Vec<YearDayTest> { vec![
     YearDayTest { year: 1900, month: 12, day: 31, yday: 365 },
     YearDayTest { year: 1, month: 1, day: 1, yday: 1 },
     YearDayTest { year: 1, month: 12, day: 31, yday: 365 },
-]}
+].into()}
 
 test!{ fn TestYearDay(t) {
     let locs = vec![

@@ -13,7 +13,7 @@ use goish::prelude::*;
 
 struct PUTest { In: &'static str, Out: u64, Err: Option<error> }
 
-fn parseUint64Tests() -> Vec<PUTest> { vec![
+fn parseUint64Tests() -> slice<PUTest> { vec![
     PUTest { In: "",                    Out: 0, Err: Some(strconv::ErrSyntax()) },
     PUTest { In: "0",                   Out: 0, Err: None },
     PUTest { In: "1",                   Out: 1, Err: None },
@@ -31,7 +31,7 @@ fn parseUint64Tests() -> Vec<PUTest> { vec![
     PUTest { In: "-0",                  Out: 0, Err: Some(strconv::ErrSyntax()) },
     PUTest { In: "-1",                  Out: 0, Err: Some(strconv::ErrSyntax()) },
     PUTest { In: "+1",                  Out: 0, Err: Some(strconv::ErrSyntax()) },
-]}
+].into()}
 
 fn err_matches(got: &error, want: &error) -> bool {
     let g = Sprintf!("%v", got);
@@ -58,7 +58,7 @@ test!{ fn TestParseUint64(t) {
 
 struct PITest { In: &'static str, Out: i64, Err: Option<error> }
 
-fn parseInt64Tests() -> Vec<PITest> { vec![
+fn parseInt64Tests() -> slice<PITest> { vec![
     PITest { In: "",         Out: 0, Err: Some(strconv::ErrSyntax()) },
     PITest { In: "0",        Out: 0, Err: None },
     PITest { In: "-0",       Out: 0, Err: None },
@@ -84,7 +84,7 @@ fn parseInt64Tests() -> Vec<PITest> { vec![
     PITest { In: "1__2345",    Out: 0, Err: Some(strconv::ErrSyntax()) },
     PITest { In: "12345_",     Out: 0, Err: Some(strconv::ErrSyntax()) },
     PITest { In: "123%45",     Out: 0, Err: Some(strconv::ErrSyntax()) },
-]}
+].into()}
 
 test!{ fn TestParseInt64(t) {
     for test in parseInt64Tests() {
@@ -105,7 +105,7 @@ test!{ fn TestParseInt64(t) {
 
 struct PIBase { In: &'static str, Base: int, Out: i64, Err: Option<error> }
 
-fn parseInt64BaseTests() -> Vec<PIBase> { vec![
+fn parseInt64BaseTests() -> slice<PIBase> { vec![
     PIBase { In: "0",                   Base: 0,  Out: 0, Err: None },
     PIBase { In: "-0",                  Base: 0,  Out: 0, Err: None },
     PIBase { In: "1",                   Base: 0,  Out: 1, Err: None },
@@ -140,7 +140,7 @@ fn parseInt64BaseTests() -> Vec<PIBase> { vec![
     PIBase { In: "-0xf",                Base: 0,  Out: -0xf, Err: None },
     PIBase { In: "0x+f",                Base: 0,  Out: 0, Err: Some(strconv::ErrSyntax()) },
     PIBase { In: "0x-f",                Base: 0,  Out: 0, Err: Some(strconv::ErrSyntax()) },
-]}
+].into()}
 
 test!{ fn TestParseInt64Base(t) {
     for test in parseInt64BaseTests() {
@@ -161,7 +161,7 @@ test!{ fn TestParseInt64Base(t) {
 
 struct PU32 { In: &'static str, Out: u32, Err: Option<error> }
 
-fn parseUint32Tests() -> Vec<PU32> { vec![
+fn parseUint32Tests() -> slice<PU32> { vec![
     PU32 { In: "",                  Out: 0, Err: Some(strconv::ErrSyntax()) },
     PU32 { In: "0",                 Out: 0, Err: None },
     PU32 { In: "1",                 Out: 1, Err: None },
@@ -171,7 +171,7 @@ fn parseUint32Tests() -> Vec<PU32> { vec![
     PU32 { In: "987654321",         Out: 987654321, Err: None },
     PU32 { In: "4294967295",        Out: u32::MAX, Err: None },
     PU32 { In: "4294967296",        Out: u32::MAX, Err: Some(strconv::ErrRange()) },
-]}
+].into()}
 
 test!{ fn TestParseUint32(t) {
     for test in parseUint32Tests() {
@@ -192,7 +192,7 @@ test!{ fn TestParseUint32(t) {
 
 struct PI32 { In: &'static str, Out: i32, Err: Option<error> }
 
-fn parseInt32Tests() -> Vec<PI32> { vec![
+fn parseInt32Tests() -> slice<PI32> { vec![
     PI32 { In: "",             Out: 0, Err: Some(strconv::ErrSyntax()) },
     PI32 { In: "0",            Out: 0, Err: None },
     PI32 { In: "-0",           Out: 0, Err: None },
@@ -206,7 +206,7 @@ fn parseInt32Tests() -> Vec<PI32> { vec![
     PI32 { In: "-2147483648",  Out: i32::MIN, Err: None },
     PI32 { In: "2147483649",   Out: i32::MAX, Err: Some(strconv::ErrRange()) },
     PI32 { In: "-2147483649",  Out: i32::MIN, Err: Some(strconv::ErrRange()) },
-]}
+].into()}
 
 test!{ fn TestParseInt32(t) {
     for test in parseInt32Tests() {
